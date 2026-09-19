@@ -1,0 +1,2 @@
+-- GroundQ seed structure.
+-- Reference data will be added with the database implementation milestone.
