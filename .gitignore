@@ -8,3 +8,4 @@ test-results/
 !.env.example
 .vite/
 .DS_Store
+.vscode/*.local.json

@@ -23,6 +23,8 @@ copy .env.example .env
 
 Fill in local configuration as needed. Never expose `SUPABASE_SERVICE_ROLE_KEY` to the web application.
 
+The Stitch MCP integration reads `STITCH_API_KEY` from the local `.env` file through `.vscode/mcp.json`. Keep the real value only in `.env`; commit only `.env.example` and the key-free MCP configuration.
+
 ## Run locally
 
 ```bash
