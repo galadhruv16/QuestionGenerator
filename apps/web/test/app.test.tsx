@@ -19,4 +19,16 @@ describe('GroundQ scaffold', () => {
       screen.getAllByRole('link', { name: 'Get started' })[0],
     ).toHaveAttribute('href', '/sign-in');
   });
+
+  it('renders the password update route used by recovery links', () => {
+    window.history.pushState({}, '', '/update-password');
+    render(<App />);
+
+    expect(
+      screen.getByRole('heading', { name: 'Choose a new password' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('button', { name: 'Show password' }),
+    ).toHaveLength(2);
+  });
 });

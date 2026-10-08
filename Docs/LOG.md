@@ -4,6 +4,154 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-10-09] — Full Validation and Live Project Flow
+
+### Type
+Testing / Runtime / Integration
+
+### Status
+Verified locally and against the authenticated Supabase project.
+
+### Verification
+- Prettier check — passed.
+- ESLint — passed.
+- Contracts, API, and web TypeScript checks — passed.
+- Contracts tests — passed (3 tests).
+- API tests — passed (2 tests).
+- Web tests — passed (3 tests).
+- E2E suite — passed (3 tests).
+- API health endpoint — returned 200.
+- Unauthenticated project access — returned the expected 401 response.
+- Authenticated workspace loaded projects from Supabase.
+- Authenticated project creation succeeded and the created project appeared in the workspace.
+- The temporary live-test project was archived after verification and is no longer shown in the default project list.
+
+### Environment Note
+The installed shell did not expose `corepack` or `pnpm`, so validation and startup used the pinned pnpm version through `npx pnpm@9.15.5`. The API now runs on port 3001 and the web app runs on the available Vite port.
+
+## [2026-10-08] — Auth and Project Slice Gap Fixes
+
+### Type
+Feature / Bug Fix / API / Security / Testing
+
+### Status
+Implemented locally; remote profiles/projects migration applied and verified.
+
+### Changes
+- Added `/update-password` and connected password-reset emails to the password update flow.
+- Implemented password visibility controls and removed the previously inert behavior.
+- Added project get, update, archive, archived filtering, and bounded opaque-cursor pagination endpoints.
+- Added shared Zod schemas for projects, generation blueprints, question versions, validation checks, and API errors.
+- Added API error mapping for not-found, forbidden, conflict, and validation failures.
+- Added regression tests for unauthenticated project access, shared project validation, and the password update route.
+- Applied the versioned profiles/projects migration through the authenticated Supabase SQL Editor.
+- Made the migration policy section replay-safe for future CLI migration synchronization.
+
+### Verification
+- Supabase SQL Editor reported `Success. No rows returned` for the migration.
+- Read-only verification confirmed `profiles` and `projects` exist with RLS enabled.
+- Live web verification confirmed `/update-password` renders.
+- Static editor diagnostics are clean for all changed source and test files.
+
+### Follow-up
+- Continue with the resource-management vertical slice after the authenticated project workflow is accepted.
+
+## [2026-10-08] — Verify Supabase Auth Provider Configuration
+
+### Type
+Configuration / Authentication
+
+### Status
+Verified in the authenticated Supabase dashboard.
+
+### Verified State
+- User sign-ups are enabled.
+- Email provider is enabled.
+- Google provider is enabled.
+- Email confirmation is enabled.
+- Site URL and allowed redirect URL are configured for `http://localhost:5173`.
+
+### Validation
+- The dashboard reports the provider settings above as enabled.
+- The local sign-in page loads at `/sign-in`.
+- Automated clicking of the local Google button timed out while waiting for the page element to stabilize, so a completed Google OAuth login was not claimed.
+
+## [2026-10-08] — Complete Local Supabase Client Runtime Configuration
+
+### Type
+Configuration / Authentication
+
+### Status
+Implemented locally; remote provider configuration remains pending Supabase authentication.
+
+### Changes
+- Added the ignored API runtime environment file so the backend can validate browser-issued Supabase access tokens and serve authenticated project requests.
+- Added `apps/api/.env.example` with the required backend configuration and no credentials.
+- Kept the browser Supabase client on the publishable `VITE_*` variables and the backend on server-side `SUPABASE_*` variables.
+
+### Verification
+- API auth configuration files report no editor diagnostics.
+- The local API environment file is covered by the repository's ignored `.env` rules.
+
+### Blocker
+Supabase Dashboard and MCP management requests are unauthenticated in the current session, so Email/Google providers, redirect URLs, and the pending migration cannot be changed remotely here.
+
+## [2026-10-08] — Fix Google Sign-Up Action
+
+### Type
+Bug Fix / Authentication
+
+### Status
+Implemented and verified locally.
+
+### Changes
+- Connected the create-account page's Google button to Supabase `signInWithOAuth` with the local `/app` redirect instead of navigating to the sign-in page.
+- Preserved the existing email/password sign-up and sign-in flows.
+
+### Tests
+- `corepack pnpm --filter @groundq/web lint` — passed.
+- `corepack pnpm --filter @groundq/web typecheck` — passed.
+- `corepack pnpm --filter @groundq/web test` — passed (2 tests).
+- `corepack pnpm --filter @groundq/web build` — passed.
+
+### Follow-up
+Supabase Auth must have Email enabled, Google enabled with valid provider credentials, and `http://localhost:5173/app` configured as an allowed redirect URL before hosted authentication can complete.
+
+## [2026-10-08] — Supabase Auth and Projects Vertical Slice Stabilization
+
+### Type
+Feature / Integration / Code Quality / Documentation
+
+### Status
+Implemented locally and verified; Supabase migration remains unapplied remotely.
+
+### Changes
+- Completed the local Supabase Auth browser integration for password sign-in, account creation, Google OAuth initiation, password recovery, and session-based workspace access.
+- Completed the API foundation for authenticated `GET /api/v1/me` and ownership-scoped project listing and creation under `/api/v1/projects`.
+- Added the profiles/projects migration with profile creation from `auth.users`, timestamps, ownership indexes, and RLS policies.
+- Corrected the API authentication request typing to remain compatible with the installed Express 5 typings and ESLint rules.
+- Configured API Vitest to use a single thread, avoiding the Windows `spawn EPERM` worker failure.
+- Registered the Supabase MCP server in `.vscode/mcp.json` for the configured project and requested database/development/function capabilities. OAuth authentication is host-managed; no remote migration was applied by this work.
+
+### Files
+- `.vscode/mcp.json`
+- `apps/api/src/middleware/require-auth.ts`
+- `apps/api/src/routes/me.ts`
+- `apps/api/src/routes/projects.ts`
+- `apps/api/vitest.config.ts`
+- `docs/LOG.md`
+
+### Tests
+- `corepack pnpm format:check` — passed after formatting the changed files.
+- `corepack pnpm lint` — passed.
+- `corepack pnpm typecheck` — passed.
+- `corepack pnpm test` — passed (4 tests).
+- `corepack pnpm build` — passed.
+- API focused lint, typecheck, and test checks — passed.
+
+### Follow-up
+Apply and review the versioned Supabase migration through the authenticated Supabase workflow before relying on `/me` or project persistence against the hosted database. The current terminal does not include the `codex` CLI or direct Supabase MCP tool surface, so remote MCP verification could not be performed here.
+
 ---
 
 ## [2026-09-23] — Frontend Modularization and Auth Cleanup

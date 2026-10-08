@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { Link } from 'react-router-dom';
 
 export type IconName =
@@ -215,9 +215,20 @@ export function PortalFooter() {
   );
 }
 
-export function GoogleButton() {
+export function GoogleButton({
+  disabled = false,
+  onClick,
+}: {
+  disabled?: boolean;
+  onClick?: () => void;
+}) {
   return (
-    <button className="portal-google" type="button">
+    <button
+      className="portal-google"
+      disabled={disabled}
+      onClick={onClick}
+      type="button"
+    >
       <span className="google-symbol">G</span>
       Continue with Google Workspace
     </button>
@@ -240,13 +251,18 @@ export function PortalField({
   label,
   placeholder,
   type = 'text',
+  inputProps,
 }: {
   action?: string;
   id: string;
   label: string;
   placeholder: string;
   type?: string;
+  inputProps?: Omit<ComponentProps<'input'>, 'id' | 'placeholder' | 'type'>;
 }) {
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const inputType = type === 'password' && isPasswordVisible ? 'text' : type;
+
   return (
     <label className="portal-field" htmlFor={id}>
       <span>
@@ -257,10 +273,20 @@ export function PortalField({
           </a>
         )}
       </span>
-      <input id={id} placeholder={placeholder} type={type} />
+      <input
+        id={id}
+        placeholder={placeholder}
+        type={inputType}
+        {...inputProps}
+      />
       {type === 'password' && (
-        <button aria-label="Show password" className="field-eye" type="button">
-          ◉
+        <button
+          aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+          className="field-eye"
+          onClick={() => setIsPasswordVisible((visible) => !visible)}
+          type="button"
+        >
+          {isPasswordVisible ? '◉' : '○'}
         </button>
       )}
     </label>

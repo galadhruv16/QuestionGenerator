@@ -11,6 +11,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@groundq/contracts": "workspace:*",
+    "@supabase/supabase-js": "^2.117.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
