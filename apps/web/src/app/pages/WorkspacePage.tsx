@@ -138,8 +138,13 @@ export function WorkspacePage() {
             <ul>
               {projects.map((project) => (
                 <li key={project.id}>
-                  <strong>{project.name}</strong>
-                  {project.description && <span>{project.description}</span>}
+                  <Link
+                    className="project-link"
+                    to={`/app/projects/${project.id}/resources`}
+                  >
+                    <strong>{project.name}</strong>
+                    {project.description && <span>{project.description}</span>}
+                  </Link>
                 </li>
               ))}
             </ul>

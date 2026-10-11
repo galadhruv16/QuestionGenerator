@@ -31,7 +31,17 @@ The Stitch MCP integration reads `STITCH_API_KEY` from the local `.env` file thr
 pnpm dev
 ```
 
-The web scaffold runs on `http://localhost:5173`; the API runs on `http://localhost:3001`. The health endpoint is `GET /api/v1/health`.
+The dev command builds shared contracts and checks that ports are available before starting both processes. It does not terminate existing processes. Stop anything already using the ports and run the command again if the check reports a conflict.
+
+The web application runs on `http://localhost:5173`; the API runs on `http://localhost:3001`. The health endpoint is `GET /api/v1/health`.
+
+If Corepack is unavailable in the current shell, use the pinned package manager through npm:
+
+```bash
+npx --yes pnpm@9.15.5 dev
+```
+
+The API starts with a warning when Supabase variables are missing, but protected routes require `apps/api/.env` to be configured.
 
 Supabase CLI configuration is under `supabase/`. Future database work should use versioned migrations and the CLI's local development commands.
 

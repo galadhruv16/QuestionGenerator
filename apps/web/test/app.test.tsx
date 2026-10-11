@@ -1,7 +1,12 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/app/App';
+
 describe('GroundQ scaffold', () => {
+  beforeEach(() => {
+    window.history.pushState({}, '', '/');
+  });
+
   it('renders the GroundQ landing page', () => {
     render(<App />);
     expect(screen.getAllByText('GroundQ').length).toBeGreaterThan(0);

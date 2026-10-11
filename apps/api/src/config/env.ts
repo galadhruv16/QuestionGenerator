@@ -16,7 +16,7 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: optionalString,
   OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),
   OLLAMA_MODEL: z.string().optional(),
-  EMBEDDING_MODEL: z.string().optional(),
+  EMBEDDING_MODEL: z.string().default('nomic-embed-text'),
 });
 
 export const env = envSchema.parse(process.env);

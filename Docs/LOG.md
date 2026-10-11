@@ -4,6 +4,110 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-10-11] — Resource Ingestion Pipeline (Text Extraction, Chunking & Embeddings)
+
+### Type
+Feature / AI / Processing / Database / Architecture
+
+### Status
+Implemented and verified locally.
+
+### Changes
+- Pulled and configured `nomic-embed-text` (768 dimensions) via local Ollama for semantic chunk embeddings.
+- Installed `pdf-parse` in `@groundq/api` for page-wise text extraction.
+- Created migration `202610110002_resource_chunks.sql`:
+  - `resource_chunks` table with `vector(768)` embedding column, foreign keys to resources, runs, and projects.
+  - Page-level provenance fields (`page_number`, `token_count`, `chunk_index`).
+  - Unique index guaranteeing chunk sequence within a processing run.
+  - RLS policies enforcing project ownership.
+- Implemented `apps/api/src/services/resource-processor.ts`:
+  - Page-by-page text extraction (`extractPagesFromPdf`).
+  - Automatic detection of image-only / scanned PDFs (less than 50 total characters or < 10 chars/page) flagging `FAILED` with "This PDF does not contain extractable text. OCR support is not available yet."
+  - Overlapping page-bounded semantic chunking (`chunkPages`), maintaining `page_number` provenance for question evidence citations.
+  - Asynchronous vector embedding generation (`getEmbedding`) via local Ollama.
+  - Pipeline coordinator (`processResourcePipeline`) updating run stages (`DOWNLOADING_FILE` → `EXTRACTING_TEXT` → `CHUNKING` → `EMBEDDING` → `READY`).
+- Wired in-process asynchronous pipeline trigger into `POST /api/v1/projects/:projectId/resources/:resourceId/process` and `reprocess`.
+
+### Verification
+- Prettier check (`pnpm format:check`) — passed.
+- ESLint (`pnpm lint`) — passed with 0 warnings/errors.
+- TypeScript compilation (`pnpm typecheck`) — passed across contracts, API, and web.
+- Contracts unit tests (`pnpm --filter @groundq/contracts test`) — 4/4 passed.
+- API tests (`pnpm --filter @groundq/api test`) — 9/9 passed, including new chunking and page provenance tests.
+- Web unit/component tests (`pnpm --filter @groundq/web test`) — 8/8 passed.
+- Playwright E2E suite (`pnpm test:e2e`) — 3/3 passed.
+- Production build (`pnpm build`) — succeeded cleanly.
+
+## [2026-10-11] — Project Resource Management Vertical Slice
+
+### Type
+Feature / UI / API / Database / Security / Contracts
+
+### Status
+Implemented and verified locally.
+
+### Changes
+- Implemented Google Stitch-designed operational UI for `/app/projects/:projectId/resources` in `@groundq/web`:
+  - Project header, breadcrumb navigation, corpus telemetry (`Active Corpus: X / Y Ready`), and pipeline tabs (`Resources` active; `Topics`, `Generation`, `Question Bank` locked).
+  - Search filter ribbon, classification dropdown (`STUDY_MATERIAL`, `PRESENTATION`, `PYQ`, `SYLLABUS`, `OTHER`), and lifecycle status dropdown (`READY`, `PROCESSING`, `READY_TO_PROCESS`, `FAILED`).
+  - Dense operational table with all lifecycle states, interactive State Inspector switcher, and 4-step onboarding empty state.
+  - PDF Upload dialog supporting drag-and-drop, 25 MB max size validation, client classification selector, and direct-to-storage staging.
+  - Resource Inspector details drawer displaying SHA checksum, token anchor count, page count, storage path, error diagnostics, and run telemetry.
+  - Dedicated unsupported scanned-PDF error mode: "This PDF does not contain extractable text. OCR parsing is disabled in local-first standard tier."
+- Created `@groundq/contracts` resources schemas:
+  - `resourceKindSchema`, `resourceStatusSchema` (including `READY_TO_PROCESS`), `resourceSchema`.
+  - `uploadInitRequestSchema` (strictly enforcing PDF MIME type and 25 MB max limit) and `uploadInitResponseSchema`.
+  - `finalizeResourceRequestSchema`, `resourceListQuerySchema`, `resourceListResponseSchema`.
+  - `resourceProcessingRunSchema` and `resourceStatusResponseSchema`.
+- Created Supabase migration `202610110001_resources_and_processing.sql`:
+  - `resources` table with UUID PK, project/profile foreign keys, timestamps, and indexes.
+  - `resource_processing_runs` table with audit trail, parser/chunking versioning, and status checks.
+  - Supabase Storage bucket `resources` (private, 25 MB file size limit, `application/pdf` MIME type).
+  - Row Level Security (RLS) policies enforcing project ownership on `resources`, `resource_processing_runs`, and `storage.objects`.
+- Implemented Express API routes under `/api/v1/projects/:projectId/resources` in `@groundq/api`:
+  - `POST /upload-init`: validates project ownership, generates server-side storage path (`resources/:projectId/:resourceId/:safeFilename`), stages `UPLOADING` record, and returns signed upload parameters.
+  - `POST /`: finalizes upload, transitions status to `READY_TO_PROCESS`.
+  - `GET /`: cursor-paginated resource listing scoped to project with status and type filters.
+  - `GET /:resourceId`: retrieves individual resource metadata.
+  - `GET /:resourceId/status`: retrieves resource status and most recent processing run.
+  - `POST /:resourceId/process` and `POST /:resourceId/reprocess`: initiates/re-runs processing run.
+  - `POST /:resourceId/archive`: soft-archives resource without hard deletion.
+- Wired `ProjectResourcesPage` to live backend and Supabase Storage with graceful fallback for local development and testing.
+
+### Verification
+- Prettier check (`pnpm format:check`) — passed.
+- ESLint (`pnpm lint`) — passed with 0 warnings/errors.
+- TypeScript compilation (`pnpm typecheck`) — passed across contracts, API, and web.
+- Contracts unit tests (`pnpm --filter @groundq/contracts test`) — 4/4 passed.
+- API tests (`pnpm --filter @groundq/api test`) — 6/6 passed.
+- Web unit/component tests (`pnpm --filter @groundq/web test`) — 8/8 passed.
+- Playwright E2E suite (`pnpm test:e2e`) — 3/3 passed.
+- Production build (`pnpm build`) — succeeded cleanly.
+
+## [2026-10-11] — Deterministic Development Orchestration
+
+### Type
+Developer Experience / Configuration / Runtime Stability
+
+### Status
+Implemented and verified locally.
+
+### Changes
+- Added a root `dev:prepare` step that builds `@groundq/contracts` before starting the API and web processes.
+- Added a cross-platform Node port preflight for the fixed API (`3001`) and web (`5173`) ports.
+- Configured Vite with `strictPort: true` so it no longer silently moves to a port that conflicts with CORS and Supabase redirect configuration.
+- Changed root scripts to call `pnpm` directly, allowing both Corepack shims and the documented `npm exec`/`npx` pinned pnpm fallback.
+- Added an API startup warning when Supabase environment variables are missing.
+- Documented startup, port-conflict, and package-manager fallback behavior in `README.md`.
+
+### Verification
+- Contracts build completed before dev processes started.
+- API started on `http://localhost:3001`.
+- Web started on `http://localhost:5173`.
+- API health returned 200 and the web root returned 200.
+- A duplicate startup attempt was rejected with a clear occupied-port message without terminating existing processes.
+- Prettier, ESLint, all package typechecks, and all package tests passed.
+
 ## [2026-10-09] — Full Validation and Live Project Flow
 
 ### Type

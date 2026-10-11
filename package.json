@@ -8,14 +8,15 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "dev": "corepack pnpm --parallel --filter @groundq/web --filter @groundq/api dev",
-    "build": "corepack pnpm -r --workspace-concurrency=1 build",
+    "dev": "pnpm run dev:prepare && pnpm --parallel --filter @groundq/web --filter @groundq/api dev",
+    "dev:prepare": "pnpm --filter @groundq/contracts build && node scripts/check-dev-ports.mjs",
+    "build": "pnpm -r --workspace-concurrency=1 build",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "corepack pnpm -r --workspace-concurrency=1 typecheck",
-    "test": "corepack pnpm -r --workspace-concurrency=1 test",
-    "test:e2e": "corepack pnpm exec playwright test"
+    "typecheck": "pnpm -r --workspace-concurrency=1 typecheck",
+    "test": "pnpm -r --workspace-concurrency=1 test",
+    "test:e2e": "pnpm exec playwright test"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

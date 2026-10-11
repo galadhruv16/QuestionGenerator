@@ -2,15 +2,27 @@ import { useState, type ComponentProps } from 'react';
 import { Link } from 'react-router-dom';
 
 export type IconName =
+  | 'alert'
+  | 'archive'
   | 'arrow'
   | 'arrowUpRight'
   | 'book'
   | 'check'
   | 'chevron'
   | 'close'
+  | 'copy'
+  | 'database'
+  | 'delete'
   | 'file'
+  | 'folder'
   | 'menu'
   | 'network'
+  | 'pause'
+  | 'pdf'
+  | 'refresh'
+  | 'replay'
+  | 'search'
+  | 'shield'
   | 'sliders'
   | 'spark'
   | 'upload'
@@ -18,6 +30,18 @@ export type IconName =
 
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, React.ReactNode> = {
+    alert: (
+      <>
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 8v4M12 16h.01" />
+      </>
+    ),
+    archive: (
+      <>
+        <rect height="5" rx="1" width="20" x="2" y="3" />
+        <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4" />
+      </>
+    ),
     arrow: (
       <>
         <path d="M4 12h15" />
@@ -44,10 +68,32 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
         <path d="M18 6 6 18" />
       </>
     ),
+    copy: (
+      <>
+        <rect height="13" rx="2" width="13" x="9" y="9" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </>
+    ),
+    database: (
+      <>
+        <ellipse cx="12" cy="5" rx="9" ry="3" />
+        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
+      </>
+    ),
+    delete: (
+      <>
+        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      </>
+    ),
     file: (
       <>
         <path d="M6 3h8l4 4v14H6z" />
         <path d="M14 3v5h5M9 13h6M9 17h6" />
+      </>
+    ),
+    folder: (
+      <>
+        <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
       </>
     ),
     menu: (
@@ -61,6 +107,40 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
         <circle cx="18" cy="6" r="2.5" />
         <circle cx="18" cy="18" r="2.5" />
         <path d="m8.3 10.8 7.4-3.6M8.3 13.2l7.4 3.6" />
+      </>
+    ),
+    pause: (
+      <>
+        <rect height="16" rx="1" width="4" x="6" y="4" />
+        <rect height="16" rx="1" width="4" x="14" y="4" />
+      </>
+    ),
+    pdf: (
+      <>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6M10 12h4M10 16h4" />
+      </>
+    ),
+    refresh: (
+      <>
+        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+        <path d="M3 3v5h5M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16M16 16h5v5" />
+      </>
+    ),
+    replay: (
+      <>
+        <path d="m4 12 4-4m-4 4 4 4m-4-4h11a5 5 0 0 1 5 5v1" />
+      </>
+    ),
+    search: (
+      <>
+        <circle cx="11" cy="11" r="8" />
+        <path d="m21 21-4.3-4.3" />
+      </>
+    ),
+    shield: (
+      <>
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       </>
     ),
     sliders: (

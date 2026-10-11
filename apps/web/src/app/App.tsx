@@ -6,6 +6,7 @@ import {
   UpdatePasswordPage,
 } from './pages/AuthPages';
 import { LandingPage } from './pages/LandingPage';
+import { ProjectResourcesPage } from './pages/ProjectResourcesPage';
 import { WorkspacePage } from './pages/WorkspacePage';
 
 export function App() {
@@ -18,6 +19,10 @@ export function App() {
         <Route element={<PasswordRecoveryPage />} path="/password-recovery" />
         <Route element={<UpdatePasswordPage />} path="/update-password" />
         <Route element={<WorkspacePage />} path="/app" />
+        <Route
+          element={<ProjectResourcesPage />}
+          path="/app/projects/:projectId/resources"
+        />
       </Routes>
     </BrowserRouter>
   );

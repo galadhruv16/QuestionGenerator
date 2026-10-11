@@ -5,6 +5,7 @@ import {
   idSchema,
   projectSchema,
   questionVersionSchema,
+  uploadInitRequestSchema,
   validationCheckSchema,
 } from '../src/index.js';
 
@@ -41,5 +42,29 @@ describe('shared contracts scaffold', () => {
     ).toBe(true);
     expect(questionVersionSchema.shape.content).toBeDefined();
     expect(validationCheckSchema.shape.status).toBeDefined();
+  });
+
+  it('validates resource schemas and enforces 25MB limit on PDF uploads', () => {
+    const validInit = {
+      file_size_bytes: 10 * 1024 * 1024,
+      filename: 'lecture-notes.pdf',
+      mime_type: 'application/pdf',
+      resource_kind: 'STUDY_MATERIAL',
+    };
+    expect(uploadInitRequestSchema.safeParse(validInit).success).toBe(true);
+
+    const oversizedInit = {
+      ...validInit,
+      file_size_bytes: 26 * 1024 * 1024,
+    };
+    expect(uploadInitRequestSchema.safeParse(oversizedInit).success).toBe(
+      false,
+    );
+
+    const nonPdfInit = {
+      ...validInit,
+      filename: 'lecture-notes.docx',
+    };
+    expect(uploadInitRequestSchema.safeParse(nonPdfInit).success).toBe(false);
   });
 });
