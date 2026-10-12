@@ -91,7 +91,7 @@ export function chunkPages(
 export async function getEmbedding(text: string): Promise<number[] | null> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     const response = await fetch(`${env.OLLAMA_BASE_URL}/api/embeddings`, {
       body: JSON.stringify({
@@ -104,12 +104,19 @@ export async function getEmbedding(text: string): Promise<number[] | null> {
     }).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
+      console.warn(
+        `[resource-processor] Embedding request returned status ${response.status}`,
+      );
       return null;
     }
 
     const payload = (await response.json()) as { embedding?: number[] };
     return payload.embedding ?? null;
-  } catch {
+  } catch (err) {
+    console.warn(
+      '[resource-processor] Embedding generation failed or timed out:',
+      err,
+    );
     return null;
   }
 }
@@ -130,16 +137,26 @@ export async function processResourcePipeline(
 ): Promise<void> {
   const { client, projectId, resourceId, runId, storagePath } = options;
 
+  console.log(
+    `[resource-processor] Starting processing run ${runId} for resource ${resourceId}`,
+  );
+
   const updateRun = async (
     updates: Record<string, unknown>,
     status?: string,
   ) => {
     const payload: Record<string, unknown> = { ...updates };
     if (status) payload.status = status;
-    await client
+    const { error } = await client
       .from('resource_processing_runs')
       .update(payload)
       .eq('id', runId);
+    if (error) {
+      console.error(
+        `[resource-processor] Failed to update run ${runId}:`,
+        error,
+      );
+    }
   };
 
   const updateResource = async (
@@ -148,12 +165,24 @@ export async function processResourcePipeline(
   ) => {
     const payload: Record<string, unknown> = { ...updates };
     if (status) payload.status = status;
-    await client.from('resources').update(payload).eq('id', resourceId);
+    const { error } = await client
+      .from('resources')
+      .update(payload)
+      .eq('id', resourceId);
+    if (error) {
+      console.error(
+        `[resource-processor] Failed to update resource ${resourceId}:`,
+        error,
+      );
+    }
   };
 
   try {
     // 1. Download file from Supabase Storage
     await updateRun({ metadata: { stage: 'DOWNLOADING_FILE' } });
+    console.log(
+      `[resource-processor] Downloading file from storage: ${storagePath}`,
+    );
 
     const bucketObjectKey = storagePath.startsWith('resources/')
       ? storagePath.slice('resources/'.length)
@@ -174,11 +203,18 @@ export async function processResourcePipeline(
 
     // 2. Extract text and detect scanned/image-only PDFs
     await updateRun({ metadata: { stage: 'EXTRACTING_TEXT' } });
+    console.log(
+      `[resource-processor] Extracting pages from PDF buffer (${buffer.length} bytes)...`,
+    );
     const { pages, totalPages } = await extractPagesFromPdf(buffer);
 
     const totalExtractedChars = pages.reduce(
       (sum, p) => sum + p.text.length,
       0,
+    );
+
+    console.log(
+      `[resource-processor] Extraction completed: ${totalPages} pages, ${totalExtractedChars} text characters`,
     );
 
     // Scanned document detection: non-extractable text
@@ -187,7 +223,10 @@ export async function processResourcePipeline(
       totalExtractedChars / (totalPages || 1) < 10
     ) {
       const scannedError =
-        'This PDF does not contain extractable text. OCR support is not available yet.';
+        'Scanned or image-only document detected. No extractable digital text layers found. GroundQ V1 requires digital PDFs with selectable text (OCR is not supported in V1).';
+      console.warn(
+        `[resource-processor] Resource ${resourceId} rejected: ${scannedError}`,
+      );
       await updateRun(
         {
           completed_at: new Date().toISOString(),
@@ -208,6 +247,9 @@ export async function processResourcePipeline(
     // 3. Chunk page text
     await updateRun({ metadata: { stage: 'CHUNKING' } });
     const chunks = chunkPages(pages);
+    console.log(
+      `[resource-processor] Generated ${chunks.length} page-bounded chunks`,
+    );
 
     // 4. Generate embeddings and persist chunks
     await updateRun({ metadata: { stage: 'EMBEDDING' } });
@@ -215,19 +257,27 @@ export async function processResourcePipeline(
     for (const chunk of chunks) {
       const embedding = await getEmbedding(chunk.text);
 
-      await client.from('resource_chunks').insert({
-        chunk_index: chunk.chunkIndex,
-        embedding: embedding ?? undefined,
-        metadata: {
-          char_length: chunk.text.length,
-        },
-        page_number: chunk.pageNumber,
-        processing_run_id: runId,
-        project_id: projectId,
-        resource_id: resourceId,
-        text: chunk.text,
-        token_count: chunk.tokenCount,
-      });
+      const { error: insertError } = await client
+        .from('resource_chunks')
+        .insert({
+          chunk_index: chunk.chunkIndex,
+          embedding: embedding ?? undefined,
+          metadata: {
+            char_length: chunk.text.length,
+          },
+          page_number: chunk.pageNumber,
+          processing_run_id: runId,
+          project_id: projectId,
+          resource_id: resourceId,
+          text: chunk.text,
+          token_count: chunk.tokenCount,
+        });
+
+      if (insertError) {
+        throw new Error(
+          `Failed to insert chunk ${chunk.chunkIndex}: ${insertError.message}`,
+        );
+      }
     }
 
     // 5. Finalize processing run and resource state
@@ -254,9 +304,16 @@ export async function processResourcePipeline(
       },
       'READY',
     );
+    console.log(
+      `[resource-processor] Pipeline completed successfully for resource ${resourceId}`,
+    );
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown processing error';
+    console.error(
+      `[resource-processor] Pipeline failed for resource ${resourceId}:`,
+      error,
+    );
 
     await updateRun(
       {

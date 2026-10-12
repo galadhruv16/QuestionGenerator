@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getSupabaseClient } from '../../lib/supabase';
 import {
   AuthShell,
@@ -11,6 +11,8 @@ import {
 
 export function SignInPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirectTo') || '/app';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export function SignInPage() {
           password,
         });
       if (signInError) throw signInError;
-      navigate('/app');
+      navigate(redirectTo);
     } catch (authError) {
       setError(
         authError instanceof Error ? authError.message : 'Unable to sign in.',

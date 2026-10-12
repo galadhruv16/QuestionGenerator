@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import { ProjectTopicsPage } from '../src/app/pages/ProjectTopicsPage';
+import {
+  ProjectTopicsPage,
+  mockDemoModules,
+} from '../src/app/pages/ProjectTopicsPage';
 
 function renderTopicsPage(projectId = '123e4567-e89b-12d3-a456-426614174000') {
   window.history.pushState({}, '', `/app/projects/${projectId}/topics`);
@@ -9,7 +12,13 @@ function renderTopicsPage(projectId = '123e4567-e89b-12d3-a456-426614174000') {
     <BrowserRouter>
       <Routes>
         <Route
-          element={<ProjectTopicsPage />}
+          element={
+            <ProjectTopicsPage
+              initialModules={mockDemoModules}
+              initialReadyCount={3}
+              initialTotalCount={5}
+            />
+          }
           path="/app/projects/:projectId/topics"
         />
       </Routes>
@@ -75,39 +84,9 @@ describe('ProjectTopicsPage', () => {
     expect(screen.getAllByText('100% Locked').length).toBeGreaterThan(0);
     expect(screen.getByText('Linked Chunks')).toBeInTheDocument();
     expect(screen.getByText('Hallucinations')).toBeInTheDocument();
-    expect(screen.getByText('Blueprint Alloc.')).toBeInTheDocument();
     expect(
       screen.getByText(/Verified Cryptographic Evidence/i),
     ).toBeInTheDocument();
-  });
-
-  it('allows switching workspace view modes via the State Inspector bar', () => {
-    renderTopicsPage();
-
-    // Switch to Empty State (No Topics)
-    const emptyBtn = screen.getByRole('button', {
-      name: /Empty State \(No Topics\)/i,
-    });
-    fireEvent.click(emptyBtn);
-
-    expect(screen.getByText('No topics mapped yet')).toBeInTheDocument();
-    expect(
-      screen.getByText('Deterministic Extraction Required'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /Create Empty Hierarchy/i }),
-    ).toBeInTheDocument();
-
-    // Switch to Zero Resources Warning
-    const zeroBtn = screen.getByRole('button', {
-      name: /Zero Resources Warning/i,
-    });
-    fireEvent.click(zeroBtn);
-
-    expect(
-      screen.getByText('Zero Processed Resources Ingested'),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/Go to Resources Workspace/i)).toBeInTheDocument();
   });
 
   it('opens and closes the Add Topic slide-over drawer', () => {

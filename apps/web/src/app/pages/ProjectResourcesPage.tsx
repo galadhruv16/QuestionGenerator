@@ -1,4 +1,10 @@
-import { useEffect, useId, useState, type ChangeEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useState,
+  type ChangeEvent,
+} from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { ResourceKind, ResourceStatus } from '@groundq/contracts';
 import { getSupabaseClient } from '../../lib/supabase';
@@ -27,7 +33,7 @@ export interface ResourceItem {
   storage_path: string;
 }
 
-const mockDemoResources: ResourceItem[] = [
+export const mockDemoResources: ResourceItem[] = [
   {
     checksum_sha256: '7b1e84df9a49f0',
     created_at: '2026-09-24T10:00:00Z',
@@ -108,15 +114,22 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
 
-export function ProjectResourcesPage() {
+export function ProjectResourcesPage({
+  initialResources,
+}: {
+  initialResources?: ResourceItem[];
+} = {}) {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
 
   const [project, setProject] = useState<ProjectInfo | null>(null);
-  const [resources, setResources] = useState<ResourceItem[]>(mockDemoResources);
-  const [activeView, setActiveView] = useState<'table' | 'empty' | 'ocr_alert'>(
-    'table',
+  const [resources, setResources] = useState<ResourceItem[]>(
+    initialResources ?? [],
   );
+  const [activeView, setActiveView] = useState<'table' | 'empty' | 'ocr_alert'>(
+    initialResources && initialResources.length > 0 ? 'table' : 'empty',
+  );
+  const [isLoading, setIsLoading] = useState(!initialResources);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -162,49 +175,113 @@ export function ProjectResourcesPage() {
     return payload;
   };
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (!projectId) return;
+    try {
+      const projectPayload = await apiRequest(`/projects/${projectId}`);
+      if (projectPayload.data) {
+        setProject(projectPayload.data);
+      }
 
-    const loadData = async () => {
-      try {
-        const projectPayload = await apiRequest(`/projects/${projectId}`);
-        if (projectPayload.data) {
-          setProject(projectPayload.data);
-        }
+      const resourcesPayload = await apiRequest(
+        `/projects/${projectId}/resources`,
+      );
+      if (resourcesPayload.data && Array.isArray(resourcesPayload.data)) {
+        if (resourcesPayload.data.length === 0) {
+          setResources([]);
+          setActiveView('empty');
+        } else {
+          // Resolve processing runs details for non-ready items
+          const detailedResources = await Promise.all(
+            resourcesPayload.data.map(async (r: ResourceItem) => {
+              let failureReason = r.failure_reason;
+              let processingStage = r.processing_stage;
 
-        const resourcesPayload = await apiRequest(
-          `/projects/${projectId}/resources`,
-        );
-        if (resourcesPayload.data && Array.isArray(resourcesPayload.data)) {
-          if (resourcesPayload.data.length === 0) {
-            setActiveView('empty');
-          } else {
-            setResources(
-              resourcesPayload.data.map((r: ResourceItem) => ({
+              if (r.status === 'FAILED' || r.status === 'PROCESSING') {
+                try {
+                  const statusPayload = await apiRequest(
+                    `/projects/${projectId}/resources/${r.id}/status`,
+                  );
+                  const run = statusPayload.data?.processing_run;
+                  if (run?.error_message) {
+                    failureReason = run.error_message;
+                  }
+                  if (run?.metadata?.stage) {
+                    const st = String(run.metadata.stage);
+                    processingStage =
+                      st === 'DOWNLOADING_FILE'
+                        ? 'Stage 1 of 3: Retrieving document'
+                        : st === 'EXTRACTING_TEXT'
+                          ? 'Stage 1 of 3: Text extraction'
+                          : st === 'CHUNKING'
+                            ? 'Stage 2 of 3: Semantic chunking'
+                            : st === 'EMBEDDING'
+                              ? 'Stage 3 of 3: Vector embedding'
+                              : processingStage;
+                  }
+                } catch {
+                  // Keep fallback values
+                }
+              }
+
+              const isScanned =
+                failureReason?.toLowerCase().includes('scanned') ||
+                failureReason?.toLowerCase().includes('ocr') ||
+                failureReason?.toLowerCase().includes('extractable');
+
+              return {
                 ...r,
                 checksum_sha256: r.checksum_sha256 ?? r.id.substring(0, 8),
+                failure_reason: failureReason,
+                processing_stage: processingStage,
                 evidence_summary:
                   r.status === 'READY'
                     ? `${r.page_count ?? 1} pp indexed · text anchors locked`
                     : r.status === 'READY_TO_PROCESS'
                       ? 'Uploaded · Manual start required to prevent unneeded tokenization'
                       : r.status === 'PROCESSING'
-                        ? 'Extracting text and structure'
+                        ? (processingStage ?? 'Extracting text and structure')
                         : r.status === 'FAILED'
-                          ? 'Processing failed'
+                          ? isScanned
+                            ? 'Scanned document · No selectable digital text'
+                            : (failureReason ?? 'Processing failed')
                           : undefined,
-              })),
-            );
-            setActiveView('table');
-          }
-        }
-      } catch {
-        // Fallback gracefully for local mock preview / testing environment
-      }
-    };
+              };
+            }),
+          );
 
+          setResources(detailedResources);
+          setActiveView('table');
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'UNAUTHENTICATED') {
+        navigate(
+          `/sign-in?redirectTo=${encodeURIComponent(window.location.pathname)}`,
+        );
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId, navigate]);
+
+  useEffect(() => {
     void loadData();
-  }, [projectId]);
+  }, [loadData]);
+
+  // Polling for ongoing processing runs
+  useEffect(() => {
+    const hasActiveProcessing = resources.some(
+      (r) => r.status === 'PROCESSING' || r.status === 'UPLOADING',
+    );
+    if (!hasActiveProcessing) return;
+
+    const interval = setInterval(() => {
+      void loadData();
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [resources, loadData]);
 
   const filteredResources = resources.filter((item) => {
     if (activeView === 'empty') return false;
@@ -415,12 +492,9 @@ export function ProjectResourcesPage() {
             <span className="text-outline-variant font-label-md text-label-md">
               /
             </span>
-            <div className="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface-variant">
-              <span className="uppercase text-outline">Context:</span>
-              <span className="font-medium text-on-surface">
-                {project?.name ?? 'Study Corpus'}
-              </span>
-            </div>
+            <span className="font-label-sm text-label-sm text-on-surface font-medium truncate max-w-xs md:max-w-md">
+              {project?.name ?? 'Study Corpus'}
+            </span>
           </div>
           <div className="flex items-center gap-4">
             <Link
@@ -446,90 +520,6 @@ export function ProjectResourcesPage() {
 
       {/* Main Page Content */}
       <main className="w-full pt-16 flex-1 flex flex-col">
-        {/* Interactive State Inspector (GroundQ Reviewer Demo Switcher) */}
-        <aside
-          aria-label="GroundQ Reviewer State Switcher"
-          className="w-full bg-surface-container-high px-4 sm:px-8 py-2 text-on-surface-variant text-label-sm font-label-sm border-b border-outline-variant/30"
-        >
-          <div className="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-container font-medium text-primary">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                STATE INSPECTOR
-              </span>
-              <span className="hidden sm:inline text-outline">|</span>
-              <span className="text-on-surface-variant hidden md:inline">
-                GroundQ Verification State Switcher:
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button
-                className={`px-2.5 py-1 rounded text-label-sm transition-all ${
-                  activeView === 'table' && !selectedDrawerResource
-                    ? 'bg-surface-container-lowest text-primary shadow-sm font-semibold'
-                    : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
-                }`}
-                onClick={() => {
-                  setActiveView('table');
-                  setSelectedDrawerResource(null);
-                }}
-                type="button"
-              >
-                All Resources ({resources.length})
-              </button>
-              <button
-                className={`px-2.5 py-1 rounded text-label-sm transition-all ${
-                  selectedDrawerResource
-                    ? 'bg-surface-container-lowest text-primary shadow-sm font-semibold'
-                    : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
-                }`}
-                onClick={() => {
-                  setActiveView('table');
-                  setSelectedDrawerResource(resources[0] ?? null);
-                }}
-                type="button"
-              >
-                Details Drawer
-              </button>
-              <button
-                className="px-2.5 py-1 rounded text-label-sm bg-surface-container-low text-on-surface-variant hover:bg-surface-container transition-all"
-                onClick={() => setIsUploadOpen(true)}
-                type="button"
-              >
-                Upload Dialog
-              </button>
-              <button
-                className={`px-2.5 py-1 rounded text-label-sm transition-all ${
-                  activeView === 'empty'
-                    ? 'bg-surface-container-lowest text-primary shadow-sm font-semibold'
-                    : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
-                }`}
-                onClick={() => {
-                  setActiveView('empty');
-                  setSelectedDrawerResource(null);
-                }}
-                type="button"
-              >
-                Empty State
-              </button>
-              <button
-                className={`px-2.5 py-1 rounded text-label-sm transition-all ${
-                  activeView === 'ocr_alert'
-                    ? 'bg-surface-container-lowest text-error shadow-sm font-semibold'
-                    : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
-                }`}
-                onClick={() => {
-                  setActiveView('ocr_alert');
-                  setSelectedDrawerResource(null);
-                }}
-                type="button"
-              >
-                OCR Alert Mode
-              </button>
-            </div>
-          </div>
-        </aside>
-
         {/* Project Context Subheader Bar */}
         <header className="w-full bg-surface-container-lowest shadow-[0_1px_3px_rgba(0,0,0,0.03)] px-4 sm:px-8 py-5 border-b border-outline-variant/30">
           <div className="max-w-[1440px] mx-auto flex flex-col gap-4">
@@ -665,8 +655,7 @@ export function ProjectResourcesPage() {
                 <button
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container font-body-sm text-body-sm shadow-sm transition-all border border-outline-variant/40"
                   onClick={() => {
-                    setResources(mockDemoResources);
-                    setActiveView('table');
+                    void loadData();
                   }}
                   type="button"
                 >
@@ -684,8 +673,14 @@ export function ProjectResourcesPage() {
               </div>
             </div>
 
-            {/* OCR Scanned Error Alert Banner (Shown in Alert Mode) */}
-            {activeView === 'ocr_alert' && (
+            {/* Scanned Document Error Alert Banner (Shown dynamically when a scanned PDF is detected) */}
+            {resources.some(
+              (r) =>
+                r.status === 'FAILED' &&
+                (r.failure_reason?.includes('Scanned') ||
+                  r.failure_reason?.includes('OCR') ||
+                  r.failure_reason?.includes('extractable')),
+            ) && (
               <div className="w-full bg-surface-container-lowest rounded p-4 shadow-sm flex flex-col gap-3 border border-error/20">
                 <div className="flex items-start gap-3 bg-error-container/30 p-4 rounded">
                   <div className="text-error mt-0.5">
@@ -697,26 +692,35 @@ export function ProjectResourcesPage() {
                     </h3>
                     <p className="font-body-md text-body-md text-on-surface-variant mt-1">
                       GroundQ&apos;s deterministic engine relies on digital text
-                      layers and vector font glyphs. Scanned document{' '}
-                      <code className="font-label-sm text-label-sm text-on-surface bg-surface-container px-1 py-0.5 rounded">
-                        Historical_Scanned_Notes_1998.pdf
+                      layers and vector font glyphs. Document{' '}
+                      <code className="font-label-sm text-label-sm text-on-surface bg-surface-container px-1 py-0.5 rounded font-mono font-bold">
+                        {resources.find(
+                          (r) =>
+                            r.status === 'FAILED' &&
+                            (r.failure_reason?.includes('Scanned') ||
+                              r.failure_reason?.includes('OCR') ||
+                              r.failure_reason?.includes('extractable')),
+                        )?.original_filename ?? 'Uploaded Document.pdf'}
                       </code>{' '}
-                      does not contain selectable text.
+                      contains no selectable digital text. GroundQ requires
+                      digital PDFs with text layers to guarantee 100% grounded
+                      questions (OCR is out of scope for V1).
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-2 font-body-sm text-body-sm">
                       <button
-                        className="px-3 py-1.5 rounded bg-error text-on-error font-medium hover:opacity-90 transition-all"
+                        className="px-3 py-1.5 rounded bg-error text-on-error font-medium hover:opacity-90 transition-all flex items-center gap-1.5"
                         onClick={() => setIsUploadOpen(true)}
                         type="button"
                       >
-                        Replace with OCRed digital copy
+                        <Icon name="upload" size={14} />
+                        <span>Upload digital PDF with selectable text</span>
                       </button>
                       <button
                         className="px-3 py-1.5 rounded bg-surface-container text-on-surface hover:bg-surface-container-high transition-all"
                         onClick={() => setActiveView('table')}
                         type="button"
                       >
-                        Dismiss and view resources
+                        Dismiss
                       </button>
                     </div>
                   </div>
@@ -724,8 +728,18 @@ export function ProjectResourcesPage() {
               </div>
             )}
 
+            {/* Loading Indicator */}
+            {isLoading && (
+              <div className="w-full py-16 flex flex-col items-center justify-center text-on-surface-variant">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
+                <span className="font-body-sm text-body-sm text-outline">
+                  Loading project resources...
+                </span>
+              </div>
+            )}
+
             {/* Empty State View */}
-            {activeView === 'empty' && (
+            {!isLoading && activeView === 'empty' && (
               <div className="w-full bg-surface-container-lowest rounded p-12 text-center shadow-sm flex flex-col items-center border border-outline-variant/30">
                 <div className="w-16 h-16 rounded-full bg-surface-container-low text-primary flex items-center justify-center mb-4">
                   <Icon name="upload" size={30} />
@@ -1282,6 +1296,24 @@ export function ProjectResourcesPage() {
                 </span>
               </div>
             </div>
+
+            {/* Failure Reason Callout */}
+            {selectedDrawerResource.status === 'FAILED' && (
+              <div className="w-full p-4 bg-error-container/30 rounded border border-error/30 text-body-sm text-on-error-container flex flex-col gap-1.5 shadow-sm">
+                <div className="flex items-center gap-2 font-semibold text-error">
+                  <Icon name="alert" size={16} />
+                  <span>Processing Failed</span>
+                </div>
+                <p className="text-body-sm leading-relaxed text-on-surface">
+                  {selectedDrawerResource.failure_reason ??
+                    'Document extraction could not be completed.'}
+                </p>
+                <div className="mt-1 pt-1.5 border-t border-error/20 text-label-sm text-outline">
+                  GroundQ requires text-selectable digital PDFs. OCR for scanned
+                  documents is out of scope for V1.
+                </div>
+              </div>
+            )}
 
             {/* Key-Value Metadata Matrix */}
             <div className="w-full bg-surface-container-low rounded p-4 flex flex-col gap-2.5 font-body-sm text-body-sm border border-outline-variant/30">

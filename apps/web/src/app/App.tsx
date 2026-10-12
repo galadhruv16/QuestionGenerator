@@ -1,4 +1,5 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { GuestRoute, ProtectedRoute } from './components/AuthGuards';
 import {
   CreateAccountPage,
   PasswordRecoveryPage,
@@ -15,17 +16,53 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route element={<LandingPage />} path="/" />
-        <Route element={<SignInPage />} path="/sign-in" />
-        <Route element={<CreateAccountPage />} path="/sign-up" />
-        <Route element={<PasswordRecoveryPage />} path="/password-recovery" />
-        <Route element={<UpdatePasswordPage />} path="/update-password" />
-        <Route element={<WorkspacePage />} path="/app" />
         <Route
-          element={<ProjectResourcesPage />}
+          element={
+            <GuestRoute>
+              <SignInPage />
+            </GuestRoute>
+          }
+          path="/sign-in"
+        />
+        <Route
+          element={
+            <GuestRoute>
+              <CreateAccountPage />
+            </GuestRoute>
+          }
+          path="/sign-up"
+        />
+        <Route
+          element={
+            <GuestRoute>
+              <PasswordRecoveryPage />
+            </GuestRoute>
+          }
+          path="/password-recovery"
+        />
+        <Route element={<UpdatePasswordPage />} path="/update-password" />
+        <Route
+          element={
+            <ProtectedRoute>
+              <WorkspacePage />
+            </ProtectedRoute>
+          }
+          path="/app"
+        />
+        <Route
+          element={
+            <ProtectedRoute>
+              <ProjectResourcesPage />
+            </ProtectedRoute>
+          }
           path="/app/projects/:projectId/resources"
         />
         <Route
-          element={<ProjectTopicsPage />}
+          element={
+            <ProtectedRoute>
+              <ProjectTopicsPage />
+            </ProtectedRoute>
+          }
           path="/app/projects/:projectId/topics"
         />
       </Routes>

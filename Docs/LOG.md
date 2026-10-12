@@ -4,7 +4,171 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
-## [2026-10-12] — Course Topic Map & Grounding Hierarchy Slice
+## [2026-10-12] — Fixed Ingestion Pipeline Scanned Document Reporting & Topics Mock Bleed
+
+### Type
+Bug Fix / AI Pipeline / UI / Verification
+
+### Status
+Implemented and verified locally.
+
+### Root Cause Analysis
+1. **Pipeline Failure on `SHA CSS.pdf`**:
+   - The user uploaded `SHA CSS.pdf` (6.3 MB, 13 pages). Direct byte analysis verified that the file consists solely of raster image scans (`/Font: true`, `/Text: false`, `/Image: true`). Text extraction via `pdf-parse` returned `totalExtractedChars: 0`.
+   - Per `PRD.md` Section 15 and `SYSTEM_DESIGN.md`, GroundQ V1 deterministically requires digital PDFs with selectable vector text layers; OCR/scanned document processing is explicitly out of scope for V1 to guarantee 0% hallucination rates.
+   - The engine correctly flagged this as non-extractable (`SCANNED_DOCUMENT`), set `resources.status = FAILED`, and recorded the failure message in `resource_processing_runs`.
+   - However, `resources` table lacked `failure_reason` column, and `loadData()` on the frontend didn't query `GET /resources/:id/status`, causing the UI to merely display generic "FAILED / Processing failed" without communicating the scanned PDF rejection reason to the user.
+   - Furthermore, `getEmbedding` in `resource-processor.ts` had an overly aggressive 2.5s timeout that aborted during local Ollama cold starts.
+2. **Topics Page Mock Text Bleed**:
+   - When 0 resources are processed, `ProjectTopicsPage.tsx` entered `viewMode = 'zero'`.
+   - A logic bug in line 916 (`viewMode !== 'empty'`) evaluated to true for `'zero'`, inadvertently rendering the two-column hierarchy layout underneath the warning banner.
+   - Inside the right-hand Grounding Evidence Inspector, null checks defaulted to hardcoded strings: `"1.1 Banker's Algorithm & Resource Allocation"`, `"Module 1: Process Synchronization & Deadlocks"`, and `"Silberschatz OS (Ch. 8)"`.
+   - Breadcrumb headers also had fallback values referencing `"Distributed Systems Spring 2025 (CS-842)"`.
+3. **Missing Polling & Loading States**:
+   - `ProjectResourcesPage.tsx` did not poll during `PROCESSING` states, causing users to get stuck on optimistic stage indicators unless they navigated away and returned.
+   - Lack of an explicit `isLoading` state caused an empty screen flash on mount.
+
+### Changes
+- Enhanced [resource-processor.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/services/resource-processor.ts):
+  - Increased local Ollama embedding inference timeout from 2,500ms to 15,000ms to tolerate cold-start model loads.
+  - Added explicit status logging across all pipeline stages (`DOWNLOADING_FILE`, `EXTRACTING_TEXT`, `CHUNKING`, `EMBEDDING`, `COMPLETED`, `FAILED`).
+  - Improved scanned document failure message to clearly explain why the PDF was rejected and that GroundQ V1 requires text-selectable digital PDFs.
+  - Added error checks on `resource_chunks.insert()`.
+- Updated [ProjectResourcesPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectResourcesPage.tsx):
+  - Added automatic polling interval (every 2.5s) while any resource is in `PROCESSING` or `UPLOADING` state.
+  - In `loadData()`, resolved `/projects/:id/resources/:resourceId/status` for failed/processing items to dynamically retrieve `error_message` and pipeline stage.
+  - Displayed descriptive summary (`Scanned document · No selectable digital text`) in table rows when a scanned PDF is detected.
+  - Rendered dynamic "Corpus Ingestion Blocked: 1 Scanned Document Detected" banner highlighting the exact uploaded filename.
+  - Added failure reason diagnostic box in the slide-over resource inspector drawer.
+  - Added `isLoading` spinner to prevent flash of empty states while data is loading.
+- Fixed [ProjectTopicsPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectTopicsPage.tsx):
+  - Changed condition so the two-column workspace only renders when `viewMode !== 'empty' && viewMode !== 'zero'`.
+  - Removed all hardcoded fallbacks to Banker's Algorithm, Silberschatz OS, and CS-842.
+  - When no subtopic is selected, Grounding Evidence Inspector displays a clean "No Topic Selected" prompt rather than fake mock text.
+  - Replaced hardcoded header fallbacks with generic project title fallbacks.
+
+### Verification
+- Ran vitest across `@groundq/api`, `@groundq/web`, and `@groundq/contracts` — all 36 tests passing (18 API, 14 Web, 4 Contracts).
+- Ran TypeScript compilation (`pnpm run typecheck`) — 0 errors across all workspaces.
+- Ran ESLint (`pnpm run lint`) — passed cleanly.
+- Ran Prettier check (`pnpm run format:check`) — passed cleanly.
+- Verified deterministic extraction on sample digital PDF with `pdf-parse` (46 extracted chars, 1 chunk created, 768-dim embedding generated via Ollama nomic-embed-text).
+
+### Type
+Bug Fix / UI / Architecture / Alignment / Verification
+
+### Status
+Implemented and verified locally.
+
+### Changes
+- Fixed initial mock state flicker and false fallback in [ProjectResourcesPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectResourcesPage.tsx):
+  - Changed initial `resources` state from hardcoded `mockDemoResources` to empty array `[]`.
+  - Changed initial `activeView` to correctly compute `'empty'` if 0 resources exist.
+  - Rewrote `loadData()` as a reusable `useCallback` that queries live `/api/v1/projects/:projectId/resources` from Supabase.
+  - Fixed the "Refresh resources" button: now executes `loadData()` to re-fetch live project data from the database instead of resetting to the 5 mock demo PDFs.
+  - Fixed OCR scanned document alert banner: now checks exclusively whether any real resource in the project failed with a scanned/OCR failure reason (instead of checking `activeView === 'ocr_alert'`).
+- Fixed mock demo fallback in [ProjectTopicsPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectTopicsPage.tsx):
+  - Initial `modules` and resource counts now default to empty (`[]` and 0) for real projects.
+  - Removed silent fallback that was overwriting real project state with `mockDemoModules` on error.
+  - Provided explicit `initialModules` and `initialResources` props for unit test isolation while keeping production live and clean.
+- Formatted, linted, and typechecked all workspaces.
+
+### Verification
+- Prettier check (`npx pnpm@9.15.5 run format:check`) — passed cleanly.
+- ESLint (`npx pnpm@9.15.5 run lint`) — passed cleanly (0 errors, 0 warnings).
+- TypeScript compilation (`npx pnpm@9.15.5 run typecheck`) — passed cleanly across all workspaces.
+- Workspace unit tests (`npx pnpm@9.15.5 run test`) — 36/36 passed:
+  - `@groundq/contracts`: 4/4 passed.
+  - `@groundq/api`: 18/18 passed.
+  - `@groundq/web`: 14/14 passed.
+
+## [2026-10-12] — Academic Course Project Manager (/app) Stitch UI Implementation
+
+### Type
+Feature / UI / Integration / QA / Verification
+
+### Status
+Implemented and verified locally.
+
+### Changes
+- Fetched and extracted latest Stitch UI design (`ee63e19630b847c893021496504f590c`) for GroundQ Course Project Manager via the Google Stitch MCP interface (`get_screen`).
+- Implemented high-density academic course manager in [WorkspacePage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/WorkspacePage.tsx):
+  - Fixed top navigation bar with GroundQ logo, workspace breadcrumbs, live inference status indicator (`Local Ollama Inference: Online`), active faculty identity chip, and sign out button.
+  - Academic telemetry strip: Active Projects count, Processed PDFs counter, Topics Extracted tally, and Grounding Integrity (100% Locked indicator).
+  - Search & filter toolbar: Keyword filtering across course name and description, and toggle tabs between `Active Projects` and `Archived`.
+  - Responsive 3-column project cards grid: Course badge, context menu with archive and direct navigation shortcuts, description synopsis, quantitative badges (`Grounded PDFs`, `Curriculum Topics`, `100% Grounded`), creation date, and primary `Open Workspace →` button linking into `/app/projects/:projectId/resources`.
+  - Empty state: Clean folder vector illustration, quickstart 3-step guide (`Upload PDFs` -> `Extract Topics` -> `Synthesize`), and primary `Create Your First Project` action.
+  - Centered Create Project Modal: Backdrop blur dialog with form controls for Course Title, Curriculum Scope/Description, Grounding Pipeline indicator, validation, and real-time Supabase project creation.
+- Added comprehensive unit tests in [workspace.test.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/test/workspace.test.tsx).
+
+### Verification
+- Prettier check (`npx pnpm@9.15.5 run format:check`) — passed cleanly.
+- ESLint (`npx pnpm@9.15.5 run lint`) — passed cleanly (0 errors, 0 warnings).
+- TypeScript compilation (`npx pnpm@9.15.5 run typecheck`) — passed cleanly across contracts, api, and web.
+- Workspace unit tests (`npx pnpm@9.15.5 run test`) — 36/36 passed:
+  - `@groundq/contracts`: 4/4 passed.
+  - `@groundq/api`: 18/18 passed.
+  - `@groundq/web`: 14/14 passed.
+- Production build (`npx pnpm@9.15.5 run build`) — succeeded cleanly.
+
+## [2026-10-12] — Route Guards & Strict Authentication Lifecycle
+
+### Type
+Feature / Security / UI / Verification
+
+### Status
+Implemented and verified locally.
+
+### Changes
+- Created [AuthGuards.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/components/AuthGuards.tsx) containing:
+  - `ProtectedRoute`: Verifies active Supabase session; redirects unauthenticated users to `/sign-in?redirectTo=<target>`. Subscribes to `onAuthStateChange` to respond dynamically.
+  - `GuestRoute`: Redirects users who are already logged in away from `/sign-in`, `/sign-up`, and `/password-recovery` directly to `/app`.
+- Applied route guards in [App.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/App.tsx):
+  - Protected: `/app`, `/app/projects/:projectId/resources`, `/app/projects/:projectId/topics`.
+  - Guest-only: `/sign-in`, `/sign-up`, `/password-recovery`.
+- Hardened [ProjectResourcesPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectResourcesPage.tsx) and [ProjectTopicsPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectTopicsPage.tsx):
+  - Replaced silent fallback on `UNAUTHENTICATED` with an immediate redirect to `/sign-in?redirectTo=...`.
+  - Enforced session access token verification in `apiRequest` before executing calls.
+- Updated [AuthPages.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/AuthPages.tsx) to honor `redirectTo` search parameter upon successful sign-in.
+
+### Verification
+- Prettier check (`npx pnpm@9.15.5 run format:check`) — passed cleanly.
+- ESLint (`npx pnpm@9.15.5 run lint`) — passed cleanly (0 errors, 0 warnings).
+- TypeScript compilation (`npx pnpm@9.15.5 run typecheck`) — passed cleanly across all workspaces.
+- Unit tests (`npx pnpm@9.15.5 run test`) — 34/34 passed across contracts, api, and web.
+
+## [2026-10-12] — Dynamic State Integration & Live Supabase Verification for Topics and Resources
+
+### Type
+Feature / UI / Database / QA / Verification
+
+### Status
+Implemented and verified locally.
+
+### Changes
+- Cleaned up top header chrome:
+  - Removed confusing `"Context:"` pill in both [ProjectTopicsPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectTopicsPage.tsx) and [ProjectResourcesPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectResourcesPage.tsx).
+  - Removed the mock manual "State Inspector" bar (`Normal`, `Add Topic Drawer`, `Empty State`, `Zero Resources Warning`).
+  - Implemented dynamic workspace state determination based directly on live project data:
+    - If ready processed resources == 0 -> automatically displays the "Zero Processed Resources Ingested" warning banner with a quick navigation link to `/resources`.
+    - If ready processed resources > 0 and 0 topics mapped -> automatically renders the Empty State with deterministic extraction prompt.
+    - If topics exist -> renders the full 2-level module hierarchy tree with the Evidence Inspector and live chunk metrics.
+- Connected remote Supabase PostgreSQL schema:
+  - Verified user execution of migrations `202610110001`, `202610110002`, and `202610110003` in Supabase SQL editor creating tables `resources`, `resource_processing_runs`, `resource_chunks`, `topics`, and `chunk_topics`.
+- Resolved unit test assertions:
+  - Fixed duplicate element matching in [resources.test.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/test/resources.test.tsx) caused by the dynamic OCR alert banner and table row.
+  - Aligned [topics.test.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/test/topics.test.tsx) default module state.
+- Formatted, linted, and typechecked all workspaces.
+
+### Verification
+- Prettier check (`npx pnpm@9.15.5 run format:check`) — passed cleanly.
+- ESLint (`npx pnpm@9.15.5 run lint`) — passed cleanly (0 errors, 0 warnings).
+- TypeScript compilation (`npx pnpm@9.15.5 run typecheck`) — passed cleanly across contracts, api, and web.
+- Workspace unit tests (`npx pnpm@9.15.5 run test`) — 34/34 passed:
+  - `@groundq/contracts`: 4/4 passed.
+  - `@groundq/api`: 18/18 passed.
+  - `@groundq/web`: 12/12 passed.
+- Production build (`npx pnpm@9.15.5 run build`) — succeeded cleanly.
 
 ### Type
 Feature / UI / AI / API / Database / Security / Contracts

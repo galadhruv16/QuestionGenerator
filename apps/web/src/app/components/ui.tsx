@@ -18,11 +18,13 @@ export type IconName =
   | 'folder'
   | 'lock'
   | 'menu'
+  | 'more_horiz'
   | 'network'
   | 'pause'
   | 'pdf'
   | 'refresh'
   | 'replay'
+  | 'school'
   | 'search'
   | 'shield'
   | 'sliders'
@@ -195,6 +197,19 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
       <>
         <path d="M12 3 14 5.2l3-.2.9 2.9 2.4 1.8-1.2 2.7.6 2.9-2.8 1.2-1.2 2.7-3-.6L12 21l-2.7-2.4-3 .6-1.2-2.7-2.8-1.2.6-2.9-1.2-2.7 2.4-1.8.9-2.9 3 .2z" />
         <path d="m8 12 2.5 2.5L16 9" />
+      </>
+    ),
+    more_horiz: (
+      <>
+        <circle cx="12" cy="12" r="1.5" />
+        <circle cx="19" cy="12" r="1.5" />
+        <circle cx="5" cy="12" r="1.5" />
+      </>
+    ),
+    school: (
+      <>
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+        <path d="M6 12v5c3 3 9 3 12 0v-5" />
       </>
     ),
   };

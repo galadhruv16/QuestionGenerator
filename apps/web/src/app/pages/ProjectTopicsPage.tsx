@@ -23,7 +23,7 @@ interface EvidenceChunk {
   text: string;
 }
 
-const mockDemoModules: TopicWithSubtopics[] = [
+export const mockDemoModules: TopicWithSubtopics[] = [
   {
     archived_at: null,
     chunk_count: 92,
@@ -254,7 +254,7 @@ const mockDemoModules: TopicWithSubtopics[] = [
   },
 ];
 
-const mockDemoEvidence: EvidenceChunk[] = [
+export const mockDemoEvidence: EvidenceChunk[] = [
   {
     chunk_id: 'chk_1',
     chunk_index: 4,
@@ -294,33 +294,51 @@ const apiBaseUrl =
   import.meta.env.VITE_API_URL ||
   (import.meta.env.MODE === 'production' ? '' : 'http://localhost:3001');
 
-export function ProjectTopicsPage() {
+export function ProjectTopicsPage({
+  initialModules,
+  initialReadyCount,
+  initialTotalCount,
+}: {
+  initialModules?: TopicWithSubtopics[];
+  initialReadyCount?: number;
+  initialTotalCount?: number;
+} = {}) {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
 
   // State switcher view mode: 'normal' | 'drawer' | 'empty' | 'zero'
   const [viewMode, setViewMode] = useState<
     'drawer' | 'empty' | 'normal' | 'zero'
-  >('normal');
+  >(initialModules && initialModules.length > 0 ? 'normal' : 'zero');
 
   // Real data state
   const [project, setProject] = useState<ProjectInfo | null>(null);
-  const [modules, setModules] = useState<TopicWithSubtopics[]>(mockDemoModules);
-  const [readyResourceCount, setReadyResourceCount] = useState<number>(3);
-  const [totalResourceCount, setTotalResourceCount] = useState<number>(5);
+  const [modules, setModules] = useState<TopicWithSubtopics[]>(
+    initialModules ?? [],
+  );
+  const [readyResourceCount, setReadyResourceCount] = useState<number>(
+    initialReadyCount ?? 0,
+  );
+  const [totalResourceCount, setTotalResourceCount] = useState<number>(
+    initialTotalCount ?? 0,
+  );
   const [isInferring, setIsInferring] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedSubtopic, setSelectedSubtopic] = useState<{
     moduleName: string;
     subtopic: TopicWithSubtopics['subtopics'][number];
-  } | null>(() => {
-    const first = mockDemoModules[0];
-    const sub = first?.subtopics[0];
-    return first && sub ? { moduleName: first.name, subtopic: sub } : null;
-  });
+  } | null>(
+    initialModules && initialModules[0]?.subtopics[0]
+      ? {
+          moduleName: initialModules[0].name,
+          subtopic: initialModules[0].subtopics[0],
+        }
+      : null,
+  );
 
-  const [evidenceList, setEvidenceList] =
-    useState<EvidenceChunk[]>(mockDemoEvidence);
+  const [evidenceList, setEvidenceList] = useState<EvidenceChunk[]>(
+    initialModules && initialModules.length > 0 ? mockDemoEvidence : [],
+  );
   const [collapsedModuleIds, setCollapsedModuleIds] = useState<
     Record<string, boolean>
   >({});
@@ -347,7 +365,10 @@ export function ProjectTopicsPage() {
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    if (!session) {
+      throw new Error('UNAUTHENTICATED');
+    }
+    const token = session.access_token;
 
     const response = await fetch(`${apiBaseUrl}/api/v1${path}`, {
       ...init,
@@ -379,47 +400,57 @@ export function ProjectTopicsPage() {
           setProject(projectPayload.data);
         }
 
+        let currentReady = 0;
+        let currentTotal = 0;
+
         // Check resources status
         const resPayload = await apiRequest(`/projects/${projectId}/resources`);
         if (resPayload.data && Array.isArray(resPayload.data)) {
-          setTotalResourceCount(resPayload.data.length);
-          const readyCount = (
-            resPayload.data as Array<{ status: string }>
-          ).filter((r) => r.status === 'READY').length;
-          setReadyResourceCount(readyCount);
-
-          if (resPayload.data.length === 0 || readyCount === 0) {
-            setViewMode('zero');
-          }
+          currentTotal = resPayload.data.length;
+          currentReady = (resPayload.data as Array<{ status: string }>).filter(
+            (r) => r.status === 'READY',
+          ).length;
+          setTotalResourceCount(currentTotal);
+          setReadyResourceCount(currentReady);
         }
 
         // Fetch topics
         const topicsPayload = await apiRequest(`/projects/${projectId}/topics`);
-        if (topicsPayload.data && Array.isArray(topicsPayload.data)) {
-          if (topicsPayload.data.length === 0) {
-            if (readyResourceCount > 0) {
-              setViewMode('empty');
-            }
-          } else {
-            setModules(topicsPayload.data);
-            const firstMod = topicsPayload.data[0];
-            const firstSub = firstMod?.subtopics[0];
-            if (firstMod && firstSub) {
-              setSelectedSubtopic({
-                moduleName: firstMod.name,
-                subtopic: firstSub,
-              });
-              loadEvidence(firstSub.id);
-            }
+        const fetchedTopics =
+          topicsPayload.data && Array.isArray(topicsPayload.data)
+            ? (topicsPayload.data as TopicWithSubtopics[])
+            : [];
+
+        setModules(fetchedTopics);
+
+        // Dynamically compute view mode
+        if (currentReady === 0) {
+          setViewMode('zero');
+        } else if (fetchedTopics.length === 0) {
+          setViewMode('empty');
+        } else {
+          setViewMode('normal');
+          const firstMod = fetchedTopics[0];
+          const firstSub = firstMod?.subtopics[0];
+          if (firstMod && firstSub) {
+            setSelectedSubtopic({
+              moduleName: firstMod.name,
+              subtopic: firstSub,
+            });
+            void loadEvidence(firstSub.id);
           }
         }
-      } catch {
-        // Fallback gracefully for local mock / demo mode
+      } catch (err: unknown) {
+        if (err instanceof Error && err.message === 'UNAUTHENTICATED') {
+          navigate(
+            `/sign-in?redirectTo=${encodeURIComponent(window.location.pathname)}`,
+          );
+        }
       }
     };
 
     void loadData();
-  }, [projectId]);
+  }, [projectId, navigate]);
 
   const loadEvidence = async (topicId: string) => {
     try {
@@ -427,19 +458,15 @@ export function ProjectTopicsPage() {
         const evPayload = await apiRequest(
           `/projects/${projectId}/topics/${topicId}/evidence`,
         );
-        if (
-          evPayload.data &&
-          Array.isArray(evPayload.data) &&
-          evPayload.data.length > 0
-        ) {
+        if (evPayload.data && Array.isArray(evPayload.data)) {
           setEvidenceList(evPayload.data);
           return;
         }
       }
     } catch {
-      // Fallback to mock
+      // Fallback
     }
-    setEvidenceList(mockDemoEvidence);
+    setEvidenceList([]);
   };
 
   const handleSelectSubtopic = (
@@ -637,12 +664,9 @@ export function ProjectTopicsPage() {
             <span className="text-outline-variant font-label-md text-label-md">
               /
             </span>
-            <div className="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface-variant">
-              <span className="uppercase text-outline">Context:</span>
-              <span className="font-medium text-on-surface">
-                {project?.name ?? 'Distributed Systems Spring 2025'}
-              </span>
-            </div>
+            <span className="font-label-sm text-label-sm text-on-surface font-medium truncate max-w-xs md:max-w-md">
+              {project?.name ?? 'Course Workspace'}
+            </span>
           </div>
           <div className="flex items-center gap-4">
             <Link
@@ -668,83 +692,6 @@ export function ProjectTopicsPage() {
 
       {/* Main Page Area */}
       <main className="w-full pt-16 flex-1 flex flex-col">
-        {/* Interactive State Inspector Bar (GroundQ Reviewer Demo Switcher) */}
-        <aside
-          aria-label="Workspace state switcher"
-          className="w-full bg-surface-container-high px-4 sm:px-8 py-2 text-on-surface-variant text-label-sm font-label-sm border-b border-outline-variant/30"
-        >
-          <div className="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-container font-medium text-primary">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                STATE INSPECTOR
-              </span>
-              <span className="hidden sm:inline text-outline">|</span>
-              <span className="text-on-surface-variant hidden md:inline">
-                Mode Preview Engine:
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button
-                className={`px-2.5 py-1 rounded text-label-sm transition-all ${
-                  viewMode === 'normal' && !isDrawerOpen
-                    ? 'bg-surface-container-lowest text-primary shadow-sm font-semibold'
-                    : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
-                }`}
-                onClick={() => {
-                  setViewMode('normal');
-                  setIsDrawerOpen(false);
-                }}
-                type="button"
-              >
-                Normal (Populated Tree + Inspector)
-              </button>
-              <button
-                className={`px-2.5 py-1 rounded text-label-sm transition-all ${
-                  isDrawerOpen
-                    ? 'bg-surface-container-lowest text-primary shadow-sm font-semibold'
-                    : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
-                }`}
-                onClick={() => {
-                  setViewMode('normal');
-                  setIsDrawerOpen(true);
-                }}
-                type="button"
-              >
-                Add Topic Drawer
-              </button>
-              <button
-                className={`px-2.5 py-1 rounded text-label-sm transition-all ${
-                  viewMode === 'empty'
-                    ? 'bg-surface-container-lowest text-primary shadow-sm font-semibold'
-                    : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
-                }`}
-                onClick={() => {
-                  setViewMode('empty');
-                  setIsDrawerOpen(false);
-                }}
-                type="button"
-              >
-                Empty State (No Topics)
-              </button>
-              <button
-                className={`px-2.5 py-1 rounded text-label-sm transition-all ${
-                  viewMode === 'zero'
-                    ? 'bg-surface-container-lowest text-error shadow-sm font-semibold'
-                    : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
-                }`}
-                onClick={() => {
-                  setViewMode('zero');
-                  setIsDrawerOpen(false);
-                }}
-                type="button"
-              >
-                Zero Resources Warning
-              </button>
-            </div>
-          </div>
-        </aside>
-
         {/* Project Context & Pipeline Header */}
         <section className="w-full bg-surface-container-lowest shadow-[0_1px_3px_rgba(0,0,0,0.03)] px-4 sm:px-8 py-5 border-b border-outline-variant/30">
           <div className="max-w-[1440px] mx-auto flex flex-col gap-4">
@@ -762,7 +709,7 @@ export function ProjectTopicsPage() {
               </Link>
               <span className="text-outline-variant font-label-md">/</span>
               <span className="text-on-surface font-label-sm truncate max-w-xs md:max-w-md">
-                {project?.name ?? 'Distributed Systems Spring 2025 (CS-842)'}
+                {project?.name ?? 'Course Workspace'}
               </span>
               <span className="text-outline-variant font-label-md">/</span>
               <span className="text-primary font-medium">Topics</span>
@@ -773,20 +720,19 @@ export function ProjectTopicsPage() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <h1 className="font-headline-lg text-headline-lg tracking-tight text-on-surface">
-                    {project?.name ??
-                      'Distributed Systems Spring 2025 (CS-842)'}
+                    {project?.name ?? 'Course Workspace'}
                   </h1>
                   <span className="px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-on-surface uppercase tracking-wider font-semibold">
                     SEC-01 · GRADUATE
                   </span>
                   <span className="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-                    Taxonomy v1.2 Active
+                    Taxonomy Active
                   </span>
                 </div>
                 <p className="font-body-md text-body-md text-on-surface-variant max-w-3xl">
                   {project?.description ??
-                    'Authoritative knowledge base for fault tolerance, consensus protocols, and remote procedural primitives.'}
+                    'Authoritative curriculum hierarchy and deterministic grounding evidence.'}
                 </p>
               </div>
 
@@ -975,7 +921,7 @@ export function ProjectTopicsPage() {
           )}
 
           {/* MAIN TWO-COLUMN WORKSPACE (Visible in normal state) */}
-          {viewMode !== 'empty' && (
+          {viewMode !== 'empty' && viewMode !== 'zero' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* LEFT COLUMN: Topic Hierarchy Tree (lg:col-span-7) */}
               <div className="lg:col-span-7 flex flex-col gap-4">
@@ -1184,144 +1130,169 @@ export function ProjectTopicsPage() {
                 className="lg:col-span-5 sticky top-20 flex flex-col gap-4"
               >
                 <div className="rounded-xl bg-surface-container-lowest shadow-md overflow-hidden flex flex-col border border-outline-variant/30">
-                  {/* Inspector Header */}
-                  <div className="p-4 bg-surface-container-low border-b border-outline-variant/20">
-                    <div className="flex items-center justify-between text-label-sm font-label-sm text-primary font-bold tracking-wider uppercase mb-1">
-                      <span className="flex items-center gap-1">
-                        <Icon name="verified" size={16} />
-                        Grounding Evidence Inspector
-                      </span>
-                      <span className="text-secondary font-mono">
-                        100% Locked
-                      </span>
-                    </div>
-                    <h3 className="font-headline-lg text-headline-lg text-on-surface leading-tight">
-                      {selectedSubtopic?.subtopic.name ??
-                        "1.1 Banker's Algorithm & Resource Allocation"}
-                    </h3>
-                    <div className="flex items-center gap-1.5 text-body-sm font-body-sm text-on-surface-variant mt-1">
-                      <span className="text-outline">Parent:</span>
-                      <span className="font-medium text-on-surface">
-                        {selectedSubtopic?.moduleName ??
-                          'Module 1: Process Synchronization & Deadlocks'}
-                      </span>
-                    </div>
-                    {/* Corpus Origin Metadata */}
-                    <div className="mt-2 pt-2 border-t border-surface-variant/40 flex items-center gap-2">
-                      <Icon name="book" size={14} />
-                      <span className="font-label-sm text-label-sm text-on-surface-variant truncate">
-                        Corpus: Silberschatz OS (Ch. 8), CS842 Syllabus
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Grounding Metric Visualizer Cards */}
-                  <div className="p-4 grid grid-cols-3 gap-2 bg-surface">
-                    <div className="p-2 rounded bg-surface-container-lowest shadow-sm flex flex-col border border-outline-variant/20">
-                      <span className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-                        Linked Chunks
-                      </span>
-                      <span className="font-headline-sm text-headline-sm text-secondary font-bold mt-1">
-                        {selectedSubtopic?.subtopic.chunk_count ?? 28} Chunks
-                      </span>
-                      <span className="font-label-sm text-label-sm text-outline mt-0.5">
-                        Deterministic
-                      </span>
-                    </div>
-                    <div className="p-2 rounded bg-surface-container-lowest shadow-sm flex flex-col border border-outline-variant/20">
-                      <span className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-                        Hallucinations
-                      </span>
-                      <span className="font-headline-sm text-headline-sm text-secondary font-bold mt-1">
-                        0 Detected
-                      </span>
-                      <span className="font-label-sm text-label-sm text-outline mt-0.5">
-                        Zero drift
-                      </span>
-                    </div>
-                    <div className="p-2 rounded bg-surface-container-lowest shadow-sm flex flex-col border border-outline-variant/20">
-                      <span className="font-label-sm text-label-sm text-on-surface-variant uppercase">
-                        Blueprint Alloc.
-                      </span>
-                      <span className="font-headline-sm text-headline-sm text-primary font-bold mt-1">
-                        25.0%
-                      </span>
-                      <span className="font-label-sm text-label-sm text-outline mt-0.5">
-                        Recommended
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Verified Evidence Chunks Stream */}
-                  <div className="p-4 flex flex-col gap-3 max-h-[460px] overflow-y-auto">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-label-sm text-label-sm text-on-surface-variant uppercase font-semibold">
-                        Verified Cryptographic Evidence
-                      </span>
-                      <span className="font-label-sm text-label-sm text-outline">
-                        Showing {evidenceList.length} chunks
-                      </span>
-                    </div>
-
-                    {evidenceList.map((chunk, idx) => (
-                      <div
-                        className="p-3 rounded-lg bg-surface-container-low shadow-sm space-y-2 border border-outline-variant/20"
-                        key={chunk.chunk_id ?? idx}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm font-mono text-on-surface font-semibold border border-outline-variant/30">
-                            #{chunk.resource_name.slice(0, 3).toUpperCase()}-P
-                            {chunk.page_number ?? 'X'}-C{chunk.chunk_index}
+                  {selectedSubtopic ? (
+                    <>
+                      {/* Inspector Header */}
+                      <div className="p-4 bg-surface-container-low border-b border-outline-variant/20">
+                        <div className="flex items-center justify-between text-label-sm font-label-sm text-primary font-bold tracking-wider uppercase mb-1">
+                          <span className="flex items-center gap-1">
+                            <Icon name="verified" size={16} />
+                            Grounding Evidence Inspector
                           </span>
-                          <span className="font-label-sm text-label-sm text-secondary font-medium">
-                            {Math.round(chunk.confidence * 1000) / 10}% match
+                          <span className="text-secondary font-mono">
+                            100% Locked
                           </span>
                         </div>
-                        <p className="font-label-sm text-label-sm text-outline">
-                          {chunk.resource_name} · Page{' '}
-                          {chunk.page_number ?? 'N/A'}{' '}
-                          {chunk.section_title
-                            ? `· ${chunk.section_title}`
-                            : ''}
-                        </p>
-                        <div className="pl-2 border-l-2 border-secondary bg-surface-container-lowest/60 p-2 rounded-r font-editorial-quote text-body-sm text-on-surface italic">
-                          "{chunk.text}"
+                        <h3 className="font-headline-lg text-headline-lg text-on-surface leading-tight">
+                          {selectedSubtopic.subtopic.name}
+                        </h3>
+                        <div className="flex items-center gap-1.5 text-body-sm font-body-sm text-on-surface-variant mt-1">
+                          <span className="text-outline">Parent:</span>
+                          <span className="font-medium text-on-surface">
+                            {selectedSubtopic.moduleName}
+                          </span>
                         </div>
-                        <div className="flex items-center justify-between text-label-sm font-label-sm text-outline font-mono">
-                          <span>sha256: {chunk.chunk_id.slice(0, 8)}..</span>
-                          <span className="flex items-center gap-1 text-secondary">
-                            <Icon name="lock" size={12} /> locked
+                        {selectedSubtopic.subtopic.description && (
+                          <div className="mt-2 pt-2 border-t border-surface-variant/40 flex items-center gap-2">
+                            <Icon name="book" size={14} />
+                            <span className="font-label-sm text-label-sm text-on-surface-variant truncate">
+                              {selectedSubtopic.subtopic.description}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Grounding Metric Visualizer Cards */}
+                      <div className="p-4 grid grid-cols-3 gap-2 bg-surface">
+                        <div className="p-2 rounded bg-surface-container-lowest shadow-sm flex flex-col border border-outline-variant/20">
+                          <span className="font-label-sm text-label-sm text-on-surface-variant uppercase">
+                            Linked Chunks
+                          </span>
+                          <span className="font-headline-sm text-headline-sm text-secondary font-bold mt-1">
+                            {selectedSubtopic.subtopic.chunk_count ??
+                              evidenceList.length}{' '}
+                            Chunks
+                          </span>
+                          <span className="font-label-sm text-label-sm text-outline mt-0.5">
+                            Deterministic
+                          </span>
+                        </div>
+                        <div className="p-2 rounded bg-surface-container-lowest shadow-sm flex flex-col border border-outline-variant/20">
+                          <span className="font-label-sm text-label-sm text-on-surface-variant uppercase">
+                            Hallucinations
+                          </span>
+                          <span className="font-headline-sm text-headline-sm text-secondary font-bold mt-1">
+                            0 Detected
+                          </span>
+                          <span className="font-label-sm text-label-sm text-outline mt-0.5">
+                            Zero drift
+                          </span>
+                        </div>
+                        <div className="p-2 rounded bg-surface-container-lowest shadow-sm flex flex-col border border-outline-variant/20">
+                          <span className="font-label-sm text-label-sm text-on-surface-variant uppercase">
+                            Source
+                          </span>
+                          <span className="font-headline-sm text-headline-sm text-primary font-bold mt-1">
+                            {selectedSubtopic.subtopic.source === 'INFERRED'
+                              ? 'Inferred'
+                              : 'Manual'}
+                          </span>
+                          <span className="font-label-sm text-label-sm text-outline mt-0.5">
+                            Origin
                           </span>
                         </div>
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Inspector Action Footer */}
-                  <div className="p-3 bg-surface-container-low flex items-center justify-between gap-2 border-t border-outline-variant/20">
-                    <button
-                      className="px-3 py-1.5 rounded bg-surface-container-lowest text-on-surface hover:bg-surface font-body-sm text-body-sm shadow-sm transition-colors flex items-center gap-1 border border-outline-variant/30"
-                      onClick={() =>
-                        showToast(
-                          'Evidence anchor linked to question generation blueprint.',
-                        )
-                      }
-                      type="button"
-                    >
-                      <Icon name="verified" size={14} />
-                      <span>Add Anchor</span>
-                    </button>
-                    <button
-                      className="px-3 py-1.5 rounded bg-surface-container-lowest text-on-surface hover:bg-surface font-body-sm text-body-sm shadow-sm transition-colors flex items-center gap-1 border border-outline-variant/30"
-                      onClick={() =>
-                        showToast('Cosine similarity threshold set to 0.85.')
-                      }
-                      type="button"
-                    >
-                      <Icon name="sliders" size={14} />
-                      <span>Threshold (0.85)</span>
-                    </button>
-                  </div>
+                      {/* Verified Evidence Chunks Stream */}
+                      <div className="p-4 flex flex-col gap-3 max-h-[460px] overflow-y-auto">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-label-sm text-label-sm text-on-surface-variant uppercase font-semibold">
+                            Verified Cryptographic Evidence
+                          </span>
+                          <span className="font-label-sm text-label-sm text-outline">
+                            Showing {evidenceList.length} chunks
+                          </span>
+                        </div>
+
+                        {evidenceList.length === 0 ? (
+                          <div className="p-6 text-center text-on-surface-variant text-body-sm">
+                            No grounded evidence chunks linked to this topic
+                            yet.
+                          </div>
+                        ) : (
+                          evidenceList.map((chunk, idx) => (
+                            <div
+                              className="p-3 rounded-lg bg-surface-container-low shadow-sm space-y-2 border border-outline-variant/20"
+                              key={chunk.chunk_id ?? idx}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm font-mono text-on-surface font-semibold border border-outline-variant/30">
+                                  #
+                                  {chunk.resource_name
+                                    .slice(0, 3)
+                                    .toUpperCase()}
+                                  -P
+                                  {chunk.page_number ?? 'X'}-C
+                                  {chunk.chunk_index}
+                                </span>
+                                <span className="font-label-sm text-label-sm text-secondary font-medium">
+                                  {Math.round(chunk.confidence * 1000) / 10}%
+                                  match
+                                </span>
+                              </div>
+                              <p className="font-label-sm text-label-sm text-outline">
+                                {chunk.resource_name} · Page{' '}
+                                {chunk.page_number ?? 'N/A'}{' '}
+                                {chunk.section_title
+                                  ? `· ${chunk.section_title}`
+                                  : ''}
+                              </p>
+                              <div className="pl-2 border-l-2 border-secondary bg-surface-container-lowest/60 p-2 rounded-r font-editorial-quote text-body-sm text-on-surface italic">
+                                "{chunk.text}"
+                              </div>
+                              <div className="flex items-center justify-between text-label-sm font-label-sm text-outline font-mono">
+                                <span>
+                                  sha256: {chunk.chunk_id.slice(0, 8)}..
+                                </span>
+                                <span className="flex items-center gap-1 text-secondary">
+                                  <Icon name="lock" size={12} /> locked
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Inspector Action Footer */}
+                      <div className="p-3 bg-surface-container-low flex items-center justify-between gap-2 border-t border-outline-variant/20">
+                        <button
+                          className="px-3 py-1.5 rounded bg-surface-container-lowest text-on-surface hover:bg-surface font-body-sm text-body-sm shadow-sm transition-colors flex items-center gap-1 border border-outline-variant/30"
+                          onClick={() =>
+                            showToast(
+                              'Evidence anchor linked to question generation blueprint.',
+                            )
+                          }
+                          type="button"
+                        >
+                          <Icon name="verified" size={14} />
+                          <span>Add Anchor</span>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-12 text-center flex flex-col items-center justify-center text-on-surface-variant">
+                      <div className="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-outline mb-3">
+                        <Icon name="tree" size={24} />
+                      </div>
+                      <h4 className="font-headline-sm text-headline-sm font-semibold text-on-surface">
+                        No Topic Selected
+                      </h4>
+                      <p className="font-body-sm text-body-sm text-outline mt-1 max-w-xs">
+                        Select a subtopic from the hierarchy to inspect verified
+                        grounding evidence chunks and deterministic citations.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </aside>
             </div>

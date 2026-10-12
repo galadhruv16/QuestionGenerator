@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import { ProjectResourcesPage } from '../src/app/pages/ProjectResourcesPage';
+import {
+  ProjectResourcesPage,
+  mockDemoResources,
+} from '../src/app/pages/ProjectResourcesPage';
 
 function renderResourcesPage(
   projectId = '123e4567-e89b-12d3-a456-426614174000',
@@ -11,7 +14,9 @@ function renderResourcesPage(
     <BrowserRouter>
       <Routes>
         <Route
-          element={<ProjectResourcesPage />}
+          element={
+            <ProjectResourcesPage initialResources={mockDemoResources} />
+          }
           path="/app/projects/:projectId/resources"
         />
       </Routes>
@@ -61,8 +66,8 @@ describe('ProjectResourcesPage', () => {
 
     // Failed row
     expect(
-      screen.getByText('Historical_Scanned_Notes_1998.pdf'),
-    ).toBeInTheDocument();
+      screen.getAllByText('Historical_Scanned_Notes_1998.pdf').length,
+    ).toBeGreaterThan(0);
     expect(screen.getByText('FAILED')).toBeInTheDocument();
     expect(screen.getByText('Retry')).toBeInTheDocument();
   });
@@ -109,28 +114,8 @@ describe('ProjectResourcesPage', () => {
     expect(screen.queryByText('Resource Inspector')).not.toBeInTheDocument();
   });
 
-  it('supports inspector state switching to Empty State and OCR Alert mode', () => {
+  it('displays the OCR alert banner when a scanned document is present', () => {
     renderResourcesPage();
-
-    // Switch to Empty State
-    const emptyStateButton = screen.getByRole('button', {
-      name: /Empty State/i,
-    });
-    fireEvent.click(emptyStateButton);
-
-    expect(
-      screen.getByText('Upload study resources to begin'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('STEP 01')).toBeInTheDocument();
-    expect(screen.getByText('STEP 02')).toBeInTheDocument();
-    expect(screen.getByText('STEP 03')).toBeInTheDocument();
-    expect(screen.getByText('STEP 04')).toBeInTheDocument();
-
-    // Switch to OCR Alert Mode
-    const ocrAlertButton = screen.getByRole('button', {
-      name: /OCR Alert Mode/i,
-    });
-    fireEvent.click(ocrAlertButton);
 
     expect(
       screen.getByText(
