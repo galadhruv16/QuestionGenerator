@@ -1,0 +1,1766 @@
+<!doctype html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta content="web_standard" name="shell-type" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=JetBrains+Mono:wght@100..900&amp;family=Newsreader:wght@100..900&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      @layer base {
+        html,
+        body {
+          margin: 0;
+          padding: 0;
+        }
+        body {
+          overscroll-behavior: none;
+        }
+        main > :first-child {
+          margin-top: 0 !important;
+        }
+        main > :last-child {
+          margin-bottom: 0 !important;
+        }
+      }
+      ::-webkit-scrollbar {
+        display: none;
+      }
+    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              background: '#fbf8fc',
+              'surface-container-lowest': '#ffffff',
+              outline: '#747685',
+              'surface-dim': '#dcd9dd',
+              'surface-container': '#f0edf1',
+              'surface-tint': '#2c53d1',
+              'on-tertiary-fixed-variant': '#2f2ebe',
+              'surface-variant': '#e4e1e6',
+              tertiary: '#3332c2',
+              'on-surface-variant': '#444654',
+              'on-primary': '#ffffff',
+              'on-background': '#1b1b1e',
+              'surface-bright': '#fbf8fc',
+              'on-surface': '#1b1b1e',
+              'surface-container-low': '#f6f2f7',
+              'secondary-container': '#86f2e4',
+              'tertiary-container': '#4d4fda',
+              'secondary-fixed-dim': '#6bd8cb',
+              'tertiary-fixed-dim': '#c0c1ff',
+              'surface-container-high': '#eae7eb',
+              'inverse-on-surface': '#f3f0f4',
+              'outline-variant': '#c4c5d6',
+              'on-secondary': '#ffffff',
+              'on-tertiary-container': '#dddbff',
+              'inverse-surface': '#303033',
+              'on-tertiary-fixed': '#07006c',
+              'on-tertiary': '#ffffff',
+              'primary-container': '#3157d5',
+              primary: '#063cbc',
+              'on-primary-container': '#d8ddff',
+              'surface-container-highest': '#e4e1e6',
+              error: '#ba1a1a',
+              'on-error-container': '#93000a',
+              'inverse-primary': '#b7c4ff',
+              surface: '#fbf8fc',
+              secondary: '#006a61',
+              'on-primary-fixed-variant': '#0038b6',
+              'on-primary-fixed': '#001452',
+              'secondary-fixed': '#89f5e7',
+              'on-secondary-fixed': '#00201d',
+              'primary-fixed': '#dde1ff',
+              'primary-fixed-dim': '#b7c4ff',
+              'on-secondary-fixed-variant': '#005049',
+              'error-container': '#ffdad6',
+              'on-secondary-container': '#006f66',
+              'tertiary-fixed': '#e1e0ff',
+              'on-error': '#ffffff',
+            },
+            borderRadius: {
+              DEFAULT: '0.125rem',
+              lg: '0.25rem',
+              xl: '0.5rem',
+              full: '0.75rem',
+            },
+            spacing: {
+              'margin-desktop': '2rem',
+              'space-lg': '1.25rem',
+              'space-md': '0.75rem',
+              gutter: '1rem',
+              'gutter-desktop': '1.5rem',
+              'space-sm': '0.5rem',
+              'space-xl': '2rem',
+              'space-xs': '0.25rem',
+              margin: '1rem',
+            },
+            fontFamily: {
+              'label-sm': ['JetBrains Mono'],
+              'headline-md': ['Geist'],
+              'body-sm': ['Geist'],
+              'editorial-quote': ['Newsreader'],
+              'headline-sm': ['Geist'],
+              'body-lg': ['Geist'],
+              'headline-lg': ['Newsreader'],
+              'label-md': ['JetBrains Mono'],
+              'display-lg': ['Newsreader'],
+              'body-md': ['Geist'],
+              'display-lg-mobile': ['Newsreader'],
+            },
+            fontSize: {
+              'label-sm': [
+                '11px',
+                {
+                  lineHeight: '14px',
+                  letterSpacing: '0.03em',
+                  fontWeight: '500',
+                },
+              ],
+              'headline-md': [
+                '20px',
+                {
+                  lineHeight: '28px',
+                  letterSpacing: '-0.01em',
+                  fontWeight: '600',
+                },
+              ],
+              'body-sm': ['13px', { lineHeight: '20px', fontWeight: '400' }],
+              'editorial-quote': [
+                '18px',
+                { lineHeight: '28px', fontWeight: '400' },
+              ],
+              'headline-sm': [
+                '16px',
+                {
+                  lineHeight: '24px',
+                  letterSpacing: '-0.005em',
+                  fontWeight: '600',
+                },
+              ],
+              'body-lg': ['16px', { lineHeight: '26px', fontWeight: '400' }],
+              'headline-lg': [
+                '28px',
+                {
+                  lineHeight: '36px',
+                  letterSpacing: '-0.015em',
+                  fontWeight: '500',
+                },
+              ],
+              'label-md': [
+                '12px',
+                {
+                  lineHeight: '16px',
+                  letterSpacing: '0.02em',
+                  fontWeight: '500',
+                },
+              ],
+              'display-lg': [
+                '40px',
+                {
+                  lineHeight: '48px',
+                  letterSpacing: '-0.02em',
+                  fontWeight: '500',
+                },
+              ],
+              'body-md': ['14px', { lineHeight: '22px', fontWeight: '400' }],
+              'display-lg-mobile': [
+                '30px',
+                {
+                  lineHeight: '38px',
+                  letterSpacing: '-0.015em',
+                  fontWeight: '500',
+                },
+              ],
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body
+    class="bg-surface font-body-md text-body-md text-on-surface antialiased"
+  >
+    <header
+      class="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.04)]"
+    >
+      <div
+        class="h-16 w-full px-margin-desktop flex items-center justify-between"
+      >
+        <div class="flex items-center gap-space-md">
+          <img
+            alt="Brand logo. - Primary color: #3157d5
+- Font: newsreader
+- Mode: light
+- Roundness: rounded-sm
+"
+            class="h-8 w-auto object-contain"
+            src="https://lh3.googleusercontent.com/aida/AEtjO1WyoJTJ0F1EpGvOmAqXH3haRa1RFyYPI4AU7nnHRV0JfYTD6GWMJLzTtaKttnyIRTmy3uCVv6XHR9U11p4UnP5N8spuf7XCWZrhpCL2PuCDSHqkbwa6FKTS30P0dR4BHtTOilfUW7vOBBaQmsmrJ_EWffNJlgIHBOEIHzR4FLYP0XG9GzGXbm-QNyzrBYON_gHP1PpHGX7DwAdSS8kBa0tgWO0sJIZ-p36ZJ1P4rALsERocElW0cVTqCONT"
+          /><span
+            class="font-headline-sm text-headline-sm tracking-tight text-on-surface"
+            >GroundQ</span
+          ><span
+            class="px-space-xs py-0.5 rounded-DEFAULT bg-surface-container font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant"
+            >WORKSPACE</span
+          ><span class="text-outline-variant font-label-md text-label-md"
+            >/</span
+          >
+          <div class="flex items-center gap-space-xs">
+            <span
+              class="font-label-sm text-label-sm text-on-surface-variant uppercase"
+              >Context:</span
+            ><button
+              class="flex items-center gap-space-xs px-space-sm py-1 rounded-DEFAULT bg-surface-container-low hover:bg-surface-container text-on-surface font-body-sm text-body-sm transition-colors"
+              type="button"
+            >
+              <span>Biochem Core Syllabus v3</span
+              ><span
+                class="material-symbols-outlined text-[16px] text-on-surface-variant"
+                >unfold_more</span
+              >
+            </button>
+          </div>
+        </div>
+        <div class="flex items-center gap-space-lg">
+          <nav
+            class="flex items-center gap-space-xs"
+            data-active-classes="bg-primary-container text-on-primary-container font-medium rounded-lg"
+          >
+            <a
+              class="px-space-md py-1.5 rounded-lg font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+              data-path="workspace-overview"
+              href="#"
+              >Overview</a
+            ><a
+              class="px-space-md py-1.5 rounded-lg font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+              data-path="workspace-documentation"
+              href="#"
+              >Documentation</a
+            >
+          </nav>
+          <div class="flex items-center gap-space-md pl-space-md">
+            <button
+              aria-label="Command Menu"
+              class="flex items-center gap-space-xs px-space-sm py-1 rounded-DEFAULT bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm shadow-[0_1px_4px_rgba(0,0,0,0.02)] transition-colors"
+              type="button"
+            >
+              <span class="material-symbols-outlined text-[16px]">terminal</span
+              ><span>⌘K</span>
+            </button>
+            <div
+              class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"
+            >
+              <span
+                class="material-symbols-outlined text-on-primary text-[18px]"
+                >person</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+    <main class="w-full pt-16 bg-surface min-h-[calc(100vh-80px)]">
+      <div class="flex flex-col w-full">
+        <!-- Interactive State Inspector Bar (Utility Bar for Workspace Modes) -->
+        <aside
+          aria-label="Operational state switcher"
+          class="w-full bg-surface-container-high px-margin-desktop py-space-xs flex items-center justify-between text-on-surface-variant text-label-sm font-label-sm"
+        >
+          <div class="flex items-center gap-space-sm">
+            <span
+              class="flex h-2 w-2 rounded-full bg-primary animate-pulse"
+            ></span>
+            <span class="uppercase tracking-wider text-on-surface font-semibold"
+              >Workspace State Inspector:</span
+            >
+            <span class="text-outline">Mode Preview Engine</span>
+          </div>
+          <div
+            aria-label="Workspace View Modes"
+            class="flex items-center gap-space-xs"
+            role="tablist"
+          >
+            <button
+              aria-selected="true"
+              class="px-space-sm py-1 rounded bg-surface text-on-surface shadow-sm font-label-sm transition-all"
+              id="btn-state-normal"
+              onclick="switchState('normal')"
+              role="tab"
+            >
+              Normal (Populated Tree + Inspector)
+            </button>
+            <button
+              aria-selected="false"
+              class="px-space-sm py-1 rounded hover:bg-surface-container text-on-surface-variant font-label-sm transition-all"
+              id="btn-state-drawer"
+              onclick="switchState('drawer')"
+              role="tab"
+            >
+              Add Topic Drawer
+            </button>
+            <button
+              aria-selected="false"
+              class="px-space-sm py-1 rounded hover:bg-surface-container text-on-surface-variant font-label-sm transition-all"
+              id="btn-state-empty"
+              onclick="switchState('empty')"
+              role="tab"
+            >
+              Empty State (No Topics)
+            </button>
+            <button
+              aria-selected="false"
+              class="px-space-sm py-1 rounded hover:bg-surface-container text-on-surface-variant font-label-sm transition-all"
+              id="btn-state-zero"
+              onclick="switchState('zero')"
+              role="tab"
+            >
+              Zero Resources Warning
+            </button>
+          </div>
+        </aside>
+        <!-- Project Header, Context & Pipeline Navigation -->
+        <section
+          class="w-full bg-surface-container-lowest px-margin-desktop pt-space-lg pb-0 shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
+        >
+          <!-- Academic Breadcrumbs -->
+          <nav
+            aria-label="Breadcrumb"
+            class="flex items-center gap-space-xs text-body-sm font-body-sm text-on-surface-variant mb-space-sm"
+          >
+            <a class="hover:text-primary transition-colors" href="#">GroundQ</a>
+            <span class="text-outline-variant font-label-md">/</span>
+            <a class="hover:text-primary transition-colors" href="#"
+              >Projects</a
+            >
+            <span class="text-outline-variant font-label-md">/</span>
+            <span
+              class="text-on-surface font-medium truncate max-w-xs md:max-w-md"
+              >Distributed Systems Spring 2025 (CS-842)</span
+            >
+            <span class="text-outline-variant font-label-md">/</span>
+            <span class="text-primary font-medium">Topics</span>
+          </nav>
+          <!-- Project Identity Bar -->
+          <div
+            class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md pb-space-lg"
+          >
+            <div class="space-y-1">
+              <div class="flex items-center gap-space-sm flex-wrap">
+                <h1
+                  class="font-headline-lg text-headline-lg text-on-surface tracking-tight"
+                >
+                  Distributed Systems Spring 2025 (CS-842)
+                </h1>
+                <span
+                  class="px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-on-surface tracking-wider uppercase font-semibold"
+                >
+                  SEC-01 · GRADUATE
+                </span>
+                <span
+                  class="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm flex items-center gap-1"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                  Taxonomy v1.2 Active
+                </span>
+              </div>
+              <p
+                class="font-body-md text-body-md text-on-surface-variant max-w-3xl"
+              >
+                Authoritative knowledge base for fault tolerance, consensus
+                protocols, and remote procedural primitives.
+              </p>
+            </div>
+            <!-- Live Pipeline Telemetry Cluster -->
+            <div
+              class="flex items-center gap-space-md p-space-sm rounded-lg bg-surface-container-low"
+            >
+              <div class="flex flex-col pr-space-md">
+                <span
+                  class="font-label-sm text-label-sm text-on-surface-variant uppercase"
+                  >Active Corpus</span
+                >
+                <span
+                  class="font-headline-sm text-headline-sm text-on-surface flex items-center gap-1"
+                >
+                  <span
+                    class="material-symbols-outlined text-[16px] text-secondary"
+                    >check_circle</span
+                  >
+                  3 / 5 Ready
+                </span>
+              </div>
+              <div class="w-px h-8 bg-surface-variant"></div>
+              <div class="flex flex-col pr-space-md">
+                <span
+                  class="font-label-sm text-label-sm text-on-surface-variant uppercase"
+                  >Grounding Index</span
+                >
+                <span
+                  class="font-headline-sm text-headline-sm text-secondary flex items-center gap-1"
+                >
+                  <span class="material-symbols-outlined text-[16px]"
+                    >verified</span
+                  >
+                  100% Locked
+                </span>
+              </div>
+              <div class="w-px h-8 bg-surface-variant"></div>
+              <div class="flex flex-col">
+                <span
+                  class="font-label-sm text-label-sm text-on-surface-variant uppercase"
+                  >Mapped Chunks</span
+                >
+                <span
+                  class="font-headline-sm text-headline-sm text-on-surface font-label-sm"
+                >
+                  360 Units
+                </span>
+              </div>
+            </div>
+          </div>
+          <!-- Pipeline Navigation Tabs -->
+          <div class="flex items-center gap-space-lg overflow-x-auto">
+            <a
+              class="pb-3 flex items-center gap-space-xs font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors"
+              href="#"
+            >
+              <span class="material-symbols-outlined text-[18px] text-secondary"
+                >check_circle</span
+              >
+              <span>Resources (5)</span>
+            </a>
+            <div
+              class="pb-3 flex items-center gap-space-xs font-headline-sm text-headline-sm text-primary font-semibold shadow-[inset_0_-2px_0_0] shadow-primary"
+            >
+              <span class="material-symbols-outlined text-[18px]"
+                >account_tree</span
+              >
+              <span>Topics (14)</span>
+              <span
+                class="ml-1 px-1.5 py-0.2 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm"
+                >Active</span
+              >
+            </div>
+            <div
+              class="pb-3 flex items-center gap-space-xs font-body-sm text-body-sm text-outline cursor-not-allowed"
+            >
+              <span class="material-symbols-outlined text-[18px]"
+                >neurology</span
+              >
+              <span>Generation</span>
+              <span
+                class="px-1.5 py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-outline-variant"
+                >Upcoming step</span
+              >
+            </div>
+            <div
+              class="pb-3 flex items-center gap-space-xs font-body-sm text-body-sm text-outline cursor-not-allowed"
+            >
+              <span class="material-symbols-outlined text-[18px]">quiz</span>
+              <span>Question Bank</span>
+              <span
+                class="px-1.5 py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-outline-variant"
+                >Upcoming step</span
+              >
+            </div>
+          </div>
+        </section>
+        <!-- Main Content Stage -->
+        <div class="px-margin-desktop py-space-xl flex flex-col gap-space-lg">
+          <!-- View Mode Warning Banner for State 4 -->
+          <div
+            class="hidden p-space-md rounded-lg bg-error-container text-on-error-container flex items-start gap-space-md shadow-sm"
+            id="state-zero-banner"
+          >
+            <span
+              class="material-symbols-outlined text-[24px] text-error mt-0.5"
+              >warning</span
+            >
+            <div class="flex-1">
+              <h2 class="font-headline-sm text-headline-sm font-semibold">
+                Zero Processed Resources Ingested
+              </h2>
+              <p class="font-body-sm text-body-sm mt-1">
+                GroundQ requires at least one processed syllabus, PDF textbook,
+                or lecture note transcript to deterministically infer knowledge
+                nodes. Please navigate to the Resources stage.
+              </p>
+              <button
+                class="mt-space-sm px-space-md py-1.5 rounded bg-error text-on-error font-body-sm text-body-sm font-medium hover:bg-error/90 transition-colors inline-flex items-center gap-space-xs"
+              >
+                <span class="material-symbols-outlined text-[16px]"
+                  >upload_file</span
+                >
+                Go to Resources Workspace
+              </button>
+            </div>
+          </div>
+          <!-- Page Title & Operational Control Strip -->
+          <div
+            class="flex flex-col md:flex-row md:items-end justify-between gap-space-md"
+          >
+            <div class="space-y-1">
+              <span
+                class="font-label-sm text-label-sm uppercase tracking-widest text-outline"
+              >
+                Curriculum Architecture · Deterministic Taxonomy
+              </span>
+              <h2 class="font-headline-lg text-headline-lg text-on-surface">
+                Topic map &amp; knowledge coverage
+              </h2>
+              <p
+                class="font-body-md text-body-md text-on-surface-variant max-w-2xl"
+              >
+                Review and structure the concept hierarchy inferred from your
+                processed resources. This map determines the blueprint targets
+                for question generation.
+              </p>
+            </div>
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-space-sm flex-wrap shrink-0">
+              <button
+                class="px-space-md py-2 rounded-lg bg-primary-container text-on-primary font-headline-sm text-headline-sm hover:bg-primary transition-all shadow-sm flex items-center gap-space-xs active:scale-[0.985]"
+                onclick="simulateInfer()"
+              >
+                <span class="material-symbols-outlined text-[18px]"
+                  >auto_awesome</span
+                >
+                <span>Infer Topics from Resources</span>
+              </button>
+              <button
+                class="px-space-md py-2 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container font-headline-sm text-headline-sm shadow-sm transition-all flex items-center gap-space-xs"
+                onclick="toggleDrawer(true)"
+              >
+                <span class="material-symbols-outlined text-[18px]">add</span>
+                <span>Add Topic Manually</span>
+              </button>
+              <button
+                class="p-2 rounded-lg bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:bg-surface-container shadow-sm transition-colors"
+                title="Reorganize / Sort Hierarchy"
+              >
+                <span class="material-symbols-outlined text-[20px]">sort</span>
+              </button>
+            </div>
+          </div>
+          <!-- MAIN TWO-COLUMN WORKSPACE (Visible in normal & drawer states) -->
+          <div
+            class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start"
+            id="workspace-populated"
+          >
+            <!-- LEFT COLUMN: Topic Hierarchy Tree (62% ~ cols 7 or 8) -->
+            <main class="lg:col-span-7 flex flex-col gap-space-md">
+              <!-- Filter Bar -->
+              <div
+                class="p-space-sm rounded-lg bg-surface-container-lowest shadow-sm flex flex-col sm:flex-row items-center justify-between gap-space-sm"
+              >
+                <div class="relative w-full sm:w-auto flex-1 max-w-md">
+                  <span
+                    class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline"
+                    >search</span
+                  >
+                  <input
+                    class="w-full pl-9 pr-3 py-1.5 rounded bg-surface-container-low text-body-sm font-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="Filter topics by concept or chunk keyword..."
+                    type="text"
+                  />
+                </div>
+                <div
+                  class="flex items-center gap-space-xs shrink-0 self-end sm:self-auto"
+                >
+                  <button
+                    class="px-2.5 py-1 text-label-sm font-label-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors"
+                  >
+                    Expand All
+                  </button>
+                  <span class="text-outline-variant font-label-md">/</span>
+                  <button
+                    class="px-2.5 py-1 text-label-sm font-label-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors"
+                  >
+                    Collapse All
+                  </button>
+                  <div class="h-4 w-px bg-surface-variant mx-1"></div>
+                  <button
+                    class="px-2.5 py-1 text-label-sm font-label-sm bg-surface-container rounded font-medium text-on-surface"
+                  >
+                    By Module
+                  </button>
+                  <button
+                    class="px-2.5 py-1 text-label-sm font-label-sm text-on-surface-variant hover:bg-surface-container rounded"
+                  >
+                    Flat List
+                  </button>
+                </div>
+              </div>
+              <!-- MODULE 1 CARD (Expanded with Subtopics) -->
+              <div
+                class="rounded-xl bg-surface-container-lowest shadow-sm overflow-hidden transition-all"
+              >
+                <!-- Module Header -->
+                <div
+                  class="p-space-md bg-surface-container-low flex items-start justify-between gap-space-md"
+                >
+                  <div class="flex items-start gap-space-sm">
+                    <button
+                      aria-label="Toggle Module Collapse"
+                      class="mt-1 text-on-surface-variant hover:text-on-surface"
+                    >
+                      <span class="material-symbols-outlined text-[20px]"
+                        >expand_more</span
+                      >
+                    </button>
+                    <div>
+                      <div class="flex items-center gap-space-sm flex-wrap">
+                        <h3
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                        >
+                          Module 1: Process Synchronization &amp; Deadlocks
+                        </h3>
+                        <span
+                          class="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-label-sm text-label-sm font-medium"
+                        >
+                          AI INFERRED
+                        </span>
+                      </div>
+                      <p
+                        class="font-label-sm text-label-sm text-on-surface-variant mt-1"
+                      >
+                        4 Subtopics · 92 text chunks locked · Coverage 98%
+                      </p>
+                    </div>
+                  </div>
+                  <!-- Quick module action triggers -->
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button
+                      class="px-2 py-1 rounded text-label-sm font-label-sm hover:bg-surface text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1"
+                      onclick="toggleDrawer(true)"
+                    >
+                      <span class="material-symbols-outlined text-[14px]"
+                        >add</span
+                      >
+                      <span>Subtopic</span>
+                    </button>
+                    <button
+                      class="p-1 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface"
+                      title="Rename Module"
+                    >
+                      <span class="material-symbols-outlined text-[16px]"
+                        >edit</span
+                      >
+                    </button>
+                    <button
+                      class="p-1 rounded text-on-surface-variant hover:text-error hover:bg-surface"
+                      title="Archive Module"
+                    >
+                      <span class="material-symbols-outlined text-[16px]"
+                        >archive</span
+                      >
+                    </button>
+                  </div>
+                </div>
+                <!-- Subtopics List (Indented) -->
+                <div
+                  class="divide-y divide-surface-container-low flex flex-col"
+                >
+                  <!-- Subtopic 1.1: ACTIVE SELECTED STATE -->
+                  <div
+                    class="p-space-md pl-12 bg-primary/5 shadow-[inset_3px_0_0_0] shadow-primary flex items-center justify-between gap-space-sm hover:bg-primary/10 transition-colors cursor-pointer"
+                    onclick="selectTopic('1.1')"
+                  >
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-space-sm">
+                        <span
+                          class="font-label-md text-label-md text-primary font-bold"
+                          >1.1</span
+                        >
+                        <span
+                          class="font-headline-sm text-headline-sm text-on-surface font-semibold"
+                        >
+                          Banker's Algorithm &amp; Resource Allocation
+                        </span>
+                      </div>
+                      <div
+                        class="flex items-center gap-space-md font-label-sm text-label-sm"
+                      >
+                        <span
+                          class="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-medium"
+                        >
+                          28 chunks locked
+                        </span>
+                        <span class="text-secondary font-medium"
+                          >99.4% deterministic fit</span
+                        >
+                        <span class="text-outline">Silberschatz OS Ch.8</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="material-symbols-outlined text-[20px] text-primary"
+                        >arrow_forward_ios</span
+                      >
+                    </div>
+                  </div>
+                  <!-- Subtopic 1.2 -->
+                  <div
+                    class="p-space-md pl-12 flex items-center justify-between gap-space-sm hover:bg-surface-container-low/60 transition-colors cursor-pointer"
+                    onclick="selectTopic('1.2')"
+                  >
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-space-sm">
+                        <span class="font-label-md text-label-md text-outline"
+                          >1.2</span
+                        >
+                        <span
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                        >
+                          Coffman Conditions &amp; Deadlock Characterization
+                        </span>
+                      </div>
+                      <div
+                        class="flex items-center gap-space-md font-label-sm text-label-sm"
+                      >
+                        <span
+                          class="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-medium"
+                        >
+                          24 chunks locked
+                        </span>
+                        <span class="text-secondary font-medium"
+                          >98.8% fit</span
+                        >
+                        <span class="text-outline">CS842 Syllabus Sec 2</span>
+                      </div>
+                    </div>
+                    <button class="text-outline-variant hover:text-on-surface">
+                      <span class="material-symbols-outlined text-[18px]"
+                        >more_vert</span
+                      >
+                    </button>
+                  </div>
+                  <!-- Subtopic 1.3 -->
+                  <div
+                    class="p-space-md pl-12 flex items-center justify-between gap-space-sm hover:bg-surface-container-low/60 transition-colors cursor-pointer"
+                    onclick="selectTopic('1.3')"
+                  >
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-space-sm">
+                        <span class="font-label-md text-label-md text-outline"
+                          >1.3</span
+                        >
+                        <span
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                        >
+                          Wait-For Graphs &amp; Cycle Detection
+                        </span>
+                      </div>
+                      <div
+                        class="flex items-center gap-space-md font-label-sm text-label-sm"
+                      >
+                        <span
+                          class="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-medium"
+                        >
+                          22 chunks locked
+                        </span>
+                        <span class="text-secondary font-medium"
+                          >97.2% fit</span
+                        >
+                        <span class="text-outline">Silberschatz OS Ch.8</span>
+                      </div>
+                    </div>
+                    <button class="text-outline-variant hover:text-on-surface">
+                      <span class="material-symbols-outlined text-[18px]"
+                        >more_vert</span
+                      >
+                    </button>
+                  </div>
+                  <!-- Subtopic 1.4 -->
+                  <div
+                    class="p-space-md pl-12 flex items-center justify-between gap-space-sm hover:bg-surface-container-low/60 transition-colors cursor-pointer"
+                    onclick="selectTopic('1.4')"
+                  >
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-space-sm">
+                        <span class="font-label-md text-label-md text-outline"
+                          >1.4</span
+                        >
+                        <span
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                        >
+                          Livelock &amp; Starvation Primitives
+                        </span>
+                      </div>
+                      <div
+                        class="flex items-center gap-space-md font-label-sm text-label-sm"
+                      >
+                        <span
+                          class="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-medium"
+                        >
+                          18 chunks locked
+                        </span>
+                        <span class="text-secondary font-medium"
+                          >95.1% fit</span
+                        >
+                        <span class="text-outline">Lecture Notes Week 3</span>
+                      </div>
+                    </div>
+                    <button class="text-outline-variant hover:text-on-surface">
+                      <span class="material-symbols-outlined text-[18px]"
+                        >more_vert</span
+                      >
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <!-- MODULE 2 CARD -->
+              <div
+                class="rounded-xl bg-surface-container-lowest shadow-sm overflow-hidden"
+              >
+                <div
+                  class="p-space-md bg-surface-container-low flex items-start justify-between gap-space-md"
+                >
+                  <div class="flex items-start gap-space-sm">
+                    <button
+                      aria-label="Toggle Module Collapse"
+                      class="mt-1 text-on-surface-variant hover:text-on-surface"
+                    >
+                      <span class="material-symbols-outlined text-[20px]"
+                        >expand_more</span
+                      >
+                    </button>
+                    <div>
+                      <div class="flex items-center gap-space-sm flex-wrap">
+                        <h3
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                        >
+                          Module 2: Remote Procedure Calls &amp; Distributed IPC
+                        </h3>
+                        <span
+                          class="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-label-sm text-label-sm font-medium"
+                        >
+                          AI INFERRED
+                        </span>
+                      </div>
+                      <p
+                        class="font-label-sm text-label-sm text-on-surface-variant mt-1"
+                      >
+                        3 Subtopics · 84 text chunks locked · Coverage 100%
+                      </p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button
+                      class="px-2 py-1 rounded text-label-sm font-label-sm hover:bg-surface text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1"
+                      onclick="toggleDrawer(true)"
+                    >
+                      <span class="material-symbols-outlined text-[14px]"
+                        >add</span
+                      >
+                      <span>Subtopic</span>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="divide-y divide-surface-container-low flex flex-col"
+                >
+                  <div
+                    class="p-space-md pl-12 flex items-center justify-between gap-space-sm hover:bg-surface-container-low/60 transition-colors cursor-pointer"
+                  >
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-space-sm">
+                        <span class="font-label-md text-label-md text-outline"
+                          >2.1</span
+                        >
+                        <span
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                          >Stub Generation &amp; Marshalling /
+                          Unmarshalling</span
+                        >
+                      </div>
+                      <span
+                        class="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm"
+                        >32 chunks</span
+                      >
+                    </div>
+                  </div>
+                  <div
+                    class="p-space-md pl-12 flex items-center justify-between gap-space-sm hover:bg-surface-container-low/60 transition-colors cursor-pointer"
+                  >
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-space-sm">
+                        <span class="font-label-md text-label-md text-outline"
+                          >2.2</span
+                        >
+                        <span
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                          >At-Least-Once vs. At-Most-Once Semantics</span
+                        >
+                      </div>
+                      <span
+                        class="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm"
+                        >28 chunks</span
+                      >
+                    </div>
+                  </div>
+                  <div
+                    class="p-space-md pl-12 flex items-center justify-between gap-space-sm hover:bg-surface-container-low/60 transition-colors cursor-pointer"
+                  >
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-space-sm">
+                        <span class="font-label-md text-label-md text-outline"
+                          >2.3</span
+                        >
+                        <span
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                          >Idempotency &amp; Replay Handling</span
+                        >
+                      </div>
+                      <span
+                        class="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm"
+                        >24 chunks</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- MODULE 3 CARD -->
+              <div
+                class="rounded-xl bg-surface-container-lowest shadow-sm overflow-hidden"
+              >
+                <div
+                  class="p-space-md bg-surface-container-low flex items-start justify-between gap-space-md"
+                >
+                  <div class="flex items-start gap-space-sm">
+                    <button
+                      aria-label="Toggle Module Collapse"
+                      class="mt-1 text-on-surface-variant hover:text-on-surface"
+                    >
+                      <span class="material-symbols-outlined text-[20px]"
+                        >expand_more</span
+                      >
+                    </button>
+                    <div>
+                      <div class="flex items-center gap-space-sm flex-wrap">
+                        <h3
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                        >
+                          Module 3: Consensus Protocols &amp; State Machine
+                          Replication
+                        </h3>
+                        <span
+                          class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-label-sm text-label-sm font-medium"
+                        >
+                          MANUAL MODIFIED
+                        </span>
+                      </div>
+                      <p
+                        class="font-label-sm text-label-sm text-on-surface-variant mt-1"
+                      >
+                        4 Subtopics · 112 text chunks locked · Coverage 96%
+                      </p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button
+                      class="px-2 py-1 rounded text-label-sm font-label-sm hover:bg-surface text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1"
+                      onclick="toggleDrawer(true)"
+                    >
+                      <span class="material-symbols-outlined text-[14px]"
+                        >add</span
+                      >
+                      <span>Subtopic</span>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="divide-y divide-surface-container-low flex flex-col"
+                >
+                  <div
+                    class="p-space-md pl-12 flex items-center justify-between gap-space-sm hover:bg-surface-container-low/60 transition-colors"
+                  >
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-space-sm">
+                        <span class="font-label-md text-label-md text-outline"
+                          >3.1</span
+                        >
+                        <span
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                          >Raft Leader Election &amp; Term Monotonicity</span
+                        >
+                      </div>
+                      <span
+                        class="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm"
+                        >36 chunks</span
+                      >
+                    </div>
+                  </div>
+                  <div
+                    class="p-space-md pl-12 flex items-center justify-between gap-space-sm hover:bg-surface-container-low/60 transition-colors"
+                  >
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-space-sm">
+                        <span class="font-label-md text-label-md text-outline"
+                          >3.2</span
+                        >
+                        <span
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                          >Paxos Synod Consensus &amp; Quorums</span
+                        >
+                      </div>
+                      <span
+                        class="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm"
+                        >40 chunks</span
+                      >
+                    </div>
+                  </div>
+                  <div
+                    class="p-space-md pl-12 flex items-center justify-between gap-space-sm hover:bg-surface-container-low/60 transition-colors"
+                  >
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-space-sm">
+                        <span class="font-label-md text-label-md text-outline"
+                          >3.3</span
+                        >
+                        <span
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                          >Log Compaction &amp; Snapshotting</span
+                        >
+                      </div>
+                      <span
+                        class="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm"
+                        >20 chunks</span
+                      >
+                    </div>
+                  </div>
+                  <div
+                    class="p-space-md pl-12 flex items-center justify-between gap-space-sm hover:bg-surface-container-low/60 transition-colors"
+                  >
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-space-sm">
+                        <span class="font-label-md text-label-md text-outline"
+                          >3.4</span
+                        >
+                        <span
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                          >Byzantine Fault Tolerance Fundamentals</span
+                        >
+                      </div>
+                      <span
+                        class="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm"
+                        >16 chunks</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- MODULE 4 CARD -->
+              <div
+                class="rounded-xl bg-surface-container-lowest shadow-sm overflow-hidden opacity-80"
+              >
+                <div
+                  class="p-space-md bg-surface-container-low flex items-start justify-between gap-space-md"
+                >
+                  <div class="flex items-start gap-space-sm">
+                    <button
+                      aria-label="Toggle Module Collapse"
+                      class="mt-1 text-on-surface-variant hover:text-on-surface"
+                    >
+                      <span class="material-symbols-outlined text-[20px]"
+                        >chevron_right</span
+                      >
+                    </button>
+                    <div>
+                      <div class="flex items-center gap-space-sm flex-wrap">
+                        <h3
+                          class="font-headline-sm text-headline-sm text-on-surface"
+                        >
+                          Module 4: Virtual Memory &amp; Page Decomposition
+                        </h3>
+                        <span
+                          class="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-label-sm text-label-sm font-medium"
+                        >
+                          AI INFERRED
+                        </span>
+                      </div>
+                      <p
+                        class="font-label-sm text-label-sm text-on-surface-variant mt-1"
+                      >
+                        3 Subtopics · 72 text chunks locked
+                      </p>
+                    </div>
+                  </div>
+                  <span class="text-label-sm font-label-sm text-outline"
+                    >Collapsed</span
+                  >
+                </div>
+              </div>
+            </main>
+            <!-- RIGHT COLUMN: Topic Grounding Inspector (38% ~ cols 5) -->
+            <aside
+              aria-label="Topic Grounding Inspector"
+              class="lg:col-span-5 sticky top-20 flex flex-col gap-space-md"
+            >
+              <div
+                class="rounded-xl bg-surface-container-lowest shadow-md overflow-hidden flex flex-col"
+              >
+                <!-- Inspector Header -->
+                <div class="p-space-md bg-surface-container-low">
+                  <div
+                    class="flex items-center justify-between text-label-sm font-label-sm text-primary font-bold tracking-wider uppercase mb-1"
+                  >
+                    <span class="flex items-center gap-1">
+                      <span class="material-symbols-outlined text-[16px]"
+                        >verified</span
+                      >
+                      Grounding Evidence Inspector
+                    </span>
+                    <span class="text-secondary font-mono">100% Locked</span>
+                  </div>
+                  <h3
+                    class="font-headline-lg text-headline-lg text-on-surface leading-tight"
+                  >
+                    1.1 Banker's Algorithm &amp; Resource Allocation
+                  </h3>
+                  <div
+                    class="flex items-center gap-space-xs text-body-sm font-body-sm text-on-surface-variant mt-1"
+                  >
+                    <span class="text-outline">Parent:</span>
+                    <span class="font-medium text-on-surface"
+                      >Module 1: Process Synchronization &amp; Deadlocks</span
+                    >
+                  </div>
+                  <!-- Corpus Origin Metadata -->
+                  <div
+                    class="mt-space-sm pt-space-xs border-t border-surface-variant/40 flex items-center gap-2"
+                  >
+                    <span
+                      class="material-symbols-outlined text-[16px] text-outline"
+                      >source</span
+                    >
+                    <span
+                      class="font-label-sm text-label-sm text-on-surface-variant truncate"
+                    >
+                      Corpus: Silberschatz OS (Ch. 8), CS842 Syllabus
+                    </span>
+                  </div>
+                </div>
+                <!-- Grounding Metric Visualizer Cards -->
+                <div
+                  class="p-space-md grid grid-cols-3 gap-space-xs bg-surface"
+                >
+                  <!-- Metric 1 -->
+                  <div
+                    class="p-space-sm rounded bg-surface-container-lowest shadow-sm flex flex-col"
+                  >
+                    <span
+                      class="font-label-sm text-label-sm text-on-surface-variant uppercase"
+                      >Linked Chunks</span
+                    >
+                    <span
+                      class="font-headline-sm text-headline-sm text-secondary font-bold mt-1"
+                      >28 Chunks</span
+                    >
+                    <span
+                      class="font-label-sm text-label-sm text-outline mt-0.5"
+                      >Deterministic</span
+                    >
+                  </div>
+                  <!-- Metric 2 -->
+                  <div
+                    class="p-space-sm rounded bg-surface-container-lowest shadow-sm flex flex-col"
+                  >
+                    <span
+                      class="font-label-sm text-label-sm text-on-surface-variant uppercase"
+                      >Hallucinations</span
+                    >
+                    <span
+                      class="font-headline-sm text-headline-sm text-secondary font-bold mt-1"
+                      >0 Detected</span
+                    >
+                    <span
+                      class="font-label-sm text-label-sm text-outline mt-0.5"
+                      >Zero drift</span
+                    >
+                  </div>
+                  <!-- Metric 3 -->
+                  <div
+                    class="p-space-sm rounded bg-surface-container-lowest shadow-sm flex flex-col"
+                  >
+                    <span
+                      class="font-label-sm text-label-sm text-on-surface-variant uppercase"
+                      >Blueprint Alloc.</span
+                    >
+                    <span
+                      class="font-headline-sm text-headline-sm text-primary font-bold mt-1"
+                      >25.0%</span
+                    >
+                    <span
+                      class="font-label-sm text-label-sm text-outline mt-0.5"
+                      >Recommended</span
+                    >
+                  </div>
+                </div>
+                <!-- Verified Evidence Chunks Stream -->
+                <div
+                  class="p-space-md flex flex-col gap-space-sm max-h-[460px] overflow-y-auto"
+                >
+                  <div class="flex items-center justify-between mb-1">
+                    <span
+                      class="font-label-sm text-label-sm text-on-surface-variant uppercase font-semibold"
+                    >
+                      Verified Cryptographic Evidence
+                    </span>
+                    <span class="font-label-sm text-label-sm text-outline"
+                      >Showing 3 of 28</span
+                    >
+                  </div>
+                  <!-- Evidence Chunk #1 -->
+                  <div
+                    class="p-space-sm rounded-lg bg-surface-container-low shadow-sm space-y-2"
+                  >
+                    <div class="flex items-start justify-between gap-2">
+                      <span
+                        class="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm font-mono text-on-surface font-semibold"
+                      >
+                        #OS-312-C04
+                      </span>
+                      <span
+                        class="font-label-sm text-label-sm text-secondary font-medium"
+                        >99.8% match</span
+                      >
+                    </div>
+                    <p class="font-label-sm text-label-sm text-outline">
+                      Silberschatz_OS_Deadlocks_Ch8.pdf · Page 312 · Para 3
+                    </p>
+                    <div
+                      class="pl-2 border-l-2 border-secondary bg-surface-container-lowest/60 p-2 rounded-r font-editorial-quote text-body-sm text-on-surface italic"
+                    >
+                      "The Banker's algorithm is a deadlock avoidance algorithm
+                      that tests for safety by simulating the allocation of
+                      predetermined maximum possible amounts of all resources,
+                      and then makes an 's-state' check to test for possible
+                      activities..."
+                    </div>
+                    <div
+                      class="flex items-center justify-between text-label-sm font-label-sm text-outline font-mono"
+                    >
+                      <span>sha256: 7b1e..49f0</span>
+                      <span class="flex items-center gap-1 text-secondary">
+                        <span class="material-symbols-outlined text-[12px]"
+                          >lock</span
+                        >
+                        locked
+                      </span>
+                    </div>
+                  </div>
+                  <!-- Evidence Chunk #2 -->
+                  <div
+                    class="p-space-sm rounded-lg bg-surface-container-low shadow-sm space-y-2"
+                  >
+                    <div class="flex items-start justify-between gap-2">
+                      <span
+                        class="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm font-mono text-on-surface font-semibold"
+                      >
+                        #OS-314-C08
+                      </span>
+                      <span
+                        class="font-label-sm text-label-sm text-secondary font-medium"
+                        >99.2% match</span
+                      >
+                    </div>
+                    <p class="font-label-sm text-label-sm text-outline">
+                      Silberschatz_OS_Deadlocks_Ch8.pdf · Page 314 · Para 1
+                    </p>
+                    <div
+                      class="pl-2 border-l-2 border-secondary bg-surface-container-lowest/60 p-2 rounded-r font-editorial-quote text-body-sm text-on-surface italic"
+                    >
+                      "Let Work and Finish be vectors of length m and n
+                      respectively. Initialize Work = Available and Finish[i] =
+                      false for i = 0, 1, ..., n-1..."
+                    </div>
+                    <div
+                      class="flex items-center justify-between text-label-sm font-label-sm text-outline font-mono"
+                    >
+                      <span>sha256: 9e4a..b123</span>
+                      <span class="flex items-center gap-1 text-secondary">
+                        <span class="material-symbols-outlined text-[12px]"
+                          >lock</span
+                        >
+                        locked
+                      </span>
+                    </div>
+                  </div>
+                  <!-- Evidence Chunk #3 -->
+                  <div
+                    class="p-space-sm rounded-lg bg-surface-container-low shadow-sm space-y-2"
+                  >
+                    <div class="flex items-start justify-between gap-2">
+                      <span
+                        class="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm font-mono text-on-surface font-semibold"
+                      >
+                        #SYLLABUS-P4-C02
+                      </span>
+                      <span
+                        class="font-label-sm text-label-sm text-secondary font-medium"
+                        >98.5% match</span
+                      >
+                    </div>
+                    <p class="font-label-sm text-label-sm text-outline">
+                      CS842_Course_Syllabus_2025.pdf · Page 4 · Sec 2.1
+                    </p>
+                    <div
+                      class="pl-2 border-l-2 border-secondary bg-surface-container-lowest/60 p-2 rounded-r font-editorial-quote text-body-sm text-on-surface italic"
+                    >
+                      "Week 4 Learning Objective: Students must rigorously
+                      formulate safe sequences and prove termination guarantees
+                      under arbitrary request vectors."
+                    </div>
+                    <div
+                      class="flex items-center justify-between text-label-sm font-label-sm text-outline font-mono"
+                    >
+                      <span>sha256: 3c88..fe20</span>
+                      <span class="flex items-center gap-1 text-secondary">
+                        <span class="material-symbols-outlined text-[12px]"
+                          >lock</span
+                        >
+                        locked
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Inspector Action Footer -->
+                <div
+                  class="p-space-md bg-surface-container-low flex items-center justify-between gap-space-xs"
+                >
+                  <button
+                    class="px-3 py-1.5 rounded bg-surface-container-lowest text-on-surface hover:bg-surface font-body-sm text-body-sm shadow-sm transition-colors flex items-center gap-1"
+                  >
+                    <span class="material-symbols-outlined text-[16px]"
+                      >link</span
+                    >
+                    <span>Add Anchor</span>
+                  </button>
+                  <button
+                    class="px-3 py-1.5 rounded bg-surface-container-lowest text-on-surface hover:bg-surface font-body-sm text-body-sm shadow-sm transition-colors flex items-center gap-1"
+                  >
+                    <span class="material-symbols-outlined text-[16px]"
+                      >tune</span
+                    >
+                    <span>Threshold (0.85)</span>
+                  </button>
+                  <button
+                    class="p-1.5 rounded hover:bg-surface text-outline hover:text-error transition-colors"
+                    title="Unlink Evidence"
+                  >
+                    <span class="material-symbols-outlined text-[18px]"
+                      >link_off</span
+                    >
+                  </button>
+                </div>
+              </div>
+            </aside>
+          </div>
+          <!-- EMPTY STATE DISPLAY (State 3: No topics inferred yet) -->
+          <div
+            class="hidden w-full py-16 px-space-md rounded-2xl bg-surface-container-lowest shadow-sm flex flex-col items-center justify-center text-center"
+            id="state-empty-view"
+          >
+            <div
+              class="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-space-md"
+            >
+              <span class="material-symbols-outlined text-[36px]"
+                >account_tree</span
+              >
+            </div>
+            <span
+              class="font-label-sm text-label-sm uppercase tracking-widest text-outline"
+              >Deterministic Extraction Required</span
+            >
+            <h3
+              class="font-headline-lg text-headline-lg text-on-surface mt-2 max-w-lg"
+            >
+              No topics mapped yet
+            </h3>
+            <p
+              class="font-body-md text-body-md text-on-surface-variant max-w-xl mt-space-sm mb-space-lg"
+            >
+              GroundQ has verified 3 processed documents with 360 indexed chunks
+              ready in your corpus. Click below to deterministically infer the
+              hierarchical concept tree.
+            </p>
+            <div class="flex items-center gap-space-md">
+              <button
+                class="px-space-lg py-2.5 rounded-lg bg-primary text-on-primary font-headline-sm text-headline-sm shadow hover:bg-primary/90 transition-all flex items-center gap-space-xs"
+                onclick="simulateInfer()"
+              >
+                <span class="material-symbols-outlined text-[20px]"
+                  >auto_awesome</span
+                >
+                <span>Infer Topics from Resources</span>
+              </button>
+              <button
+                class="px-space-lg py-2.5 rounded-lg bg-surface-container text-on-surface font-headline-sm text-headline-sm hover:bg-surface-container-high transition-colors"
+                onclick="toggleDrawer(true)"
+              >
+                Create Empty Hierarchy
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- STATE 2: SLIDE-OVER DRAWER (Add Topic Manually) -->
+        <div
+          aria-hidden="true"
+          class="fixed inset-0 z-50 pointer-events-none transition-opacity duration-300 opacity-0 invisible"
+          id="drawer-add-topic"
+        >
+          <!-- Backdrop scrim -->
+          <div
+            class="absolute inset-0 bg-inverse-surface/20 backdrop-blur-[2px] pointer-events-auto"
+            onclick="toggleDrawer(false)"
+          ></div>
+          <!-- Drawer Panel -->
+          <div
+            class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-surface-container-lowest shadow-2xl pointer-events-auto flex flex-col transform transition-transform duration-300 translate-x-full"
+          >
+            <!-- Drawer Header -->
+            <div
+              class="p-space-lg bg-surface-container-low flex items-center justify-between"
+            >
+              <div class="space-y-0.5">
+                <span
+                  class="font-label-sm text-label-sm uppercase tracking-widest text-outline"
+                  >Manual Topology</span
+                >
+                <h3
+                  class="font-headline-md text-headline-md text-on-surface font-semibold"
+                >
+                  Add Curriculum Topic
+                </h3>
+              </div>
+              <button
+                class="p-1 rounded hover:bg-surface text-on-surface-variant hover:text-on-surface"
+                onclick="toggleDrawer(false)"
+              >
+                <span class="material-symbols-outlined text-[22px]">close</span>
+              </button>
+            </div>
+            <!-- Drawer Form Body -->
+            <form
+              class="p-space-lg flex-1 overflow-y-auto space-y-space-md"
+              onsubmit="
+                event.preventDefault();
+                toggleDrawer(false);
+                switchState('normal');
+              "
+            >
+              <!-- Topic Title -->
+              <div class="space-y-1">
+                <label
+                  class="block font-label-md text-label-md text-on-surface font-medium uppercase"
+                >
+                  Topic Title <span class="text-error">*</span>
+                </label>
+                <input
+                  class="w-full px-3 py-2 rounded bg-surface text-on-surface font-body-md text-body-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="e.g., Lamport Logical Timestamps"
+                  required=""
+                  type="text"
+                  value="Vector Clocks &amp; Causality Violation Detection"
+                />
+              </div>
+              <!-- Parent Module Select -->
+              <div class="space-y-1">
+                <label
+                  class="block font-label-md text-label-md text-on-surface font-medium uppercase"
+                >
+                  Parent Module <span class="text-error">*</span>
+                </label>
+                <select
+                  class="w-full px-3 py-2 rounded bg-surface text-on-surface font-body-md text-body-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option>
+                    Module 1: Process Synchronization &amp; Deadlocks
+                  </option>
+                  <option selected="">
+                    Module 2: Remote Procedure Calls &amp; Distributed IPC
+                  </option>
+                  <option>
+                    Module 3: Consensus Protocols &amp; State Machine
+                    Replication
+                  </option>
+                  <option>+ Create New Parent Module</option>
+                </select>
+              </div>
+              <!-- Bloom Target Hint -->
+              <div class="space-y-1">
+                <label
+                  class="block font-label-md text-label-md text-on-surface font-medium uppercase"
+                >
+                  Pedagogical Depth (Bloom's Taxonomy)
+                </label>
+                <select
+                  class="w-full px-3 py-2 rounded bg-surface text-on-surface font-body-md text-body-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option>Level 3: Apply (Implementation &amp; tracing)</option>
+                  <option selected="">
+                    Level 4: Analyze (Fault analysis &amp; concurrency races)
+                  </option>
+                  <option>
+                    Level 5: Evaluate (Consensus trade-offs &amp; safety proofs)
+                  </option>
+                  <option>
+                    Level 6: Synthesize (Distributed protocol design)
+                  </option>
+                </select>
+              </div>
+              <!-- Grounding Resource Origin -->
+              <div class="space-y-1">
+                <label
+                  class="block font-label-md text-label-md text-on-surface font-medium uppercase"
+                >
+                  Primary Corroborating Source
+                </label>
+                <select
+                  class="w-full px-3 py-2 rounded bg-surface text-on-surface font-body-md text-body-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option>
+                    Silberschatz_OS_Deadlocks_Ch8.pdf (312 Chunks)
+                  </option>
+                  <option selected="">
+                    CS842_Course_Syllabus_2025.pdf (48 Chunks)
+                  </option>
+                  <option>
+                    Distributed_Systems_Principles_Tanenbaum.pdf (Pre-processed)
+                  </option>
+                </select>
+              </div>
+              <!-- Description & Conceptual Bounds -->
+              <div class="space-y-1">
+                <label
+                  class="block font-label-md text-label-md text-on-surface font-medium uppercase"
+                >
+                  Conceptual Bounds &amp; Key Assertions
+                </label>
+                <textarea
+                  class="w-full px-3 py-2 rounded bg-surface text-on-surface font-body-md text-body-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="Define what questions targeting this topic must verify or avoid..."
+                  rows="3"
+                >
+Cover happens-before relations (-&gt;), concurrent events where neither a -&gt; b nor b -&gt; a, and clock size equal to system process count.</textarea>
+                <span class="font-label-sm text-label-sm text-outline"
+                  >GroundQ will use this scope when generating question
+                  stems.</span
+                >
+              </div>
+              <!-- Drawer Action Buttons -->
+              <div
+                class="pt-space-md flex items-center justify-end gap-space-sm"
+              >
+                <button
+                  class="px-space-md py-2 rounded bg-surface-container text-on-surface font-headline-sm text-headline-sm hover:bg-surface-container-high transition-colors"
+                  onclick="toggleDrawer(false)"
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  class="px-space-md py-2 rounded bg-primary text-on-primary font-headline-sm text-headline-sm hover:bg-primary/90 shadow-sm transition-all flex items-center gap-1"
+                  type="submit"
+                >
+                  <span class="material-symbols-outlined text-[16px]"
+                    >check</span
+                  >
+                  <span>Save Topic &amp; Lock</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <!-- Operational Feedback Toast (Hidden by default) -->
+        <div
+          class="fixed bottom-6 right-6 z-50 hidden bg-inverse-surface text-inverse-on-surface px-space-md py- space-sm rounded-lg shadow-xl items-center gap-space-sm font-body-sm text-body-sm"
+          id="operational-toast"
+        >
+          <span class="material-symbols-outlined text-[18px] text-secondary"
+            >verified</span
+          >
+          <span id="toast-message"
+            >Deterministic taxonomy indexed successfully.</span
+          >
+        </div>
+        <!-- Inline Micro-interactions Script -->
+        <script>
+          function switchState(state) {
+            const workspacePopulated = document.getElementById(
+              'workspace-populated',
+            );
+            const stateEmptyView = document.getElementById('state-empty-view');
+            const stateZeroBanner =
+              document.getElementById('state-zero-banner');
+            const drawer = document.getElementById('drawer-add-topic');
+
+            // Update button styles in utility state switcher
+            const buttons = [
+              'btn-state-normal',
+              'btn-state-drawer',
+              'btn-state-empty',
+              'btn-state-zero',
+            ];
+            buttons.forEach((id) => {
+              const btn = document.getElementById(id);
+              if (btn) {
+                btn.classList.remove(
+                  'bg-surface',
+                  'text-on-surface',
+                  'shadow-sm',
+                );
+                btn.classList.add('text-on-surface-variant');
+                btn.setAttribute('aria-selected', 'false');
+              }
+            });
+
+            const activeBtn = document.getElementById('btn-state-' + state);
+            if (activeBtn) {
+              activeBtn.classList.add(
+                'bg-surface',
+                'text-on-surface',
+                'shadow-sm',
+              );
+              activeBtn.classList.remove('text-on-surface-variant');
+              activeBtn.setAttribute('aria-selected', 'true');
+            }
+
+            // Hide all optional overlays/banners first
+            stateZeroBanner.classList.add('hidden');
+            toggleDrawer(false);
+
+            if (state === 'normal') {
+              workspacePopulated.classList.remove('hidden');
+              stateEmptyView.classList.add('hidden');
+            } else if (state === 'drawer') {
+              workspacePopulated.classList.remove('hidden');
+              stateEmptyView.classList.add('hidden');
+              toggleDrawer(true);
+            } else if (state === 'empty') {
+              workspacePopulated.classList.add('hidden');
+              stateEmptyView.classList.remove('hidden');
+            } else if (state === 'zero') {
+              workspacePopulated.classList.remove('hidden');
+              stateEmptyView.classList.add('hidden');
+              stateZeroBanner.classList.remove('hidden');
+            }
+          }
+
+          function toggleDrawer(open) {
+            const drawer = document.getElementById('drawer-add-topic');
+            const panel = drawer.querySelector('.max-w-md');
+            if (open) {
+              drawer.classList.remove('invisible', 'opacity-0');
+              drawer.setAttribute('aria-hidden', 'false');
+              setTimeout(() => {
+                panel.classList.remove('translate-x-full');
+              }, 10);
+            } else {
+              panel.classList.add('translate-x-full');
+              drawer.classList.add('opacity-0');
+              setTimeout(() => {
+                drawer.classList.add('invisible');
+                drawer.setAttribute('aria-hidden', 'true');
+              }, 300);
+            }
+          }
+
+          function selectTopic(id) {
+            showToast(
+              'Active topic shifted to ' + id + ' · Re-indexing evidence.',
+            );
+          }
+
+          function simulateInfer() {
+            showToast(
+              'Extracting concepts from 3 PDFs via Deterministic Vector Search...',
+            );
+            setTimeout(() => {
+              showToast(
+                'Taxonomy updated: 14 topics mapped with 100% corpus grounding.',
+              );
+              switchState('normal');
+            }, 1200);
+          }
+
+          function showToast(msg) {
+            const toast = document.getElementById('operational-toast');
+            const text = document.getElementById('toast-message');
+            text.textContent = msg;
+            toast.classList.remove('hidden');
+            toast.classList.add('flex');
+            setTimeout(() => {
+              toast.classList.add('hidden');
+              toast.classList.remove('flex');
+            }, 3500);
+          }
+        </script>
+      </div>
+    </main>
+    <footer
+      class="w-full bg-surface-container-lowest shadow-[0_-1px_6px_rgba(0,0,0,0.02)]"
+    >
+      <div
+        class="w-full px-margin-desktop py-space-md flex flex-col md:flex-row items-center justify-between gap-space-md font-body-sm text-body-sm text-on-surface-variant"
+      >
+        <div class="flex items-center gap-space-md flex-wrap">
+          <div class="flex items-center gap-space-xs">
+            <span class="material-symbols-outlined text-[16px] text-secondary"
+              >verified_user</span
+            ><span
+              class="font-label-sm text-label-sm uppercase tracking-wide text-on-surface"
+              >ISO/IEC 42001 Audited</span
+            >
+          </div>
+          <span class="text-outline-variant font-label-md text-label-md"
+            >•</span
+          >
+          <div class="flex items-center gap-space-xs">
+            <span
+              class="material-symbols-outlined text-[16px] text-on-surface-variant"
+              >school</span
+            ><span class="font-body-sm text-body-sm"
+              >Academic Integrity Protocol v2.4</span
+            >
+          </div>
+        </div>
+        <div class="flex items-center gap-space-lg flex-wrap">
+          <div class="flex items-center gap-space-xs">
+            <span class="w-2 h-2 rounded-full bg-secondary"></span
+            ><span class="font-label-sm text-label-sm text-on-surface-variant"
+              >Grounding Latency: 42ms</span
+            >
+          </div>
+          <span class="text-outline-variant font-label-md text-label-md">•</span
+          ><span class="font-label-sm text-label-sm text-on-surface-variant"
+            >Hash:
+            <code class="font-label-sm text-label-sm text-on-surface"
+              >0x7F4B..9C</code
+            ></span
+          >
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

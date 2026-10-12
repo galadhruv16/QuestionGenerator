@@ -90,6 +90,9 @@ export function chunkPages(
  */
 export async function getEmbedding(text: string): Promise<number[] | null> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
     const response = await fetch(`${env.OLLAMA_BASE_URL}/api/embeddings`, {
       body: JSON.stringify({
         model: env.EMBEDDING_MODEL,
@@ -97,7 +100,8 @@ export async function getEmbedding(text: string): Promise<number[] | null> {
       }),
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
       return null;

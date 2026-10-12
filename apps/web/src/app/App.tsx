@@ -7,6 +7,7 @@ import {
 } from './pages/AuthPages';
 import { LandingPage } from './pages/LandingPage';
 import { ProjectResourcesPage } from './pages/ProjectResourcesPage';
+import { ProjectTopicsPage } from './pages/ProjectTopicsPage';
 import { WorkspacePage } from './pages/WorkspacePage';
 
 export function App() {
@@ -22,6 +23,10 @@ export function App() {
         <Route
           element={<ProjectResourcesPage />}
           path="/app/projects/:projectId/resources"
+        />
+        <Route
+          element={<ProjectTopicsPage />}
+          path="/app/projects/:projectId/topics"
         />
       </Routes>
     </BrowserRouter>

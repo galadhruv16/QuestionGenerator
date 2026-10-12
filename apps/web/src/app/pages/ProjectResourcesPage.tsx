@@ -612,16 +612,13 @@ export function ProjectResourcesPage() {
                   {resources.length}
                 </span>
               </div>
-              <div
-                className="flex items-center gap-2 px-4 py-2.5 text-outline cursor-not-allowed font-body-sm text-body-sm whitespace-nowrap"
-                title="Unlocked when corpus is verified"
+              <Link
+                className="flex items-center gap-2 px-4 py-2.5 text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm transition-colors whitespace-nowrap"
+                to={`/app/projects/${projectId ?? 'demo'}/topics`}
               >
-                <Icon name="network" size={16} />
+                <Icon name="tree" size={16} />
                 <span>Topics</span>
-                <span className="px-1.5 py-0.5 rounded bg-surface-container text-outline font-label-sm text-label-sm">
-                  Requires ready resources
-                </span>
-              </div>
+              </Link>
               <div className="flex items-center gap-2 px-4 py-2.5 text-outline cursor-not-allowed font-body-sm text-body-sm whitespace-nowrap">
                 <Icon name="spark" size={16} />
                 <span>Generation</span>

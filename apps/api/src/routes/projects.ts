@@ -3,6 +3,7 @@ import { createProjectSchema, updateProjectSchema } from '@groundq/contracts';
 import { z } from 'zod';
 import { createSupabaseUserClient } from '../lib/supabase.js';
 import { resourcesRouter } from './resources.js';
+import { topicsRouter } from './topics.js';
 import {
   requireAuth,
   type AuthenticatedRequest,
@@ -238,3 +239,4 @@ projectsRouter.post('/:projectId/archive', async (request, response, next) => {
 });
 
 projectsRouter.use('/:projectId/resources', resourcesRouter);
+projectsRouter.use('/:projectId/topics', topicsRouter);

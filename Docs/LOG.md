@@ -4,6 +4,61 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-10-12] — Course Topic Map & Grounding Hierarchy Slice
+
+### Type
+Feature / UI / AI / API / Database / Security / Contracts
+
+### Status
+Implemented and verified locally.
+
+### Changes
+- Implemented Google Stitch-designed operational UI for `/app/projects/:projectId/topics` in `@groundq/web`:
+  - Project header, academic breadcrumbs, live pipeline telemetry cluster (`Active Corpus`, `Grounding Index 100% Locked`, `Mapped Chunks 360 Units`), and pipeline tabs (`Resources`, `Topics` active, `Generation`, `Question Bank`).
+  - Interactive State Inspector switcher: Normal (Populated Tree + Inspector), Add Topic Drawer, Empty State (No Topics), and Zero Resources Warning banner.
+  - Left column: 2-level hierarchical topic tree with collapsible parent Module cards, AI Inferred / User Defined badges, coverage %, and indented subtopic rows displaying locked chunk counts and fit %.
+  - Right column: Topic Grounding Evidence Inspector with linked chunk metrics, zero hallucination indicator, blueprint target allocation, and verified cryptographic evidence cards with document citations, page numbers, and quote blocks.
+  - Slide-over drawer for manual topic creation: form inputs for title, parent module, Bloom's pedagogical depth, primary corroborating source, and conceptual bounds assertions.
+  - Real-time notification toasts for topic selection, inference progression, and mutation confirmations.
+  - Bidirectional navigation between Resources workspace and Topics workspace.
+- Created `@groundq/contracts` topic schemas:
+  - `topicSourceSchema` (`INFERRED`, `USER_DEFINED`, `IMPORTED`), `chunkTopicSourceSchema` (`AUTO_INFERRED`, `USER_ASSIGNED`).
+  - `topicSchema`, `topicWithSubtopicsSchema` with recursive 2-level structure and chunk counts.
+  - `createTopicSchema`, `updateTopicSchema`, `reorderTopicsRequestSchema`, `inferTopicsRequestSchema`, and `chunkTopicEvidenceSchema`.
+  - Re-exported under `@groundq/contracts`.
+- Created Supabase migration `202610110003_topics_and_chunk_mappings.sql`:
+  - `public.topics` table: UUID PK, `project_id`, self-FK `parent_id` (enforcing max 2 levels), `name`, `description`, `source`, `sort_order`, `is_active`, and soft-archive `archived_at`.
+  - Case-insensitive unique index on `(project_id, parent_id, lower(trim(name)))` for active topics.
+  - `public.chunk_topics` table: many-to-many relationship linking `resource_chunks` to `topics` with confidence and source tags.
+  - Row Level Security (RLS) policies enforcing project ownership on both `topics` and `chunk_topics`.
+- Implemented Express API routes under `/api/v1/projects/:projectId/topics` in `@groundq/api`:
+  - `GET /`: returns assembled 2-level topic tree (Modules with nested Subtopics) with aggregated chunk counts.
+  - `POST /`: creates topic or subtopic; enforces 2-level depth boundary (parent cannot have a parent).
+  - `PATCH /:topicId`: updates name, description, parent, or sort order.
+  - `POST /reorder`: bulk updates ordering positions and parent assignments.
+  - `POST /:topicId/archive`: soft-archives topic and cascades soft-archival to child subtopics (archive-first lifecycle).
+  - `POST /infer`: extracts topic tree from indexed resource chunks using local Ollama model (with deterministic structural fallback heuristics).
+  - `GET /:topicId/evidence`: fetches mapped chunk quotes, page numbers, and resource provenance for citations.
+- Added comprehensive unit tests:
+  - `@groundq/api`: 9 route and inferencer service tests in `apps/api/test/topics.test.ts`.
+  - `@groundq/web`: 5 component tests covering header, hierarchy tree, inspector, state switcher, and drawer in `apps/web/test/topics.test.tsx`.
+
+- Hardened local Ollama fetch calls in `apps/api/src/services/topic-inferencer.ts` and `apps/api/src/services/resource-processor.ts` with explicit `AbortController` timeouts (2.5s) to guarantee fast deterministic fallback and prevent hanging test runs when local inference models are cold or loading.
+
+### Verification
+- Prettier check (`npx pnpm@9.15.5 format:check`) — passed cleanly.
+- ESLint (`npx pnpm@9.15.5 lint`) — passed cleanly across all workspaces with 0 errors/warnings.
+- TypeScript compilation (`npx pnpm@9.15.5 typecheck`) — passed cleanly across contracts, api, and web.
+- Workspace unit tests (`npx pnpm@9.15.5 test`) — 35/35 passed across contracts, api, and web:
+  - `@groundq/contracts`: 4/4 passed.
+  - `@groundq/api`: 18/18 passed.
+  - `@groundq/web`: 13/13 passed.
+- Production build (`npx pnpm@9.15.5 build`) — succeeded cleanly.
+- Runtime server verification:
+  - API daemon started and verified on `http://localhost:3001` (`/api/v1/health` returned 200 `{"status":"ok","service":"groundq-api"}`).
+  - Authenticated API route rejection verified (`/api/v1/projects` returned 401 unauthenticated).
+  - Frontend Vite dev server started and verified on `http://localhost:5173` (HTTP 200).
+
 ## [2026-10-11] — Resource Ingestion Pipeline (Text Extraction, Chunking & Embeddings)
 
 ### Type

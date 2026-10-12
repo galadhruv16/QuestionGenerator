@@ -33,7 +33,6 @@ describe('ProjectResourcesPage', () => {
     // Check pipeline tabs
     expect(screen.getAllByText('Resources').length).toBeGreaterThan(0);
     expect(screen.getByText('Topics')).toBeInTheDocument();
-    expect(screen.getByText('Requires ready resources')).toBeInTheDocument();
     expect(screen.getByText('Generation')).toBeInTheDocument();
     expect(screen.getByText('Question Bank')).toBeInTheDocument();
   });
