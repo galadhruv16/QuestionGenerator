@@ -1,0 +1,629 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&amp;family=Geist:wght@300;400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"on-secondary-fixed-variant":"#005049","on-tertiary":"#ffffff","primary-container":"#3157d5","surface-dim":"#dcd9dd","outline":"#747685","inverse-primary":"#b7c4ff","on-secondary":"#ffffff","surface":"#fbf8fc","error-container":"#ffdad6","tertiary":"#3332c2","primary-fixed-dim":"#b7c4ff","on-surface":"#1b1b1e","tertiary-fixed":"#e1e0ff","secondary-fixed-dim":"#6bd8cb","secondary":"#006a61","primary-fixed":"#dde1ff","surface-bright":"#fbf8fc","on-secondary-fixed":"#00201d","surface-variant":"#e4e1e6","on-surface-variant":"#444654","inverse-surface":"#303033","primary":"#063cbc","on-tertiary-container":"#dddbff","surface-container":"#f0edf1","secondary-container":"#86f2e4","inverse-on-surface":"#f3f0f4","on-background":"#1b1b1e","error":"#ba1a1a","on-primary-fixed":"#001452","surface-container-highest":"#e4e1e6","tertiary-container":"#4d4fda","on-primary":"#ffffff","on-tertiary-fixed-variant":"#2f2ebe","on-primary-container":"#d8ddff","surface-tint":"#2c53d1","on-error":"#ffffff","secondary-fixed":"#89f5e7","surface-container-lowest":"#ffffff","surface-container-low":"#f6f2f7","surface-container-high":"#eae7eb","on-tertiary-fixed":"#07006c","on-primary-fixed-variant":"#0038b6","background":"#fbf8fc","outline-variant":"#c4c5d6","on-error-container":"#93000a","tertiary-fixed-dim":"#c0c1ff","on-secondary-container":"#006f66"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"space-lg":"1.25rem","space-md":"0.75rem","gutter-desktop":"1.5rem","space-xs":"0.25rem","space-sm":"0.5rem","space-xl":"2rem","margin":"1rem","margin-desktop":"2rem","gutter":"1rem"},"fontFamily":{"display-lg":["Newsreader"],"headline-sm":["Geist"],"headline-lg":["Newsreader"],"body-lg":["Geist"],"editorial-quote":["Newsreader"],"headline-md":["Geist"],"body-sm":["Geist"],"label-sm":["JetBrains Mono"],"body-md":["Geist"],"display-lg-mobile":["Newsreader"],"label-md":["JetBrains Mono"]},"fontSize":{"display-lg":["40px",{"lineHeight":"48px","letterSpacing":"-0.02em","fontWeight":"500"}],"headline-sm":["16px",{"lineHeight":"24px","letterSpacing":"-0.005em","fontWeight":"600"}],"headline-lg":["28px",{"lineHeight":"36px","letterSpacing":"-0.015em","fontWeight":"500"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}],"editorial-quote":["18px",{"lineHeight":"28px","fontWeight":"400"}],"headline-md":["20px",{"lineHeight":"28px","letterSpacing":"-0.01em","fontWeight":"600"}],"body-sm":["13px",{"lineHeight":"20px","fontWeight":"400"}],"label-sm":["11px",{"lineHeight":"14px","letterSpacing":"0.03em","fontWeight":"500"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"display-lg-mobile":["30px",{"lineHeight":"38px","letterSpacing":"-0.015em","fontWeight":"500"}],"label-md":["12px",{"lineHeight":"16px","letterSpacing":"0.02em","fontWeight":"500"}]}}}};</script></head><body class="bg-surface font-body-md text-on-surface"><header class="fixed top-0 left-0 right-0 h-16 bg-surface/90 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50"><div class="h-16 w-full px-gutter-desktop flex items-center justify-between"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-space-sm"><div class="flex flex-col gap-1 w-6 py-0.5 justify-center"><span class="h-1 w-6 rounded bg-primary"></span><span class="h-1 w-4 rounded bg-primary"></span><span class="h-1 w-5 rounded bg-primary"></span></div><span class="font-headline-md text-headline-md tracking-tight text-on-surface font-semibold">GroundQ</span></div><div class="h-4 w-px bg-surface-variant hidden sm:block"></div><nav class="hidden md:flex items-center gap-space-xs font-label-md text-label-md text-on-surface-variant"><span class="text-on-surface-variant">Workspace</span><span class="text-outline-variant font-mono">/</span><span class="text-primary font-headline-sm text-body-sm font-medium">Projects</span></nav></div><div class="flex items-center gap-space-md"><div class="hidden lg:flex items-center gap-space-xs px-space-sm py-1 bg-surface-container-high rounded-full border border-surface-variant"><span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span><span class="font-label-sm text-label-sm text-on-surface font-medium">Local Ollama Inference: Online</span></div><div class="flex items-center gap-space-sm pl-space-sm"><div class="hidden sm:flex flex-col text-right"><span class="font-label-md text-label-md text-on-surface">dr.elena.rostova@lab.ac.uk</span><span class="font-label-sm text-label-sm text-on-surface-variant">Senior Research Fellow</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><a class="flex items-center gap-1 font-label-md text-label-md px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="auth-login" href="#"><span class="material-symbols-outlined text-sm">logout</span><span class="hidden md:inline">Sign out</span></a></div></div></div></header><aside class="fixed left-0 top-16 bottom-0 w-64 bg-surface-container-low shadow-[0_1px_8px_rgba(0,0,0,0.02)] z-40 flex flex-col justify-between py-space-md"><div class="flex flex-col gap-space-md px-space-sm"><div class="px-space-sm"><span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Research Modules</span></div><nav class="flex flex-col gap-1" data-active-classes="bg-primary-container text-on-primary-container font-medium rounded-lg"><a aria-current="page" class="flex items-center gap-space-sm px-space-md py-2 transition-colors bg-primary-container text-on-primary-container font-medium rounded-lg" data-path="app" href="#"><span class="material-symbols-outlined text-[18px]">neurology</span>Grounding Studio</a><a class="flex items-center gap-space-sm px-space-md py-2 rounded-lg font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="corpus-repository" href="#"><span class="material-symbols-outlined text-[18px]">source</span>Corpus Repository</a><a class="flex items-center gap-space-sm px-space-md py-2 rounded-lg font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="verification-matrix" href="#"><span class="material-symbols-outlined text-[18px]">verified</span>Verification Matrix</a><a class="flex items-center gap-space-sm px-space-md py-2 rounded-lg font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="inference-logs" href="#"><span class="material-symbols-outlined text-[18px]">terminal</span>Inference Engine Logs</a></nav><div class="h-px bg-surface-variant mx-space-sm my-space-xs"></div><div class="px-space-sm"><span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Configuration</span></div><nav class="flex flex-col gap-1" data-active-classes="bg-primary-container text-on-primary-container font-medium rounded-lg"><a class="flex items-center gap-space-sm px-space-md py-2 rounded-lg font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="model-orchestration" href="#"><span class="material-symbols-outlined text-[18px]">tune</span>Ollama Topology</a><a class="flex items-center gap-space-sm px-space-md py-2 rounded-lg font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="peer-audit" href="#"><span class="material-symbols-outlined text-[18px]">rate_review</span>Peer Review Protocol</a></nav></div><div class="px-space-md py-space-sm bg-surface-container mx-space-sm rounded-lg flex flex-col gap-1"><div class="flex items-center justify-between"><span class="font-label-sm text-label-sm text-on-surface font-semibold">Ollama v0.3.12</span><span class="font-label-sm text-label-sm text-secondary font-medium">llama3:70b-instruct</span></div><span class="font-label-sm text-label-sm text-on-surface-variant">Context: 32k tokens | FP16</span></div></aside><div class="pl-64 flex flex-col min-h-screen"><main class="w-full flex-1 pt-16 bg-surface px-gutter-desktop"><div class="flex flex-col w-full pb-space-xl">
+<!-- State Inspector Pill Switcher -->
+<section class="w-full mb-space-lg">
+<div class="bg-surface-container-low rounded-lg p-space-xs flex flex-wrap items-center justify-between gap-space-sm shadow-sm">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-outline text-[18px] ml-space-xs">tune</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider pr-space-xs">Inspector State:</span>
+<div class="flex items-center gap-1 bg-surface-container-high p-0.5 rounded-lg">
+<button class="px-space-sm py-1 rounded-md font-label-sm text-label-sm font-medium transition-all bg-primary-container text-on-primary-container shadow-sm" id="state-btn-populated" onclick="setStudioState('populated')">
+            Populated Projects (3)
+          </button>
+<button class="px-space-sm py-1 rounded-md font-label-sm text-label-sm font-medium transition-all text-on-surface-variant hover:text-on-surface hover:bg-surface" id="state-btn-modal" onclick="setStudioState('modal')">
+            Create Modal Open
+          </button>
+<button class="px-space-sm py-1 rounded-md font-label-sm text-label-sm font-medium transition-all text-on-surface-variant hover:text-on-surface hover:bg-surface" id="state-btn-empty" onclick="setStudioState('empty')">
+            Empty State (0 Projects)
+          </button>
+</div>
+</div>
+<div class="flex items-center gap-space-md pr-space-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+          Deterministic Index: Ready
+        </span>
+<span class="font-label-sm text-label-sm text-outline-variant font-mono">v1.4-academic</span>
+</div>
+</div>
+</section>
+<!-- Page Header & Academic Telemetry Strip -->
+<section class="flex flex-col gap-space-md mb-space-xl">
+<div class="flex flex-col lg:flex-row lg:items-end justify-between gap-space-md">
+<div class="flex flex-col gap-space-xs max-w-3xl">
+<div class="inline-flex items-center gap-space-xs px-2 py-0.5 rounded-md bg-tertiary-fixed text-on-tertiary-fixed w-fit font-label-sm text-label-sm uppercase tracking-widest font-semibold">
+<span class="material-symbols-outlined text-[13px]">school</span>
+          Academic Curriculum Workspaces
+        </div>
+<h1 class="font-display-lg text-display-lg text-on-surface tracking-tight">Your Study Projects</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant leading-relaxed">Isolated course environments for syllabus-grounded PDF ingestion, topic extraction, and exam question generation.</p>
+</div>
+<!-- Quick Action / New Project Trigger -->
+<div class="flex items-center gap-space-sm shrink-0">
+<button class="flex items-center gap-space-xs bg-primary-container text-on-primary-container px-space-md py-2 rounded-lg font-headline-sm text-body-sm shadow-sm hover:opacity-95 active:scale-[0.985] transition-all" onclick="openModal()">
+<span class="material-symbols-outlined text-[18px]">add</span>
+          New Project
+        </button>
+</div>
+</div>
+<!-- Telemetry Strip -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-space-sm bg-surface-container-low rounded-xl p-space-md shadow-sm">
+<div class="flex flex-col gap-0.5 px-space-sm">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[16px]">folder_special</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Active Projects</span>
+</div>
+<span class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight" id="metric-projects">3</span>
+<span class="font-label-sm text-label-sm text-secondary">Course syllabi mounted</span>
+</div>
+<div class="flex flex-col gap-0.5 px-space-sm">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[16px]">description</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Processed PDFs</span>
+</div>
+<span class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight" id="metric-pdfs">14</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">4,120 pages parsed</span>
+</div>
+<div class="flex flex-col gap-0.5 px-space-sm">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-tertiary text-[16px]">hub</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Topics Extracted</span>
+</div>
+<span class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight" id="metric-topics">84</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Taxonomy nodes cached</span>
+</div>
+<div class="flex flex-col gap-0.5 px-space-sm">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[16px]">verified</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Grounding Integrity</span>
+</div>
+<div class="flex items-baseline gap-1">
+<span class="font-headline-lg text-headline-lg text-secondary font-semibold tracking-tight" id="metric-integrity">100%</span>
+<span class="font-label-sm text-label-sm text-secondary">Verified</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">0 Hallucination alerts</span>
+</div>
+</div>
+</section>
+<!-- Filter, Search & Utility Toolbar -->
+<section class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-space-sm mb-space-lg">
+<!-- Search Bar -->
+<div class="relative flex-1 max-w-lg">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-outline">
+<span class="material-symbols-outlined text-[18px]">search</span>
+</div>
+<input class="w-full bg-surface-container-lowest text-on-surface placeholder:text-outline font-body-sm text-body-sm pl-10 pr-12 py-2 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-container" id="project-search-input" onkeyup="filterProjects()" placeholder="Filter projects by course name..." type="text">
+<div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+<kbd class="px-1.5 py-0.5 bg-surface-container-high rounded text-outline font-label-sm text-[10px]">⌘K</kbd>
+</div>
+</div>
+<!-- Tab Filters & Sort Control -->
+<div class="flex items-center gap-space-xs flex-wrap sm:flex-nowrap">
+<div class="flex items-center bg-surface-container-high p-0.5 rounded-lg">
+<button class="px-space-sm py-1.5 rounded-md font-label-md text-label-md font-medium bg-surface-container-lowest text-on-surface shadow-sm" id="tab-active" onclick="switchTab('active')">
+          Active Projects (<span id="active-count" class="">3</span>)
+        </button>
+<button class="px-space-sm py-1.5 rounded-md font-label-md text-label-md font-medium text-on-surface-variant hover:text-on-surface" id="tab-archived" onclick="switchTab('archived')">
+          Archived (0)
+        </button>
+</div>
+<div class="relative">
+<button class="flex items-center gap-1.5 bg-surface-container-lowest px-space-sm py-1.5 rounded-lg text-on-surface font-label-md text-label-md shadow-sm hover:bg-surface-container" id="sort-trigger" onclick="toggleSortMenu()">
+<span class="material-symbols-outlined text-outline text-[16px]">sort</span>
+<span id="current-sort-label" class="">Sort: Last Updated</span>
+<span class="material-symbols-outlined text-outline text-[14px]">expand_more</span>
+</button>
+<div class="hidden absolute right-0 mt-1 w-44 bg-surface-container-lowest rounded-lg shadow-xl py-1 z-30" id="sort-dropdown">
+<button class="w-full text-left px-3 py-1.5 font-label-md text-label-md text-on-surface hover:bg-surface-container-high" onclick="setSort('Last Updated')">Last Updated</button>
+<button class="w-full text-left px-3 py-1.5 font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high" onclick="setSort('Course ID')">Course ID (A-Z)</button>
+<button class="w-full text-left px-3 py-1.5 font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high" onclick="setSort('Most PDFs')">Document Count</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Content State Container: Populated Grid -->
+<div class="flex flex-col gap-space-lg" id="populated-state-wrapper">
+<!-- Responsive 3-Column Projects Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-space-lg" id="projects-grid">
+<!-- Card 1: CS-842 -->
+<article class="project-card flex flex-col justify-between bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all duration-200 group" data-code="CS-842" data-title="Distributed Systems: Consensus &amp; RPC">
+<div class="flex flex-col gap-space-sm">
+<!-- Card Header & Metadata -->
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm font-semibold tracking-wider px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed">
+              CS-842
+            </span>
+<div class="relative">
+<button class="p-1 rounded text-outline hover:text-on-surface hover:bg-surface-container" onclick="toggleCardMenu('menu-1')">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+<div class="hidden absolute right-0 mt-1 w-40 bg-surface-container-lowest rounded-lg shadow-xl py-1 z-20" id="menu-1">
+<button class="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-1.5" onclick="archiveProject('CS-842')">
+<span class="material-symbols-outlined text-[15px]">archive</span>Archive
+                </button>
+<button class="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-1.5" onclick="renameProject('CS-842')">
+<span class="material-symbols-outlined text-[15px]">edit</span>Rename
+                </button>
+<button class="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-1.5" onclick="exportBlueprint('CS-842')">
+<span class="material-symbols-outlined text-[15px]">file_download</span>Export Blueprint
+                </button>
+</div>
+</div>
+</div>
+<!-- Course Title & Synopsis -->
+<div class="flex flex-col gap-1">
+<h2 class="font-headline-md text-headline-md text-on-surface tracking-tight group-hover:text-primary transition-colors">
+              Distributed Systems: Consensus &amp; RPC
+            </h2>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2">
+              Graduate-level curriculum covering Raft, Paxos, state-machine replication, and RPC primitives under network partitions.
+            </p>
+</div>
+<!-- Quantitative Badges -->
+<div class="flex flex-wrap items-center gap-1.5 pt-1">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-secondary-fixed/50 text-on-secondary-fixed-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">picture_as_pdf</span>
+              5 PDFs Indexed
+            </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-tertiary-fixed/60 text-on-tertiary-fixed font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">account_tree</span>
+              14 Topics Mapped
+            </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[14px]">verified</span>
+              100% Grounded
+            </span>
+</div>
+</div>
+<!-- Card Footer -->
+<div class="flex items-center justify-between pt-space-md mt-space-md bg-surface-container-lowest">
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-outline">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+            Updated 2h ago
+          </div>
+<a class="inline-flex items-center gap-1 font-label-md text-label-md font-semibold text-primary hover:text-primary-container group/btn transition-colors" data-path="resources" href="#">
+            Open Workspace
+            <span class="material-symbols-outlined text-[16px] group-hover/btn:translate-x-0.5 transition-transform">arrow_forward</span>
+</a>
+</div>
+</article>
+<!-- Card 2: BIO-301 -->
+<article class="project-card flex flex-col justify-between bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all duration-200 group" data-code="BIO-301" data-title="Molecular Genetics &amp; CRISPR Mechanisms">
+<div class="flex flex-col gap-space-sm">
+<!-- Card Header & Metadata -->
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm font-semibold tracking-wider px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed">
+              BIO-301
+            </span>
+<div class="relative">
+<button class="p-1 rounded text-outline hover:text-on-surface hover:bg-surface-container" onclick="toggleCardMenu('menu-2')">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+<div class="hidden absolute right-0 mt-1 w-40 bg-surface-container-lowest rounded-lg shadow-xl py-1 z-20" id="menu-2">
+<button class="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-1.5" onclick="archiveProject('BIO-301')">
+<span class="material-symbols-outlined text-[15px]">archive</span>Archive
+                </button>
+<button class="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-1.5" onclick="renameProject('BIO-301')">
+<span class="material-symbols-outlined text-[15px]">edit</span>Rename
+                </button>
+<button class="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-1.5" onclick="exportBlueprint('BIO-301')">
+<span class="material-symbols-outlined text-[15px]">file_download</span>Export Blueprint
+                </button>
+</div>
+</div>
+</div>
+<!-- Course Title & Synopsis -->
+<div class="flex flex-col gap-1">
+<h2 class="font-headline-md text-headline-md text-on-surface tracking-tight group-hover:text-primary transition-colors">
+              Molecular Genetics &amp; CRISPR Mechanisms
+            </h2>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2">
+              Undergraduate core syllabus on transcriptional regulation, DNA repair pathways, and Cas9 endonuclease structural biology.
+            </p>
+</div>
+<!-- Quantitative Badges -->
+<div class="flex flex-wrap items-center gap-1.5 pt-1">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-secondary-fixed/50 text-on-secondary-fixed-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">picture_as_pdf</span>
+              4 PDFs Indexed
+            </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-tertiary-fixed/60 text-on-tertiary-fixed font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">account_tree</span>
+              18 Topics Mapped
+            </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-secondary-container text-on-secondary-container font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[14px]">verified</span>
+              98.4% Grounded
+            </span>
+</div>
+</div>
+<!-- Card Footer -->
+<div class="flex items-center justify-between pt-space-md mt-space-md bg-surface-container-lowest">
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-outline">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+            Updated yesterday
+          </div>
+<a class="inline-flex items-center gap-1 font-label-md text-label-md font-semibold text-primary hover:text-primary-container group/btn transition-colors" data-path="resources" href="#">
+            Open Workspace
+            <span class="material-symbols-outlined text-[16px] group-hover/btn:translate-x-0.5 transition-transform">arrow_forward</span>
+</a>
+</div>
+</article>
+<!-- Card 3: PHIL-220 -->
+<article class="project-card flex flex-col justify-between bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all duration-200 group" data-code="PHIL-220" data-title="Formal Logic &amp; Modal Proof Theory">
+<div class="flex flex-col gap-space-sm">
+<!-- Card Header & Metadata -->
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm font-semibold tracking-wider px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed">
+              PHIL-220
+            </span>
+<div class="relative">
+<button class="p-1 rounded text-outline hover:text-on-surface hover:bg-surface-container" onclick="toggleCardMenu('menu-3')">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+<div class="hidden absolute right-0 mt-1 w-40 bg-surface-container-lowest rounded-lg shadow-xl py-1 z-20" id="menu-3">
+<button class="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-1.5" onclick="archiveProject('PHIL-220')">
+<span class="material-symbols-outlined text-[15px]">archive</span>Archive
+                </button>
+<button class="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-1.5" onclick="renameProject('PHIL-220')">
+<span class="material-symbols-outlined text-[15px]">edit</span>Rename
+                </button>
+<button class="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-1.5" onclick="exportBlueprint('PHIL-220')">
+<span class="material-symbols-outlined text-[15px]">file_download</span>Export Blueprint
+                </button>
+</div>
+</div>
+</div>
+<!-- Course Title & Synopsis -->
+<div class="flex flex-col gap-1">
+<h2 class="font-headline-md text-headline-md text-on-surface tracking-tight group-hover:text-primary transition-colors">
+              Formal Logic &amp; Modal Proof Theory
+            </h2>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2">
+              Propositional calculi, natural deduction soundness proofs, Kripke accessibility semantics, and completeness theorems.
+            </p>
+</div>
+<!-- Quantitative Badges -->
+<div class="flex flex-wrap items-center gap-1.5 pt-1">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-secondary-fixed/50 text-on-secondary-fixed-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">picture_as_pdf</span>
+              3 PDFs Indexed
+            </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-tertiary-fixed/60 text-on-tertiary-fixed font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">account_tree</span>
+              11 Topics Mapped
+            </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[14px]">verified</span>
+              100% Grounded
+            </span>
+</div>
+</div>
+<!-- Card Footer -->
+<div class="flex items-center justify-between pt-space-md mt-space-md bg-surface-container-lowest">
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-outline">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+            Updated 3 days ago
+          </div>
+<a class="inline-flex items-center gap-1 font-label-md text-label-md font-semibold text-primary hover:text-primary-container group/btn transition-colors" data-path="resources" href="#">
+            Open Workspace
+            <span class="material-symbols-outlined text-[16px] group-hover/btn:translate-x-0.5 transition-transform">arrow_forward</span>
+</a>
+</div>
+</article>
+</div>
+<!-- Analytical Curriculum Blueprint Banner -->
+<div class="bg-surface-container-low rounded-xl p-space-md flex flex-col md:flex-row items-center justify-between gap-space-md shadow-sm">
+<div class="flex items-center gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary text-[22px]">batch_prediction</span>
+</div>
+<div class="flex flex-col">
+<h3 class="font-headline-sm text-body-sm text-on-surface">Curriculum Synthesis Matrix</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Batch export certified assessment batteries and cross-correlate source citations.</p>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<button class="px-space-md py-1.5 rounded-lg bg-surface-container-lowest font-label-md text-label-md text-on-surface shadow-sm hover:bg-surface-container transition-colors" onclick="alert('Compiling cross-course grounding matrix...')">
+          Download Unified Index (.JSON)
+        </button>
+</div>
+</div>
+</div>
+<!-- Content State Container: Empty State (Initially Hidden unless toggled) -->
+<div class="hidden flex-col items-center justify-center py-16 px-space-md bg-surface-container-lowest rounded-xl shadow-sm text-center" id="empty-state-wrapper">
+<div class="w-16 h-16 rounded-2xl bg-surface-container-high flex items-center justify-center mb-space-md text-primary">
+<svg class="w-8 h-8 text-primary" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+<path d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.91a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight mb-space-xs">No course projects yet</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-md mb-space-lg">
+      Create a project to upload your syllabus and textbooks for verified question generation, deterministic citation graphs, and student mastery exams.
+    </p>
+<button class="flex items-center gap-space-xs bg-primary-container text-on-primary-container px-space-lg py-2.5 rounded-lg font-headline-sm text-body-sm shadow-sm hover:opacity-95 active:scale-[0.985] transition-all mb-space-xl" onclick="openModal()">
+<span class="material-symbols-outlined text-[18px]">add</span>
+      Create Your First Project
+    </button>
+<!-- 3-step Quickstart Guide -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-md w-full max-w-2xl bg-surface-container-low p-space-md rounded-xl text-left">
+<div class="flex items-start gap-space-xs">
+<span class="font-label-sm text-label-sm font-semibold text-primary px-1.5 py-0.5 rounded bg-primary-fixed">01</span>
+<div>
+<h4 class="font-headline-sm text-body-sm text-on-surface">Upload PDFs</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Drag academic papers, syllabus files, and reference volumes.</p>
+</div>
+</div>
+<div class="flex items-start gap-space-xs">
+<span class="font-label-sm text-label-sm font-semibold text-primary px-1.5 py-0.5 rounded bg-primary-fixed">02</span>
+<div>
+<h4 class="font-headline-sm text-body-sm text-on-surface">Extract Topics</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Deterministic chunking creates an isolated semantic tree.</p>
+</div>
+</div>
+<div class="flex items-start gap-space-xs">
+<span class="font-label-sm text-label-sm font-semibold text-primary px-1.5 py-0.5 rounded bg-primary-fixed">03</span>
+<div>
+<h4 class="font-headline-sm text-body-sm text-on-surface">Synthesize</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Generate peer-reviewed multiple-choice &amp; proof problems.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Create Project Modal Dialog -->
+<div class="fixed inset-0 bg-inverse-surface/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-gutter" id="create-modal-backdrop">
+<div class="w-full max-w-lg bg-surface-container-lowest rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150" id="create-modal-container">
+<!-- Modal Header -->
+<div class="px-space-lg py-space-md flex items-center justify-between bg-surface-container-lowest">
+<div class="flex items-center gap-space-xs">
+<div class="w-8 h-8 rounded-lg bg-primary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-[18px]">add_task</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Create Course Project</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Initialize an isolated academic inference scope</p>
+</div>
+</div>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container" onclick="closeModal()">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<!-- Modal Body -->
+<form class="p-space-lg flex flex-col gap-space-md" id="create-project-form" onsubmit="handleFormSubmit(event)">
+<!-- Course Code -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium flex items-center justify-between" for="input-course-code">
+<span class="">Course Code / Identifier</span>
+<span class="font-label-sm text-label-sm text-outline">e.g. CS-842, BIO-301</span>
+</label>
+<input class="w-full bg-surface-container-low text-on-surface placeholder:text-outline font-label-md text-label-md px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-container" id="input-course-code" placeholder="e.g. NEURO-410" required="" type="text">
+</div>
+<!-- Course Name -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium" for="input-course-title">
+            Course Title
+          </label>
+<input class="w-full bg-surface-container-low text-on-surface placeholder:text-outline font-body-sm text-body-sm px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-container" id="input-course-title" placeholder="e.g. Cognitive Systems &amp; Neural Computation" required="" type="text">
+</div>
+<!-- Course Description / Scope -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-medium flex items-center justify-between" for="input-course-desc">
+<span class="">Curriculum Scope &amp; Notes</span>
+<span class="font-label-sm text-label-sm text-outline">Optional</span>
+</label>
+<textarea class="w-full bg-surface-container-low text-on-surface placeholder:text-outline font-body-sm text-body-sm px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-container resize-none" id="input-course-desc" placeholder="Specify syllabus modules, primary textbooks, and milestone examination requirements..." rows="3"></textarea>
+</div>
+<!-- LLM Grounding Selection -->
+<div class="flex flex-col gap-1.5 p-space-sm bg-surface-container-low rounded-lg">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface uppercase tracking-wider">Grounding Pipeline</span>
+<span class="font-label-sm text-label-sm text-secondary font-medium flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+              Deterministic
+            </span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span class="">Engine: ChunkAnchor v1.4 + Ollama 70b</span>
+<span class="font-mono text-outline">FP16</span>
+</div>
+</div>
+<!-- Modal Footer Actions -->
+<div class="flex items-center justify-end gap-space-sm pt-space-sm mt-space-xs">
+<button class="px-space-md py-2 rounded-lg font-label-md text-label-md font-medium text-on-surface-variant hover:bg-surface-container transition-colors" onclick="closeModal()" type="button">
+            Cancel
+          </button>
+<button class="flex items-center gap-space-xs bg-primary-container text-on-primary-container px-space-lg py-2 rounded-lg font-label-md text-label-md font-semibold shadow-sm hover:opacity-95 active:scale-[0.985] transition-all" id="btn-submit-create" type="submit">
+<span class="hidden material-symbols-outlined text-[16px] animate-spin" id="submit-spinner">progress_activity</span>
+<span id="submit-label" class="">Create Project</span>
+</button>
+</div>
+</form>
+</div>
+</div>
+</div>
+<script>
+  let currentState = 'populated';
+  let activeTab = 'active';
+
+  function setStudioState(state) {
+    currentState = state;
+    
+    // Update pills styling
+    const btnPopulated = document.getElementById('state-btn-populated');
+    const btnModal = document.getElementById('state-btn-modal');
+    const btnEmpty = document.getElementById('state-btn-empty');
+
+    const defaultClass = "px-space-sm py-1 rounded-md font-label-sm text-label-sm font-medium transition-all text-on-surface-variant hover:text-on-surface hover:bg-surface";
+    const activeClass = "px-space-sm py-1 rounded-md font-label-sm text-label-sm font-medium transition-all bg-primary-container text-on-primary-container shadow-sm";
+
+    btnPopulated.className = state === 'populated' ? activeClass : defaultClass;
+    btnModal.className = state === 'modal' ? activeClass : defaultClass;
+    btnEmpty.className = state === 'empty' ? activeClass : defaultClass;
+
+    const populatedWrapper = document.getElementById('populated-state-wrapper');
+    const emptyWrapper = document.getElementById('empty-state-wrapper');
+    const modalBackdrop = document.getElementById('create-modal-backdrop');
+
+    // Telemetry metric targets
+    const metricProjects = document.getElementById('metric-projects');
+    const metricPdfs = document.getElementById('metric-pdfs');
+    const metricTopics = document.getElementById('metric-topics');
+    const metricIntegrity = document.getElementById('metric-integrity');
+
+    if (state === 'populated') {
+      populatedWrapper.classList.remove('hidden');
+      emptyWrapper.classList.add('hidden');
+      emptyWrapper.classList.remove('flex');
+      modalBackdrop.classList.add('hidden');
+      modalBackdrop.classList.remove('flex');
+
+      metricProjects.textContent = '3';
+      metricPdfs.textContent = '14';
+      metricTopics.textContent = '84';
+      metricIntegrity.textContent = '100%';
+    } else if (state === 'empty') {
+      populatedWrapper.classList.add('hidden');
+      emptyWrapper.classList.remove('hidden');
+      emptyWrapper.classList.add('flex');
+      modalBackdrop.classList.add('hidden');
+      modalBackdrop.classList.remove('flex');
+
+      metricProjects.textContent = '0';
+      metricPdfs.textContent = '0';
+      metricTopics.textContent = '0';
+      metricIntegrity.textContent = '--';
+    } else if (state === 'modal') {
+      populatedWrapper.classList.remove('hidden');
+      emptyWrapper.classList.add('hidden');
+      emptyWrapper.classList.remove('flex');
+      modalBackdrop.classList.remove('hidden');
+      modalBackdrop.classList.add('flex');
+    }
+  }
+
+  function openModal() {
+    setStudioState('modal');
+  }
+
+  function closeModal() {
+    setStudioState('populated');
+  }
+
+  function filterProjects() {
+    const input = document.getElementById('project-search-input').value.toLowerCase();
+    const cards = document.querySelectorAll('.project-card');
+    
+    cards.forEach(card => {
+      const title = card.getAttribute('data-title').toLowerCase();
+      const code = card.getAttribute('data-code').toLowerCase();
+      if (title.includes(input) || code.includes(input)) {
+        card.classList.remove('hidden');
+      } else {
+        card.classList.add('hidden');
+      }
+    });
+  }
+
+  function switchTab(tab) {
+    activeTab = tab;
+    const tabActive = document.getElementById('tab-active');
+    const tabArchived = document.getElementById('tab-archived');
+
+    if (tab === 'active') {
+      tabActive.className = "px-space-sm py-1.5 rounded-md font-label-md text-label-md font-medium bg-surface-container-lowest text-on-surface shadow-sm";
+      tabArchived.className = "px-space-sm py-1.5 rounded-md font-label-md text-label-md font-medium text-on-surface-variant hover:text-on-surface";
+      if (currentState !== 'empty') {
+        document.getElementById('populated-state-wrapper').classList.remove('hidden');
+      }
+    } else {
+      tabArchived.className = "px-space-sm py-1.5 rounded-md font-label-md text-label-md font-medium bg-surface-container-lowest text-on-surface shadow-sm";
+      tabActive.className = "px-space-sm py-1.5 rounded-md font-label-md text-label-md font-medium text-on-surface-variant hover:text-on-surface";
+      // Show empty view for archived since count is 0
+      document.getElementById('populated-state-wrapper').classList.add('hidden');
+      document.getElementById('empty-state-wrapper').classList.remove('hidden');
+      document.getElementById('empty-state-wrapper').classList.add('flex');
+    }
+  }
+
+  function toggleSortMenu() {
+    const menu = document.getElementById('sort-dropdown');
+    menu.classList.toggle('hidden');
+  }
+
+  function setSort(label) {
+    document.getElementById('current-sort-label').textContent = 'Sort: ' + label;
+    document.getElementById('sort-dropdown').classList.add('hidden');
+  }
+
+  function toggleCardMenu(menuId) {
+    const menu = document.getElementById(menuId);
+    // Close other card menus
+    document.querySelectorAll('[id^="menu-"]').forEach(el => {
+      if (el.id !== menuId) el.classList.add('hidden');
+    });
+    menu.classList.toggle('hidden');
+  }
+
+  function archiveProject(code) {
+    alert('Project ' + code + ' moved to cold archive.');
+    toggleCardMenu('menu-1');
+  }
+
+  function renameProject(code) {
+    const newName = prompt('Enter new course title for ' + code + ':');
+    if (newName) {
+      alert('Course updated: ' + newName);
+    }
+  }
+
+  function exportBlueprint(code) {
+    alert('Exporting curriculum blueprint and verified Q&A graph for ' + code + ' (.JSON)');
+  }
+
+  function handleFormSubmit(e) {
+    e.preventDefault();
+    const spinner = document.getElementById('submit-spinner');
+    const label = document.getElementById('submit-label');
+    const code = document.getElementById('input-course-code').value;
+    const title = document.getElementById('input-course-title').value;
+
+    spinner.classList.remove('hidden');
+    label.textContent = "Anchoring...";
+
+    setTimeout(() => {
+      spinner.classList.add('hidden');
+      label.textContent = "Create Project";
+      closeModal();
+      alert('Course Project ' + code + ' (' + title + ') successfully initialized with GroundAnchor v1.4.');
+      document.getElementById('create-project-form').reset();
+    }, 700);
+  }
+
+  // Global click to close floating menus if clicked outside
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#sort-trigger') && !e.target.closest('#sort-dropdown')) {
+      const sortDropdown = document.getElementById('sort-dropdown');
+      if (sortDropdown) sortDropdown.classList.add('hidden');
+    }
+    if (!e.target.closest('.project-card')) {
+      document.querySelectorAll('[id^="menu-"]').forEach(el => el.classList.add('hidden'));
+    }
+  });
+
+  // Keyboard shortcut listener for search focus
+  document.addEventListener('keydown', function(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      const input = document.getElementById('project-search-input');
+      if (input) input.focus();
+    }
+    if (e.key === 'Escape') {
+      const modal = document.getElementById('create-modal-backdrop');
+      if (modal && !modal.classList.contains('hidden')) {
+        closeModal();
+      }
+    }
+  });
+</script></main><footer class="w-full bg-surface-container-low shadow-[0_1px_8px_rgba(0,0,0,0.02)] py-space-md px-gutter-desktop"><div class="w-full flex flex-col md:flex-row items-center justify-between gap-space-sm font-label-sm text-label-sm text-on-surface-variant"><div class="">Academic Protocol: ISO/IEC 42001 &amp; IEEE P2844 Grounding Protocol Compliant</div><div class="flex items-center gap-space-lg"><span class="font-label-sm text-label-sm text-on-surface-variant">Latency: 18.4ms/t</span><span class="font-label-sm text-label-sm text-on-surface-variant">Deterministic Seed: 42</span><span class="font-label-sm text-label-sm text-on-surface">GroundQ Verifier Engine © 2025</span></div></div></footer></div>
+
+</body></html>

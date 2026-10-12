@@ -4,6 +4,10 @@ import { z } from 'zod';
 import { createSupabaseUserClient } from '../lib/supabase.js';
 import { resourcesRouter } from './resources.js';
 import { topicsRouter } from './topics.js';
+import { presetsRouter } from './presets.js';
+import { blueprintsRouter } from './blueprints.js';
+import { generationRunsRouter } from './generation-runs.js';
+import { questionsRouter } from './questions.js';
 import {
   requireAuth,
   type AuthenticatedRequest,
@@ -240,3 +244,7 @@ projectsRouter.post('/:projectId/archive', async (request, response, next) => {
 
 projectsRouter.use('/:projectId/resources', resourcesRouter);
 projectsRouter.use('/:projectId/topics', topicsRouter);
+projectsRouter.use('/:projectId/presets', presetsRouter);
+projectsRouter.use('/:projectId/blueprints', blueprintsRouter);
+projectsRouter.use('/:projectId/generation-runs', generationRunsRouter);
+projectsRouter.use('/:projectId/questions', questionsRouter);

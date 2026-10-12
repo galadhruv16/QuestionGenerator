@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=JetBrains+Mono:wght@100..900&amp;family=Newsreader:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"background":"#fbf8fc","surface-container-lowest":"#ffffff","outline":"#747685","surface-dim":"#dcd9dd","surface-container":"#f0edf1","surface-tint":"#2c53d1","on-tertiary-fixed-variant":"#2f2ebe","surface-variant":"#e4e1e6","tertiary":"#3332c2","on-surface-variant":"#444654","on-primary":"#ffffff","on-background":"#1b1b1e","surface-bright":"#fbf8fc","on-surface":"#1b1b1e","surface-container-low":"#f6f2f7","secondary-container":"#86f2e4","tertiary-container":"#4d4fda","secondary-fixed-dim":"#6bd8cb","tertiary-fixed-dim":"#c0c1ff","surface-container-high":"#eae7eb","inverse-on-surface":"#f3f0f4","outline-variant":"#c4c5d6","on-secondary":"#ffffff","on-tertiary-container":"#dddbff","inverse-surface":"#303033","on-tertiary-fixed":"#07006c","on-tertiary":"#ffffff","primary-container":"#3157d5","primary":"#063cbc","on-primary-container":"#d8ddff","surface-container-highest":"#e4e1e6","error":"#ba1a1a","on-error-container":"#93000a","inverse-primary":"#b7c4ff","surface":"#fbf8fc","secondary":"#006a61","on-primary-fixed-variant":"#0038b6","on-primary-fixed":"#001452","secondary-fixed":"#89f5e7","on-secondary-fixed":"#00201d","primary-fixed":"#dde1ff","primary-fixed-dim":"#b7c4ff","on-secondary-fixed-variant":"#005049","error-container":"#ffdad6","on-secondary-container":"#006f66","tertiary-fixed":"#e1e0ff","on-error":"#ffffff"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"margin-desktop":"2rem","space-lg":"1.25rem","space-md":"0.75rem","gutter":"1rem","gutter-desktop":"1.5rem","space-sm":"0.5rem","space-xl":"2rem","space-xs":"0.25rem","margin":"1rem"},"fontFamily":{"label-sm":["JetBrains Mono"],"headline-md":["Geist"],"body-sm":["Geist"],"editorial-quote":["Newsreader"],"headline-sm":["Geist"],"body-lg":["Geist"],"headline-lg":["Newsreader"],"label-md":["JetBrains Mono"],"display-lg":["Newsreader"],"body-md":["Geist"],"display-lg-mobile":["Newsreader"]},"fontSize":{"label-sm":["11px",{"lineHeight":"14px","letterSpacing":"0.03em","fontWeight":"500"}],"headline-md":["20px",{"lineHeight":"28px","letterSpacing":"-0.01em","fontWeight":"600"}],"body-sm":["13px",{"lineHeight":"20px","fontWeight":"400"}],"editorial-quote":["18px",{"lineHeight":"28px","fontWeight":"400"}],"headline-sm":["16px",{"lineHeight":"24px","letterSpacing":"-0.005em","fontWeight":"600"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}],"headline-lg":["28px",{"lineHeight":"36px","letterSpacing":"-0.015em","fontWeight":"500"}],"label-md":["12px",{"lineHeight":"16px","letterSpacing":"0.02em","fontWeight":"500"}],"display-lg":["40px",{"lineHeight":"48px","letterSpacing":"-0.02em","fontWeight":"500"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"display-lg-mobile":["30px",{"lineHeight":"38px","letterSpacing":"-0.015em","fontWeight":"500"}]}}}};</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased"><header class="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 w-full px-margin-desktop flex items-center justify-between"><div class="flex items-center gap-space-md"><img alt="Brand logo. - Primary color: #3157d5
+- Font: newsreader
+- Mode: light
+- Roundness: rounded-sm
+" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WyoJTJ0F1EpGvOmAqXH3haRa1RFyYPI4AU7nnHRV0JfYTD6GWMJLzTtaKttnyIRTmy3uCVv6XHR9U11p4UnP5N8spuf7XCWZrhpCL2PuCDSHqkbwa6FKTS30P0dR4BHtTOilfUW7vOBBaQmsmrJ_EWffNJlgIHBOEIHzR4FLYP0XG9GzGXbm-QNyzrBYON_gHP1PpHGX7DwAdSS8kBa0tgWO0sJIZ-p36ZJ1P4rALsERocElW0cVTqCONT"/><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface">GroundQ</span><span class="px-space-xs py-0.5 rounded-DEFAULT bg-surface-container font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">WORKSPACE</span><span class="text-outline-variant font-label-md text-label-md">/</span><div class="flex items-center gap-space-xs"><span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Context:</span><button class="flex items-center gap-space-xs px-space-sm py-1 rounded-DEFAULT bg-surface-container-low hover:bg-surface-container text-on-surface font-body-sm text-body-sm transition-colors" type="button"><span>Biochem Core Syllabus v3</span><span class="material-symbols-outlined text-[16px] text-on-surface-variant">unfold_more</span></button></div></div><div class="flex items-center gap-space-lg"><nav class="flex items-center gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-medium rounded-lg"><a class="px-space-md py-1.5 rounded-lg font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="workspace-overview" href="#">Overview</a><a class="px-space-md py-1.5 rounded-lg font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="workspace-documentation" href="#">Documentation</a></nav><div class="flex items-center gap-space-md pl-space-md"><button aria-label="Command Menu" class="flex items-center gap-space-xs px-space-sm py-1 rounded-DEFAULT bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm shadow-[0_1px_4px_rgba(0,0,0,0.02)] transition-colors" type="button"><span class="material-symbols-outlined text-[16px]">terminal</span><span>⌘K</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></div></header><main class="w-full pt-16 bg-surface min-h-[calc(100vh-80px)]"><div class="flex flex-col w-full">
+<!-- Interactive State Inspector Bar -->
+<aside aria-label="Interactive State Preview" class="w-full bg-surface-container-high px-margin-desktop py-2 flex flex-wrap items-center justify-between gap-space-sm shadow-sm">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[16px] text-tertiary">tune</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Preview Pipeline State:</span>
+</div>
+<div class="flex items-center gap-1.5 p-1 rounded-DEFAULT bg-surface-container-lowest shadow-sm" role="tablist">
+<button aria-selected="true" class="px-space-sm py-1 rounded-DEFAULT font-label-sm text-label-sm font-semibold transition-all bg-primary-container text-on-primary-container shadow-sm" id="state-btn-ready" onclick="setPipelineState('ready')" role="tab">
+        Blueprint Ready (Default)
+      </button>
+<button aria-selected="false" class="px-space-sm py-1 rounded-DEFAULT font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface transition-all" id="state-btn-generating" onclick="setPipelineState('generating')" role="tab">
+        Active Inference (8/15)
+      </button>
+<button aria-selected="false" class="px-space-sm py-1 rounded-DEFAULT font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface transition-all" id="state-btn-complete" onclick="setPipelineState('complete')" role="tab">
+        Validation Complete (15/15)
+      </button>
+</div>
+<div class="hidden xl:flex items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+<span>Ollama llama3:70b · Deterministic Seed #42</span>
+</div>
+</aside>
+<!-- Project Pipeline Stage Context Strip -->
+<section class="w-full px-margin-desktop pt-space-lg pb-space-md bg-surface-container-lowest shadow-sm">
+<div class="max-w-[1440px] mx-auto flex flex-col gap-space-md">
+<!-- Breadcrumb row & telemetry -->
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-space-sm">
+<nav aria-label="Breadcrumb" class="flex items-center gap-1.5 flex-wrap font-label-sm text-label-sm text-on-surface-variant">
+<span class="hover:text-on-surface cursor-pointer">GroundQ</span>
+<span class="text-outline-variant">/</span>
+<span class="hover:text-on-surface cursor-pointer">Projects</span>
+<span class="text-outline-variant">/</span>
+<span class="text-on-surface font-semibold">CS-842: Distributed Systems Spring 2025</span>
+<span class="text-outline-variant">/</span>
+<span class="text-primary font-bold">Generation Studio</span>
+</nav>
+<!-- Real-time Corpus Telemetry Strip -->
+<div class="flex items-center gap-space-md flex-wrap font-label-sm text-label-sm">
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded-DEFAULT bg-secondary/10 text-secondary font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span>Corpus: 3 / 3 Ready</span>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded-DEFAULT bg-surface-container text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px] text-secondary">verified</span>
+<span>Grounding Index: 100% Locked</span>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded-DEFAULT bg-surface-container text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">dataset</span>
+<span>360 Chunks Mapped</span>
+</div>
+</div>
+</div>
+<!-- Title & Academic Badges -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-space-md">
+<div>
+<div class="flex items-center gap-2 flex-wrap mb-1">
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Distributed Systems Spring 2025 (CS-842)</h1>
+<span class="px-2 py-0.5 rounded-DEFAULT bg-surface-container-highest text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wide">SEC-01 · GRADUATE</span>
+<span class="px-2 py-0.5 rounded-DEFAULT bg-primary/10 text-primary font-label-sm text-label-sm font-semibold">Taxonomy v1.2 Active</span>
+<span class="px-2 py-0.5 rounded-DEFAULT bg-secondary/15 text-secondary font-label-sm text-label-sm font-semibold">LOCAL OLLAMA ENGINE: READY</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-3xl">
+            Controllable blueprint builder and deterministic RAG question synthesizer for syllabus-grounded assessment.
+          </p>
+</div>
+</div>
+<!-- Horizontal Pipeline Navigation Tabs -->
+<div class="flex items-center gap-1 overflow-x-auto pt-space-xs scrollbar-none" role="tablist">
+<a class="flex items-center gap-2 px-space-md py-2 rounded-DEFAULT bg-surface-container-low hover:bg-surface-container text-on-surface-variant font-body-sm text-body-sm transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px] text-secondary">check_circle</span>
+<span>1. Resources (5)</span>
+</a>
+<a class="flex items-center gap-2 px-space-md py-2 rounded-DEFAULT bg-surface-container-low hover:bg-surface-container text-on-surface-variant font-body-sm text-body-sm transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px] text-secondary">check_circle</span>
+<span>2. Topics (14)</span>
+</a>
+<div aria-current="page" class="flex items-center gap-2 px-space-md py-2 rounded-DEFAULT bg-primary-container text-on-primary-container font-headline-sm text-headline-sm shadow-sm">
+<span class="material-symbols-outlined text-[18px]">psychology</span>
+<span>3. Generation Studio</span>
+<span class="px-1.5 py-0.2 rounded-DEFAULT bg-surface-container-lowest/20 font-label-sm text-label-sm uppercase tracking-wider text-on-primary">Active Stage</span>
+</div>
+<a class="flex items-center gap-2 px-space-md py-2 rounded-DEFAULT bg-surface-container-low hover:bg-surface-container text-on-surface-variant font-body-sm text-body-sm transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px]">folder_copy</span>
+<span>4. Question Bank (38)</span>
+<span class="px-1.5 py-0.2 rounded-DEFAULT bg-surface-container font-label-sm text-label-sm text-on-surface-variant">Review</span>
+</a>
+</div>
+</div>
+</section>
+<!-- Main Multi-Column Split Studio Workspace -->
+<div class="w-full px-margin-desktop py-space-xl">
+<div class="max-w-[1440px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-gutter-desktop items-start">
+<!-- LEFT COLUMN: Controllable Blueprint Builder (7 cols) -->
+<div class="xl:col-span-7 flex flex-col gap-space-xl min-w-0">
+<!-- Preset Quick-Select Ribbon -->
+<section aria-labelledby="preset-ribbon-title" class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<h2 class="font-headline-sm text-headline-sm text-on-surface tracking-tight" id="preset-ribbon-title">Curricular Blueprint Archetypes</h2>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Presets calibrate 34 generation invariants</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-sm">
+<!-- Preset 1: Balanced (ACTIVE) -->
+<button class="preset-card text-left p-space-md rounded-DEFAULT bg-surface-container-lowest shadow-md ring-2 ring-primary-container flex flex-col justify-between gap-space-sm transition-all" onclick="selectPreset(this, 'Balanced Exam Prep', 15)" type="button">
+<div class="flex items-start justify-between w-full">
+<div>
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">Balanced Exam Prep</span>
+<span class="material-symbols-outlined text-[18px] text-primary">check_circle</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Comprehensive mid-semester syllabus coverage across standard assessment modalities.</p>
+</div>
+</div>
+<div class="flex items-center gap-2 flex-wrap font-label-sm text-label-sm">
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-surface-container text-on-surface">15 Questions</span>
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-surface-container text-on-surface">MCQ 50% · SA 30% · Long 20%</span>
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-secondary/15 text-secondary font-semibold">Bloom L3–L5</span>
+</div>
+</button>
+<!-- Preset 2: High-Order Analytical -->
+<button class="preset-card text-left p-space-md rounded-DEFAULT bg-surface-container-lowest shadow-sm hover:shadow-md flex flex-col justify-between gap-space-sm transition-all" onclick="selectPreset(this, 'High-Order Analytical', 10)" type="button">
+<div class="flex items-start justify-between w-full">
+<div>
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm text-on-surface">High-Order Analytical</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Heavy focus on partition scenarios, safety invariants, and consensus proofs.</p>
+</div>
+</div>
+<div class="flex items-center gap-2 flex-wrap font-label-sm text-label-sm">
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-surface-container text-on-surface">10 Questions</span>
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-surface-container text-on-surface">Scenario &amp; Proof</span>
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-tertiary-container/15 text-tertiary font-semibold">Bloom L4–L6</span>
+</div>
+</button>
+<!-- Preset 3: Foundational Recall -->
+<button class="preset-card text-left p-space-md rounded-DEFAULT bg-surface-container-lowest shadow-sm hover:shadow-md flex flex-col justify-between gap-space-sm transition-all" onclick="selectPreset(this, 'Foundational Recall', 20)" type="button">
+<div class="flex items-start justify-between w-full">
+<div>
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm text-on-surface">Foundational Recall</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Syntax tracing, terminology definitions, and textbook algorithmic step identification.</p>
+</div>
+</div>
+<div class="flex items-center gap-2 flex-wrap font-label-sm text-label-sm">
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-surface-container text-on-surface">20 Questions</span>
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-surface-container text-on-surface">MCQ 80% · SA 20%</span>
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-surface-container text-on-surface-variant">Bloom L1–L3</span>
+</div>
+</button>
+<!-- Preset 4: Custom Blueprint -->
+<button class="preset-card text-left p-space-md rounded-DEFAULT bg-surface-container-lowest shadow-sm hover:shadow-md flex flex-col justify-between gap-space-sm transition-all" onclick="selectPreset(this, 'Custom Blueprint', 15)" type="button">
+<div class="flex items-start justify-between w-full">
+<div>
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm text-on-surface">Custom Blueprint</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Unlocked fine-grained slider manual controls across all distribution vectors.</p>
+</div>
+</div>
+<div class="flex items-center gap-2 flex-wrap font-label-sm text-label-sm">
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-surface-container text-on-surface">Configurable Output</span>
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-surface-container-highest text-on-surface">Manual Override</span>
+</div>
+</button>
+</div>
+</section>
+<!-- Section 1: Curriculum Distribution & Topic Targets -->
+<section aria-labelledby="sec-curriculum" class="p-space-lg rounded-DEFAULT bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs pb-space-sm bg-surface-container-low p-space-sm rounded-DEFAULT">
+<div>
+<span class="font-label-sm text-label-sm text-primary font-bold uppercase tracking-wider">Vector Matrix 01</span>
+<h2 class="font-headline-md text-headline-md text-on-surface font-headline-lg" id="sec-curriculum">1. Curriculum Distribution &amp; Topic Targets</h2>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded-DEFAULT bg-secondary/15 text-secondary font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[16px]">verified</span>
+<span id="topic-alloc-total">Total Allocation: 100%</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant -mt-1">
+            Specify weightings across syllabus modules. GroundQ assigns citation retrieval chunks strictly based on these proportion boundaries.
+          </p>
+<!-- Module Items -->
+<div class="flex flex-col gap-space-sm pt-space-xs">
+<!-- Topic 1 -->
+<div class="p-space-md rounded-DEFAULT bg-surface-container-low flex flex-col gap-space-sm">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-start gap-space-sm">
+<input checked="" class="mt-1 accent-primary w-4 h-4 cursor-pointer" id="topic-1" type="checkbox"/>
+<div>
+<label class="font-headline-sm text-headline-sm text-on-surface cursor-pointer" for="topic-1">Module 1: Process Synchronization &amp; Deadlocks</label>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Banker's Algorithm, Safety Vectors, Resource Allocation Graphs</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0 font-label-sm text-label-sm">
+<span class="px-2 py-0.5 rounded-DEFAULT bg-surface-container-lowest text-secondary font-semibold shadow-sm">28 chunks locked</span>
+<span class="px-2 py-0.5 rounded-DEFAULT bg-primary/10 text-primary font-bold" id="val-topic-1">40%</span>
+</div>
+</div>
+<div class="w-full bg-surface-container rounded-DEFAULT h-2 overflow-hidden">
+<div class="bg-primary h-2 rounded-DEFAULT transition-all duration-300" style="width: 40%"></div>
+</div>
+<input class="w-full accent-primary cursor-pointer h-1.5 bg-surface-container rounded-DEFAULT" max="100" min="0" oninput="document.getElementById('val-topic-1').innerText = this.value + '%'" type="range" value="40"/>
+</div>
+<!-- Topic 2 -->
+<div class="p-space-md rounded-DEFAULT bg-surface-container-low flex flex-col gap-space-sm">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-start gap-space-sm">
+<input checked="" class="mt-1 accent-primary w-4 h-4 cursor-pointer" id="topic-2" type="checkbox"/>
+<div>
+<label class="font-headline-sm text-headline-sm text-on-surface cursor-pointer" for="topic-2">Module 2: Distributed IPC &amp; RPCs</label>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Idempotency Tokens, At-Least-Once vs Exactly-Once Semantics, Fallacies of Dist. Computing</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0 font-label-sm text-label-sm">
+<span class="px-2 py-0.5 rounded-DEFAULT bg-surface-container-lowest text-secondary font-semibold shadow-sm">24 chunks locked</span>
+<span class="px-2 py-0.5 rounded-DEFAULT bg-primary/10 text-primary font-bold" id="val-topic-2">35%</span>
+</div>
+</div>
+<div class="w-full bg-surface-container rounded-DEFAULT h-2 overflow-hidden">
+<div class="bg-primary h-2 rounded-DEFAULT transition-all duration-300" style="width: 35%"></div>
+</div>
+<input class="w-full accent-primary cursor-pointer h-1.5 bg-surface-container rounded-DEFAULT" max="100" min="0" oninput="document.getElementById('val-topic-2').innerText = this.value + '%'" type="range" value="35"/>
+</div>
+<!-- Topic 3 -->
+<div class="p-space-md rounded-DEFAULT bg-surface-container-low flex flex-col gap-space-sm">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-start gap-space-sm">
+<input checked="" class="mt-1 accent-primary w-4 h-4 cursor-pointer" id="topic-3" type="checkbox"/>
+<div>
+<label class="font-headline-sm text-headline-sm text-on-surface cursor-pointer" for="topic-3">Module 3: Consensus Protocols &amp; Replication</label>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Raft Leader Election, Term Monotonicity, Log Invariant Matching, Paxos Synods</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0 font-label-sm text-label-sm">
+<span class="px-2 py-0.5 rounded-DEFAULT bg-surface-container-lowest text-secondary font-semibold shadow-sm">36 chunks locked</span>
+<span class="px-2 py-0.5 rounded-DEFAULT bg-primary/10 text-primary font-bold" id="val-topic-3">25%</span>
+</div>
+</div>
+<div class="w-full bg-surface-container rounded-DEFAULT h-2 overflow-hidden">
+<div class="bg-primary h-2 rounded-DEFAULT transition-all duration-300" style="width: 25%"></div>
+</div>
+<input class="w-full accent-primary cursor-pointer h-1.5 bg-surface-container rounded-DEFAULT" max="100" min="0" oninput="document.getElementById('val-topic-3').innerText = this.value + '%'" type="range" value="25"/>
+</div>
+<!-- Topic 4: Unselected -->
+<div class="p-space-md rounded-DEFAULT bg-surface-container opacity-60 hover:opacity-100 transition-opacity flex items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<input class="accent-primary w-4 h-4 cursor-pointer" id="topic-4" type="checkbox"/>
+<div>
+<label class="font-headline-sm text-headline-sm text-on-surface cursor-pointer" for="topic-4">Module 4: Virtual Memory &amp; Page Decomposition</label>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Paging, Translation Lookaside Buffer (TLB), Thrashing Detection</p>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-DEFAULT">0% · Idle</span>
+</div>
+</div>
+</section>
+<!-- Section 2: Pedagogical Depth (Bloom's Taxonomy Matrix) -->
+<section aria-labelledby="sec-bloom" class="p-space-lg rounded-DEFAULT bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs pb-space-sm bg-surface-container-low p-space-sm rounded-DEFAULT">
+<div>
+<span class="font-label-sm text-label-sm text-primary font-bold uppercase tracking-wider">Vector Matrix 02</span>
+<h2 class="font-headline-md text-headline-md text-on-surface font-headline-lg" id="sec-bloom">2. Pedagogical Depth (Bloom's Taxonomy)</h2>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded-DEFAULT bg-primary/10 text-primary font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[16px]">stacked_bar_chart</span>
+<span>Cognitive Span: L1–L6</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant -mt-1">
+            Calibrate cognitive complexity. Higher tiers require synthetic scenario setups and multi-hop grounding deductions.
+          </p>
+<!-- 6 Sliders Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md pt-space-xs">
+<!-- L1 -->
+<div class="p-space-sm rounded-DEFAULT bg-surface-container-low flex flex-col gap-1.5">
+<div class="flex justify-between items-center font-label-sm text-label-sm">
+<span class="text-on-surface font-semibold">L1: Remember</span>
+<span class="px-1.5 py-0.2 rounded-DEFAULT bg-surface-container-highest text-on-surface font-bold">10%</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant text-[12px] leading-tight">Definitions, terminology, and system constants.</p>
+<div class="w-full bg-surface-container rounded-DEFAULT h-1.5 overflow-hidden">
+<div class="bg-outline h-1.5 rounded-DEFAULT" style="width: 10%"></div>
+</div>
+</div>
+<!-- L2 -->
+<div class="p-space-sm rounded-DEFAULT bg-surface-container-low flex flex-col gap-1.5">
+<div class="flex justify-between items-center font-label-sm text-label-sm">
+<span class="text-on-surface font-semibold">L2: Understand</span>
+<span class="px-1.5 py-0.2 rounded-DEFAULT bg-surface-container-highest text-on-surface font-bold">15%</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant text-[12px] leading-tight">Conceptual workflows &amp; message ordering semantics.</p>
+<div class="w-full bg-surface-container rounded-DEFAULT h-1.5 overflow-hidden">
+<div class="bg-primary/60 h-1.5 rounded-DEFAULT" style="width: 15%"></div>
+</div>
+</div>
+<!-- L3 -->
+<div class="p-space-sm rounded-DEFAULT bg-surface-container-low flex flex-col gap-1.5">
+<div class="flex justify-between items-center font-label-sm text-label-sm">
+<span class="text-on-surface font-semibold">L3: Apply</span>
+<span class="px-1.5 py-0.2 rounded-DEFAULT bg-surface-container-highest text-on-surface font-bold">25%</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant text-[12px] leading-tight">Implementation tracing &amp; state machine transitions.</p>
+<div class="w-full bg-surface-container rounded-DEFAULT h-1.5 overflow-hidden">
+<div class="bg-primary h-1.5 rounded-DEFAULT" style="width: 25%"></div>
+</div>
+</div>
+<!-- L4 -->
+<div class="p-space-sm rounded-DEFAULT bg-surface-container-low flex flex-col gap-1.5 ring-1 ring-primary/20">
+<div class="flex justify-between items-center font-label-sm text-label-sm">
+<span class="text-primary font-bold">L4: Analyze (Core)</span>
+<span class="px-1.5 py-0.2 rounded-DEFAULT bg-primary-container text-on-primary-container font-bold">30%</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant text-[12px] leading-tight">Fault analysis, invariants, and partition tolerance proofs.</p>
+<div class="w-full bg-surface-container rounded-DEFAULT h-1.5 overflow-hidden">
+<div class="bg-primary-container h-1.5 rounded-DEFAULT" style="width: 30%"></div>
+</div>
+</div>
+<!-- L5 -->
+<div class="p-space-sm rounded-DEFAULT bg-surface-container-low flex flex-col gap-1.5">
+<div class="flex justify-between items-center font-label-sm text-label-sm">
+<span class="text-on-surface font-semibold">L5: Evaluate</span>
+<span class="px-1.5 py-0.2 rounded-DEFAULT bg-surface-container-highest text-on-surface font-bold">15%</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant text-[12px] leading-tight">Trade-off justification &amp; safety vs. liveness decisions.</p>
+<div class="w-full bg-surface-container rounded-DEFAULT h-1.5 overflow-hidden">
+<div class="bg-secondary h-1.5 rounded-DEFAULT" style="width: 15%"></div>
+</div>
+</div>
+<!-- L6 -->
+<div class="p-space-sm rounded-DEFAULT bg-surface-container-low flex flex-col gap-1.5">
+<div class="flex justify-between items-center font-label-sm text-label-sm">
+<span class="text-on-surface font-semibold">L6: Synthesize</span>
+<span class="px-1.5 py-0.2 rounded-DEFAULT bg-surface-container-highest text-on-surface font-bold">5%</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant text-[12px] leading-tight">Architectural composition &amp; custom protocol design.</p>
+<div class="w-full bg-surface-container rounded-DEFAULT h-1.5 overflow-hidden">
+<div class="bg-tertiary h-1.5 rounded-DEFAULT" style="width: 5%"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 3: Difficulty & Assessment Formats -->
+<section aria-labelledby="sec-formats" class="p-space-lg rounded-DEFAULT bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs pb-space-sm bg-surface-container-low p-space-sm rounded-DEFAULT">
+<div>
+<span class="font-label-sm text-label-sm text-primary font-bold uppercase tracking-wider">Vector Matrix 03</span>
+<h2 class="font-headline-md text-headline-md text-on-surface font-headline-lg" id="sec-formats">3. Difficulty &amp; Question Formats</h2>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded-DEFAULT bg-surface-container-highest text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">view_agenda</span>
+<span>3 Formats Active</span>
+</div>
+</div>
+<!-- Difficulty Pill Selectors -->
+<div class="flex flex-col gap-space-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Difficulty Calibration:</span>
+<div class="grid grid-cols-3 gap-space-sm">
+<button class="p-space-sm rounded-DEFAULT bg-surface-container hover:bg-surface-container-high text-center font-body-sm text-body-sm transition-all" type="button">
+<div class="font-bold text-on-surface">Easy (20%)</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">3 Items</span>
+</button>
+<button class="p-space-sm rounded-DEFAULT bg-primary/10 text-center font-body-sm text-body-sm ring-1 ring-primary shadow-sm transition-all" type="button">
+<div class="font-bold text-primary">Medium (50%)</div>
+<span class="font-label-sm text-label-sm text-primary">8 Items</span>
+</button>
+<button class="p-space-sm rounded-DEFAULT bg-surface-container hover:bg-surface-container-high text-center font-body-sm text-body-sm transition-all" type="button">
+<div class="font-bold text-on-surface">Hard (30%)</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">4 Items</span>
+</button>
+</div>
+</div>
+<!-- Question Types -->
+<div class="flex flex-col gap-space-sm pt-space-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Format Distribution:</span>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-sm">
+<div class="p-space-sm rounded-DEFAULT bg-surface-container-low flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm font-semibold text-on-surface">Multiple Choice (MCQ)</span>
+<span class="font-label-sm text-label-sm text-primary font-bold">60%</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">4-distractor rationale synthesis</span>
+</div>
+<div class="p-space-sm rounded-DEFAULT bg-surface-container-low flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm font-semibold text-on-surface">Short Answer / Proofs</span>
+<span class="font-label-sm text-label-sm text-on-surface font-bold">20%</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Rubric-grounded criteria key</span>
+</div>
+<div class="p-space-sm rounded-DEFAULT bg-surface-container-low flex flex-col gap-1">
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm font-semibold text-on-surface">Long Scenario Analysis</span>
+<span class="font-label-sm text-label-sm text-on-surface font-bold">20%</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Architecture failure injection</span>
+</div>
+</div>
+</div>
+<!-- Style Badges -->
+<div class="flex items-center gap-space-xs flex-wrap pt-space-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant mr-1">Style Constraints:</span>
+<span class="px-2 py-1 rounded-DEFAULT bg-primary/10 text-primary font-label-sm text-label-sm font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">check</span> Scenario-Based
+            </span>
+<span class="px-2 py-1 rounded-DEFAULT bg-primary/10 text-primary font-label-sm text-label-sm font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">check</span> Direct Analytical
+            </span>
+<span class="px-2 py-1 rounded-DEFAULT bg-surface-container text-on-surface-variant font-label-sm text-label-sm hover:text-on-surface cursor-pointer">
+              + Counterexample Tracing
+            </span>
+</div>
+</section>
+<!-- Section 4: Grounding Policy & Quality Invariants -->
+<section aria-labelledby="sec-grounding-policy" class="p-space-lg rounded-DEFAULT bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between pb-space-sm bg-surface-container-low p-space-sm rounded-DEFAULT">
+<div>
+<span class="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">Quality Safeguards</span>
+<h2 class="font-headline-md text-headline-md text-on-surface font-headline-lg" id="sec-grounding-policy">4. Grounding Policy &amp; Quality Invariants</h2>
+</div>
+<span class="material-symbols-outlined text-[20px] text-secondary">shield_lock</span>
+</div>
+<!-- Quality items -->
+<div class="flex flex-col gap-space-sm">
+<!-- Strict Deduplication -->
+<div class="p-space-md rounded-DEFAULT bg-surface-container-low flex items-start justify-between gap-space-md">
+<div class="flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-[20px] text-primary shrink-0 mt-0.5">content_copy</span>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Duplicate Prevention Policy</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                    Strict Zero-Duplicate: Rejects candidates with semantic cosine similarity <code class="font-label-sm text-label-sm bg-surface-container px-1 py-0.5 rounded-DEFAULT">&gt; 0.82</code> against existing 38 questions in this project.
+                  </p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<!-- Cryptographic Anchor Requirement -->
+<div class="p-space-md rounded-DEFAULT bg-surface-container-low flex items-start justify-between gap-space-md">
+<div class="flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-[20px] text-secondary shrink-0 mt-0.5">lock_clock</span>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Cryptographic Grounding Citation Anchors</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                    Require verified chunk byte-span on question stem AND each distractor rationale. Discard candidate if attribution threshold &lt; 98.5%.
+                  </p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<!-- Inference Mode & Temperature -->
+<div class="p-space-md rounded-DEFAULT bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[20px] text-on-surface-variant">thermostat</span>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Local Inference Determinism</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Deterministic Local Mode (Temp: 0.15, Seed: 42)</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs font-label-sm text-label-sm bg-surface-container-lowest px-space-sm py-1 rounded-DEFAULT shadow-sm">
+<span class="text-on-surface-variant">Target Model:</span>
+<span class="font-bold text-primary">llama3:70b-instruct-q4</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- RIGHT COLUMN: Blueprint Inspector & Generation Launcher (5 cols, sticky) -->
+<div class="xl:col-span-5 flex flex-col gap-space-lg min-w-0 xl:sticky xl:top-20">
+<!-- Live Generation Blueprint Card -->
+<div class="p-space-lg rounded-DEFAULT bg-surface-container-lowest shadow-md flex flex-col gap-space-md">
+<div class="flex items-start justify-between gap-space-sm">
+<div>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Cockpit Controller</span>
+<h2 class="font-headline-md text-headline-md text-on-surface font-headline-lg">Generation Blueprint Summary</h2>
+</div>
+<span class="px-2 py-1 rounded-DEFAULT bg-secondary/15 text-secondary font-label-sm text-label-sm font-semibold flex items-center gap-1 shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span>Validated (100% Satisfied)</span>
+</span>
+</div>
+<!-- Spec Matrix Metrics -->
+<div class="grid grid-cols-2 gap-space-sm p-space-sm rounded-DEFAULT bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Target Output</span>
+<span class="font-headline-md text-headline-md text-on-surface font-bold" id="target-output-display">15 Questions</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Est. Latency</span>
+<span class="font-headline-md text-headline-md text-on-surface font-bold">~42s</span>
+</div>
+<div class="flex flex-col pt-space-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Chunks In Scope</span>
+<span class="font-body-md text-body-md text-secondary font-bold">28 Chunks Mapped</span>
+</div>
+<div class="flex flex-col pt-space-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Deduplication</span>
+<span class="font-body-md text-body-md text-on-surface font-bold">Strict (&gt; 0.82)</span>
+</div>
+</div>
+<!-- Primary CTA Button -->
+<button class="w-full py-3.5 px-space-md rounded-DEFAULT bg-primary hover:bg-primary-container text-on-primary font-headline-sm text-headline-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.985]" id="primary-generate-btn" onclick="startGenerationSimulation()" type="button">
+<span class="material-symbols-outlined text-[20px]">bolt</span>
+<span id="primary-generate-label">Generate 15 Questions from Blueprint</span>
+</button>
+<!-- Secondary Actions -->
+<div class="grid grid-cols-2 gap-space-sm">
+<button class="px-space-sm py-2 rounded-DEFAULT bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">bookmark</span>
+<span>Save as Preset</span>
+</button>
+<button class="px-space-sm py-2 rounded-DEFAULT bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">data_object</span>
+<span>Export Spec (.JSON)</span>
+</button>
+</div>
+</div>
+<!-- Live Generation Telemetry & Execution Monitor Card -->
+<div class="p-space-lg rounded-DEFAULT bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-primary">terminal</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Synthesis Pipeline Execution</h3>
+</div>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded-DEFAULT bg-surface-container text-on-surface-variant" id="pipeline-status-badge">Idle</span>
+</div>
+<!-- 4-step execution stepper -->
+<div class="flex flex-col gap-2.5">
+<!-- Step 1 -->
+<div class="flex items-center justify-between p-space-xs px-space-sm rounded-DEFAULT bg-surface-container-low font-body-sm text-body-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-secondary">check_circle</span>
+<span class="text-on-surface">1. Topic-Aware Chunk Retrieval</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">18ms</span>
+</div>
+<!-- Step 2 -->
+<div class="flex items-center justify-between p-space-xs px-space-sm rounded-DEFAULT bg-surface-container-low font-body-sm text-body-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-secondary">check_circle</span>
+<span class="text-on-surface">2. Question Blueprint Planning</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">42ms</span>
+</div>
+<!-- Step 3 (Dynamic) -->
+<div class="flex items-center justify-between p-space-xs px-space-sm rounded-DEFAULT bg-primary/10 font-body-sm text-body-sm" id="step-3-container">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-primary animate-spin" id="step-3-icon">progress_activity</span>
+<span class="text-primary font-bold" id="step-3-label">3. Local LLM Inference (llama3:70b)</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary font-bold" id="step-3-progress">8 / 15 Generated</span>
+</div>
+<!-- Step 4 -->
+<div class="flex items-center justify-between p-space-xs px-space-sm rounded-DEFAULT bg-surface-container-low font-body-sm text-body-sm" id="step-4-container">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant" id="step-4-icon">hourglass_empty</span>
+<span class="text-on-surface-variant" id="step-4-label">4. Multi-Constraint Verification</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant" id="step-4-status">Queued</span>
+</div>
+</div>
+<!-- Live Streaming Synthesized Question Preview Box -->
+<div class="p-space-md rounded-DEFAULT bg-surface-container-low flex flex-col gap-space-sm shadow-inner">
+<div class="flex items-center justify-between flex-wrap gap-1">
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-tertiary-container/15 text-tertiary font-label-sm text-label-sm font-semibold">Level 4: Analyze</span>
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-surface-container-highest text-on-surface font-label-sm text-label-sm">Hard</span>
+<span class="px-1.5 py-0.5 rounded-DEFAULT bg-primary/10 text-primary font-label-sm text-label-sm">Multiple Choice</span>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-bold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span>Active Stream</span>
+</span>
+</div>
+<div class="font-editorial-quote text-editorial-quote text-on-surface italic leading-snug">
+              "Under Raft consensus with a 5-node cluster, suppose Node 1 is partitioned during Term 3 while holding uncommitted log entries. How does Raft preserve Term Monotonicity upon partition healing?"
+            </div>
+<div class="p-space-xs rounded-DEFAULT bg-surface-container-lowest font-label-sm text-label-sm text-on-surface-variant flex flex-col gap-1 shadow-sm">
+<div class="flex items-center justify-between">
+<span class="text-on-surface font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-secondary">anchor</span>
+<span>#RES-CS842-P314-C08</span>
+</span>
+<span class="text-secondary font-bold">99.4% Attribution Match</span>
+</div>
+<p class="text-[11px] leading-tight text-on-surface-variant">
+                Silberschatz OS Ch. 8 / Raft Protocol Paper §5.2 Leader Election &amp; Invariants
+              </p>
+</div>
+<div class="flex items-center justify-between font-label-sm text-label-sm pt-1">
+<span class="text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">verified</span>
+<span>Zero Hallucination Confirmed</span>
+</span>
+<span class="text-on-surface-variant">Local Seed #42</span>
+</div>
+</div>
+</div>
+<!-- Recent Generation Runs History -->
+<div class="p-space-lg rounded-DEFAULT bg-surface-container-lowest shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Recent Generation Batches</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">This Project</span>
+</div>
+<div class="flex flex-col gap-2 font-body-sm text-body-sm">
+<!-- Batch 03 -->
+<div class="p-space-sm rounded-DEFAULT bg-surface-container-low hover:bg-surface-container flex items-center justify-between transition-colors">
+<div>
+<div class="flex items-center gap-2">
+<span class="font-bold text-on-surface">Batch #03</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.2 rounded-DEFAULT bg-secondary/15 text-secondary font-semibold">100% Passed</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">15 Questions · 41.2s · Balanced Matrix</span>
+</div>
+<a class="font-label-sm text-label-sm text-primary hover:underline flex items-center gap-0.5" href="#">
+<span>View in Bank</span>
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</a>
+</div>
+<!-- Batch 02 -->
+<div class="p-space-sm rounded-DEFAULT bg-surface-container-low hover:bg-surface-container flex items-center justify-between transition-colors">
+<div>
+<div class="flex items-center gap-2">
+<span class="font-bold text-on-surface">Batch #02</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.2 rounded-DEFAULT bg-secondary/15 text-secondary font-semibold">100% Passed</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">10 Questions · 28.4s · Analytical Scenario</span>
+</div>
+<a class="font-label-sm text-label-sm text-primary hover:underline flex items-center gap-0.5" href="#">
+<span>View in Bank</span>
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</a>
+</div>
+<!-- Batch 01 -->
+<div class="p-space-sm rounded-DEFAULT bg-surface-container-low hover:bg-surface-container flex items-center justify-between transition-colors">
+<div>
+<div class="flex items-center gap-2">
+<span class="font-bold text-on-surface">Batch #01</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.2 rounded-DEFAULT bg-tertiary-container/15 text-tertiary font-semibold">1 Flagged Dup</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">5 Questions · 14.1s · Pilot Run</span>
+</div>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:underline flex items-center gap-0.5" href="#">
+<span>Reviewed</span>
+<span class="material-symbols-outlined text-[14px]">check</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Extended Academic Telemetry Strip Footer -->
+<section aria-label="Extended Academic Telemetry" class="w-full bg-surface-container-low py-space-sm px-margin-desktop shadow-inner">
+<div class="max-w-[1440px] mx-auto flex flex-col md:flex-row items-center justify-between gap-space-sm font-label-sm text-label-sm text-on-surface-variant">
+<div class="flex items-center gap-space-md flex-wrap">
+<span class="flex items-center gap-1 text-on-surface font-semibold">
+<span class="material-symbols-outlined text-[16px] text-secondary">verified_user</span>
+<span>ISO/IEC 42001 AUDITED</span>
+</span>
+<span>•</span>
+<span>Academic Integrity Protocol v2.4</span>
+<span>•</span>
+<span class="text-secondary font-semibold">Local Ollama Inference: Online (llama3:70b-instruct)</span>
+</div>
+<div class="flex items-center gap-space-md flex-wrap">
+<span>Grounding Latency: <strong class="text-on-surface">38ms</strong></span>
+<span>•</span>
+<span>Corpus Hash: <code class="text-primary font-bold">0x7F4B..9C</code></span>
+</div>
+</div>
+</section>
+</div>
+<script>
+  function selectPreset(el, name, count) {
+    document.querySelectorAll('.preset-card').forEach(btn => {
+      btn.classList.remove('ring-2', 'ring-primary-container', 'shadow-md');
+      btn.classList.add('shadow-sm');
+      const checkIcon = btn.querySelector('.material-symbols-outlined');
+      if (checkIcon) checkIcon.remove();
+    });
+    el.classList.add('ring-2', 'ring-primary-container', 'shadow-md');
+    el.classList.remove('shadow-sm');
+
+    const titleEl = el.querySelector('.font-headline-sm');
+    if (titleEl && !titleEl.parentElement.querySelector('.material-symbols-outlined')) {
+      const icon = document.createElement('span');
+      icon.className = 'material-symbols-outlined text-[18px] text-primary';
+      icon.innerText = 'check_circle';
+      titleEl.parentElement.appendChild(icon);
+    }
+
+    document.getElementById('target-output-display').innerText = count + ' Questions';
+    document.getElementById('primary-generate-label').innerText = 'Generate ' + count + ' Questions from Blueprint';
+  }
+
+  function setPipelineState(state) {
+    const btnReady = document.getElementById('state-btn-ready');
+    const btnGen = document.getElementById('state-btn-generating');
+    const btnComp = document.getElementById('state-btn-complete');
+
+    [btnReady, btnGen, btnComp].forEach(btn => {
+      btn.className = 'px-space-sm py-1 rounded-DEFAULT font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface transition-all';
+      btn.setAttribute('aria-selected', 'false');
+    });
+
+    const badge = document.getElementById('pipeline-status-badge');
+    const step3Progress = document.getElementById('step-3-progress');
+    const step3Icon = document.getElementById('step-3-icon');
+    const step4Status = document.getElementById('step-4-status');
+    const step4Container = document.getElementById('step-4-container');
+    const step4Icon = document.getElementById('step-4-icon');
+    const step4Label = document.getElementById('step-4-label');
+    const genBtn = document.getElementById('primary-generate-btn');
+
+    if (state === 'ready') {
+      btnReady.className = 'px-space-sm py-1 rounded-DEFAULT font-label-sm text-label-sm font-semibold transition-all bg-primary-container text-on-primary-container shadow-sm';
+      btnReady.setAttribute('aria-selected', 'true');
+      badge.innerText = 'Blueprint Ready';
+      badge.className = 'font-label-sm text-label-sm px-2 py-0.5 rounded-DEFAULT bg-secondary/15 text-secondary font-bold';
+      step3Progress.innerText = 'Ready to Dispatch';
+      step3Icon.className = 'material-symbols-outlined text-[16px] text-primary';
+      step3Icon.innerText = 'play_circle';
+      step4Status.innerText = 'Standby';
+      step4Container.className = 'flex items-center justify-between p-space-xs px-space-sm rounded-DEFAULT bg-surface-container-low font-body-sm text-body-sm';
+      step4Icon.className = 'material-symbols-outlined text-[16px] text-on-surface-variant';
+      step4Icon.innerText = 'hourglass_empty';
+      step4Label.className = 'text-on-surface-variant';
+      genBtn.disabled = false;
+      document.getElementById('primary-generate-label').innerText = 'Generate 15 Questions from Blueprint';
+    } else if (state === 'generating') {
+      btnGen.className = 'px-space-sm py-1 rounded-DEFAULT font-label-sm text-label-sm font-semibold transition-all bg-primary-container text-on-primary-container shadow-sm';
+      btnGen.setAttribute('aria-selected', 'true');
+      badge.innerText = 'Synthesizing (8/15)';
+      badge.className = 'font-label-sm text-label-sm px-2 py-0.5 rounded-DEFAULT bg-primary/10 text-primary font-bold animate-pulse';
+      step3Progress.innerText = '8 / 15 Generated';
+      step3Icon.className = 'material-symbols-outlined text-[16px] text-primary animate-spin';
+      step3Icon.innerText = 'progress_activity';
+      step4Status.innerText = 'Queued';
+      step4Container.className = 'flex items-center justify-between p-space-xs px-space-sm rounded-DEFAULT bg-surface-container-low font-body-sm text-body-sm';
+      step4Icon.className = 'material-symbols-outlined text-[16px] text-on-surface-variant';
+      step4Icon.innerText = 'hourglass_empty';
+      step4Label.className = 'text-on-surface-variant';
+      genBtn.disabled = true;
+      document.getElementById('primary-generate-label').innerText = 'Synthesizing 8/15 with llama3:70b...';
+    } else if (state === 'complete') {
+      btnComp.className = 'px-space-sm py-1 rounded-DEFAULT font-label-sm text-label-sm font-semibold transition-all bg-secondary/20 text-secondary font-bold shadow-sm';
+      btnComp.setAttribute('aria-selected', 'true');
+      badge.innerText = 'Batch #04 Ready (15/15)';
+      badge.className = 'font-label-sm text-label-sm px-2 py-0.5 rounded-DEFAULT bg-secondary/15 text-secondary font-bold';
+      step3Progress.innerText = '15 / 15 Finished ✓';
+      step3Icon.className = 'material-symbols-outlined text-[16px] text-secondary';
+      step3Icon.innerText = 'check_circle';
+      step4Status.innerText = '100% Passed (39ms)';
+      step4Container.className = 'flex items-center justify-between p-space-xs px-space-sm rounded-DEFAULT bg-secondary/10 font-body-sm text-body-sm';
+      step4Icon.className = 'material-symbols-outlined text-[16px] text-secondary';
+      step4Icon.innerText = 'verified';
+      step4Label.className = 'text-secondary font-bold';
+      genBtn.disabled = false;
+      document.getElementById('primary-generate-label').innerText = 'Review 15 Questions in Bank →';
+    }
+  }
+
+  function startGenerationSimulation() {
+    setPipelineState('generating');
+    setTimeout(() => {
+      setPipelineState('complete');
+    }, 2800);
+  }
+</script></main><footer class="w-full bg-surface-container-lowest shadow-[0_-1px_6px_rgba(0,0,0,0.02)]"><div class="w-full px-margin-desktop py-space-md flex flex-col md:flex-row items-center justify-between gap-space-md font-body-sm text-body-sm text-on-surface-variant"><div class="flex items-center gap-space-md flex-wrap"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[16px] text-secondary">verified_user</span><span class="font-label-sm text-label-sm uppercase tracking-wide text-on-surface">ISO/IEC 42001 Audited</span></div><span class="text-outline-variant font-label-md text-label-md">•</span><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[16px] text-on-surface-variant">school</span><span class="font-body-sm text-body-sm">Academic Integrity Protocol v2.4</span></div></div><div class="flex items-center gap-space-lg flex-wrap"><div class="flex items-center gap-space-xs"><span class="w-2 h-2 rounded-full bg-secondary"></span><span class="font-label-sm text-label-sm text-on-surface-variant">Grounding Latency: 42ms</span></div><span class="text-outline-variant font-label-md text-label-md">•</span><span class="font-label-sm text-label-sm text-on-surface-variant">Hash: <code class="font-label-sm text-label-sm text-on-surface">0x7F4B..9C</code></span></div></div></footer></body></html>

@@ -23,6 +23,13 @@ interface EvidenceChunk {
   text: string;
 }
 
+interface ProjectResourceOption {
+  chunk_count?: number;
+  id: string;
+  original_filename: string;
+  status: string;
+}
+
 export const mockDemoModules: TopicWithSubtopics[] = [
   {
     archived_at: null,
@@ -345,15 +352,32 @@ export function ProjectTopicsPage({
 
   // Drawer Form State
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [newTopicTitle, setNewTopicTitle] = useState(
-    'Vector Clocks & Causality Violation Detection',
-  );
+  const [newTopicTitle, setNewTopicTitle] = useState('');
   const [newTopicParentId, setNewTopicParentId] =
     useState<string>('NEW_MODULE');
-  const [newTopicDescription, setNewTopicDescription] = useState(
-    'Cover happens-before relations (->), concurrent events where neither a -> b nor b -> a, and clock size equal to process count.',
-  );
+  const [newTopicDescription, setNewTopicDescription] = useState('');
+  const [newTopicBloomDepth, setNewTopicBloomDepth] =
+    useState('Level 3: Apply');
+  const [newTopicSourceResource, setNewTopicSourceResource] = useState('');
+  const [projectResources, setProjectResources] = useState<
+    ProjectResourceOption[]
+  >([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const openAddTopicModal = (parentId: string = 'NEW_MODULE') => {
+    setNewTopicTitle('');
+    setNewTopicDescription('');
+    setNewTopicParentId(parentId);
+    setNewTopicSourceResource('');
+    setNewTopicBloomDepth('Level 3: Apply');
+    setIsDrawerOpen(true);
+  };
+
+  const closeDrawer = () => {
+    setNewTopicTitle('');
+    setNewTopicDescription('');
+    setIsDrawerOpen(false);
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -406,6 +430,7 @@ export function ProjectTopicsPage({
         // Check resources status
         const resPayload = await apiRequest(`/projects/${projectId}/resources`);
         if (resPayload.data && Array.isArray(resPayload.data)) {
+          setProjectResources(resPayload.data);
           currentTotal = resPayload.data.length;
           currentReady = (resPayload.data as Array<{ status: string }>).filter(
             (r) => r.status === 'READY',
@@ -516,7 +541,8 @@ export function ProjectTopicsPage({
 
   const handleCreateTopic = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTopicTitle.trim()) return;
+    const trimmedTitle = newTopicTitle.trim();
+    if (!trimmedTitle) return;
 
     try {
       if (projectId) {
@@ -527,8 +553,8 @@ export function ProjectTopicsPage({
             `/projects/${projectId}/topics`,
             {
               body: JSON.stringify({
-                description: newTopicDescription,
-                name: newTopicTitle,
+                description: newTopicDescription.trim() || undefined,
+                name: trimmedTitle,
                 parent_id: null,
               }),
               method: 'POST',
@@ -539,8 +565,8 @@ export function ProjectTopicsPage({
           parentId = newTopicParentId;
           await apiRequest(`/projects/${projectId}/topics`, {
             body: JSON.stringify({
-              description: newTopicDescription,
-              name: newTopicTitle,
+              description: newTopicDescription.trim() || undefined,
+              name: trimmedTitle,
               parent_id: parentId,
             }),
             method: 'POST',
@@ -548,45 +574,71 @@ export function ProjectTopicsPage({
         }
 
         const reload = await apiRequest(`/projects/${projectId}/topics`);
-        if (reload.data) {
+        if (reload.data && Array.isArray(reload.data)) {
           setModules(reload.data);
+          if (!selectedSubtopic) {
+            const firstSub = reload.data[0]?.subtopics?.[0];
+            if (firstSub && reload.data[0]) {
+              setSelectedSubtopic({
+                moduleName: reload.data[0].name,
+                subtopic: firstSub,
+              });
+              void loadEvidence(firstSub.id);
+            }
+          }
         }
       } else {
         // Local state update
-        const newSubtopic = {
-          archived_at: null,
-          chunk_count: 12,
-          confidence_avg: 0.99,
-          created_at: new Date().toISOString(),
-          description: newTopicDescription,
-          id: `top_${Date.now()}`,
-          is_active: true,
-          name: newTopicTitle,
-          parent_id:
-            newTopicParentId === 'NEW_MODULE'
-              ? (modules[0]?.id ?? 'mod_1')
-              : newTopicParentId,
-          project_id: projectId ?? 'cs-842',
-          sort_order: 99,
-          source: 'USER_DEFINED' as const,
-          updated_at: new Date().toISOString(),
-        };
+        if (newTopicParentId === 'NEW_MODULE') {
+          const newModule: TopicWithSubtopics = {
+            archived_at: null,
+            chunk_count: 0,
+            confidence_avg: 1.0,
+            created_at: new Date().toISOString(),
+            description: newTopicDescription.trim() || null,
+            id: `mod_${Date.now()}`,
+            is_active: true,
+            name: trimmedTitle,
+            parent_id: null,
+            project_id: projectId ?? 'proj_local',
+            sort_order: modules.length + 1,
+            source: 'USER_DEFINED' as const,
+            subtopics: [],
+            updated_at: new Date().toISOString(),
+          };
+          setModules((prev) => [...prev, newModule]);
+        } else {
+          const newSubtopic = {
+            archived_at: null,
+            chunk_count: 0,
+            confidence_avg: 1.0,
+            created_at: new Date().toISOString(),
+            description: newTopicDescription.trim() || null,
+            id: `top_${Date.now()}`,
+            is_active: true,
+            name: trimmedTitle,
+            parent_id: newTopicParentId,
+            project_id: projectId ?? 'proj_local',
+            sort_order: 99,
+            source: 'USER_DEFINED' as const,
+            updated_at: new Date().toISOString(),
+          };
 
-        setModules((prev) =>
-          prev.map((m, idx) =>
-            idx === 0
-              ? {
-                  ...m,
-                  chunk_count: (m.chunk_count ?? 0) + 12,
-                  subtopics: [...m.subtopics, newSubtopic],
-                }
-              : m,
-          ),
-        );
+          setModules((prev) =>
+            prev.map((m) =>
+              m.id === newTopicParentId
+                ? {
+                    ...m,
+                    subtopics: [...m.subtopics, newSubtopic],
+                  }
+                : m,
+            ),
+          );
+        }
       }
 
-      showToast(`Topic "${newTopicTitle}" saved and linked.`);
-      setIsDrawerOpen(false);
+      showToast(`Topic "${trimmedTitle}" saved and locked.`);
+      closeDrawer();
       setViewMode('normal');
     } catch (err: unknown) {
       const message =
@@ -723,7 +775,7 @@ export function ProjectTopicsPage({
                     {project?.name ?? 'Course Workspace'}
                   </h1>
                   <span className="px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-on-surface uppercase tracking-wider font-semibold">
-                    SEC-01 · GRADUATE
+                    CURRICULUM ARCHITECTURE
                   </span>
                   <span className="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
@@ -763,9 +815,7 @@ export function ProjectTopicsPage({
                     Mapped Chunks
                   </span>
                   <span className="font-headline-sm text-headline-sm text-on-surface font-label-sm">
-                    {totalMappedChunks > 0
-                      ? `${totalMappedChunks} Units`
-                      : '360 Units'}
+                    {totalMappedChunks} Units
                   </span>
                 </div>
               </div>
@@ -785,18 +835,18 @@ export function ProjectTopicsPage({
               </Link>
               <div className="flex items-center gap-2 px-4 py-2.5 bg-surface-container-lowest text-primary font-body-sm text-body-sm font-medium border-b-2 border-primary whitespace-nowrap">
                 <Icon name="tree" size={16} />
-                <span>Topics ({totalSubtopics > 0 ? totalSubtopics : 14})</span>
+                <span>Topics ({totalSubtopics})</span>
                 <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm font-semibold">
                   Active
                 </span>
               </div>
-              <div className="flex items-center gap-2 px-4 py-2.5 text-outline cursor-not-allowed font-body-sm text-body-sm whitespace-nowrap">
+              <Link
+                className="flex items-center gap-2 px-4 py-2.5 text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm transition-colors whitespace-nowrap"
+                to={`/app/projects/${projectId ?? 'demo'}/generation`}
+              >
                 <Icon name="spark" size={16} />
                 <span>Generation</span>
-                <span className="px-1.5 py-0.5 rounded bg-surface-container-high text-outline font-label-sm text-label-sm">
-                  Upcoming step
-                </span>
-              </div>
+              </Link>
               <div className="flex items-center gap-2 px-4 py-2.5 text-outline cursor-not-allowed font-body-sm text-body-sm whitespace-nowrap">
                 <Icon name="verified" size={16} />
                 <span>Question Bank</span>
@@ -866,7 +916,7 @@ export function ProjectTopicsPage({
               </button>
               <button
                 className="px-4 py-2 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container font-headline-sm text-headline-sm shadow-sm transition-all flex items-center gap-2 border border-outline-variant/30"
-                onClick={() => setIsDrawerOpen(true)}
+                onClick={() => openAddTopicModal('NEW_MODULE')}
                 type="button"
               >
                 <span>+</span>
@@ -911,7 +961,7 @@ export function ProjectTopicsPage({
                 </button>
                 <button
                   className="px-6 py-2.5 rounded-lg bg-surface-container text-on-surface font-headline-sm text-headline-sm hover:bg-surface-container-high transition-colors"
-                  onClick={() => setIsDrawerOpen(true)}
+                  onClick={() => openAddTopicModal('NEW_MODULE')}
                   type="button"
                 >
                   Create Empty Hierarchy
@@ -1021,10 +1071,7 @@ export function ProjectTopicsPage({
                         <div className="flex items-center gap-1 shrink-0">
                           <button
                             className="px-2 py-1 rounded text-label-sm font-label-sm hover:bg-surface text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1 border border-outline-variant/30"
-                            onClick={() => {
-                              setNewTopicParentId(module.id);
-                              setIsDrawerOpen(true);
-                            }}
+                            onClick={() => openAddTopicModal(module.id)}
                             type="button"
                           >
                             <span>+</span>
@@ -1081,13 +1128,13 @@ export function ProjectTopicsPage({
                                   </div>
                                   <div className="flex items-center gap-3 font-label-sm text-label-sm flex-wrap">
                                     <span className="px-2 py-0.5 rounded bg-secondary-container/40 text-on-secondary-container font-medium">
-                                      {sub.chunk_count ?? 18} chunks locked
+                                      {sub.chunk_count ?? 0} chunks locked
                                     </span>
                                     <span className="text-secondary font-medium">
-                                      {Math.round(
-                                        (sub.confidence_avg ?? 0.98) * 1000,
-                                      ) / 10}
-                                      % deterministic fit
+                                      {sub.confidence_avg !== undefined &&
+                                      sub.confidence_avg !== null
+                                        ? `${Math.round(sub.confidence_avg * 1000) / 10}% deterministic fit`
+                                        : 'User defined'}
                                     </span>
                                     <span className="text-outline">
                                       {sub.description?.slice(0, 35) ??
@@ -1312,7 +1359,7 @@ export function ProjectTopicsPage({
         {/* Backdrop scrim */}
         <div
           className="absolute inset-0 bg-inverse-surface/20 backdrop-blur-[2px]"
-          onClick={() => setIsDrawerOpen(false)}
+          onClick={closeDrawer}
         />
         {/* Drawer Panel */}
         <div
@@ -1333,7 +1380,7 @@ export function ProjectTopicsPage({
             <button
               aria-label="Close Drawer"
               className="p-1 rounded hover:bg-surface text-on-surface-variant hover:text-on-surface"
-              onClick={() => setIsDrawerOpen(false)}
+              onClick={closeDrawer}
               type="button"
             >
               <Icon name="close" size={20} />
@@ -1345,24 +1392,6 @@ export function ProjectTopicsPage({
             className="p-6 flex-1 overflow-y-auto space-y-4"
             onSubmit={handleCreateTopic}
           >
-            <div className="space-y-1">
-              <label
-                className="block font-label-md text-label-md text-on-surface font-medium uppercase"
-                htmlFor="drawer-topic-title"
-              >
-                Topic Title <span className="text-error">*</span>
-              </label>
-              <input
-                className="w-full px-3 py-2 rounded bg-surface text-on-surface font-body-md text-body-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 border border-outline-variant/30"
-                id="drawer-topic-title"
-                onChange={(e) => setNewTopicTitle(e.target.value)}
-                placeholder="e.g., Lamport Logical Timestamps"
-                required
-                type="text"
-                value={newTopicTitle}
-              />
-            </div>
-
             <div className="space-y-1">
               <label
                 className="block font-label-md text-label-md text-on-surface font-medium uppercase"
@@ -1383,6 +1412,33 @@ export function ProjectTopicsPage({
                   </option>
                 ))}
               </select>
+              <p className="font-label-sm text-label-sm text-outline">
+                {newTopicParentId === 'NEW_MODULE'
+                  ? 'Creates a new top-level module in your curriculum hierarchy.'
+                  : 'Adds this topic as a subtopic under the selected parent module.'}
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label
+                className="block font-label-md text-label-md text-on-surface font-medium uppercase"
+                htmlFor="drawer-topic-title"
+              >
+                Topic Title <span className="text-error">*</span>
+              </label>
+              <input
+                className="w-full px-3 py-2 rounded bg-surface text-on-surface font-body-md text-body-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 border border-outline-variant/30"
+                id="drawer-topic-title"
+                onChange={(e) => setNewTopicTitle(e.target.value)}
+                placeholder={
+                  newTopicParentId === 'NEW_MODULE'
+                    ? 'e.g., Module 1: Linked Lists & Pointers'
+                    : 'e.g., Singly Linked List Traversal & Deletion'
+                }
+                required
+                type="text"
+                value={newTopicTitle}
+              />
             </div>
 
             <div className="space-y-1">
@@ -1395,16 +1451,27 @@ export function ProjectTopicsPage({
               <select
                 className="w-full px-3 py-2 rounded bg-surface text-on-surface font-body-md text-body-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 border border-outline-variant/30"
                 id="drawer-bloom-depth"
+                onChange={(e) => setNewTopicBloomDepth(e.target.value)}
+                value={newTopicBloomDepth}
               >
-                <option>Level 3: Apply (Implementation & tracing)</option>
-                <option>
-                  Level 4: Analyze (Fault analysis & concurrency races)
+                <option value="Level 1: Remember">
+                  Level 1: Remember (Definitions, syntax & recall)
                 </option>
-                <option>
-                  Level 5: Evaluate (Consensus trade-offs & safety proofs)
+                <option value="Level 2: Understand">
+                  Level 2: Understand (Core concepts & explanation)
                 </option>
-                <option>
-                  Level 6: Synthesize (Distributed protocol design)
+                <option value="Level 3: Apply">
+                  Level 3: Apply (Implementation & problem solving)
+                </option>
+                <option value="Level 4: Analyze">
+                  Level 4: Analyze (Structure analysis, trade-offs & invariants)
+                </option>
+                <option value="Level 5: Evaluate">
+                  Level 5: Evaluate (Verification, complexity & comparative
+                  critique)
+                </option>
+                <option value="Level 6: Synthesize">
+                  Level 6: Synthesize (Algorithm design & system integration)
                 </option>
               </select>
             </div>
@@ -1419,20 +1486,41 @@ export function ProjectTopicsPage({
               <select
                 className="w-full px-3 py-2 rounded bg-surface text-on-surface font-body-md text-body-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 border border-outline-variant/30"
                 id="drawer-source"
+                onChange={(e) => setNewTopicSourceResource(e.target.value)}
+                value={newTopicSourceResource}
               >
-                <option>Silberschatz_OS_Deadlocks_Ch8.pdf (312 Chunks)</option>
-                <option>CS842_Course_Syllabus_2025.pdf (48 Chunks)</option>
+                <option value="">All Project Resources (Corpus-wide)</option>
+                {projectResources
+                  .filter((r) => r.status === 'READY')
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.original_filename}
+                      {r.chunk_count !== undefined
+                        ? ` (${r.chunk_count} Chunks)`
+                        : ''}
+                    </option>
+                  ))}
+                {projectResources.filter((r) => r.status === 'READY').length ===
+                  0 && (
+                  <option disabled value="__none">
+                    No processed resources in project
+                  </option>
+                )}
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="block font-label-md text-label-md text-on-surface font-medium uppercase">
+              <label
+                className="block font-label-md text-label-md text-on-surface font-medium uppercase"
+                htmlFor="drawer-topic-description"
+              >
                 Conceptual Bounds & Key Assertions
               </label>
               <textarea
                 className="w-full px-3 py-2 rounded bg-surface text-on-surface font-body-md text-body-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 border border-outline-variant/30"
+                id="drawer-topic-description"
                 onChange={(e) => setNewTopicDescription(e.target.value)}
-                placeholder="Define what questions targeting this topic must verify or avoid..."
+                placeholder="Define what questions targeting this topic must test or avoid (e.g., node traversal, pointer manipulation, edge cases)..."
                 rows={3}
                 value={newTopicDescription}
               />
@@ -1444,7 +1532,7 @@ export function ProjectTopicsPage({
             <div className="pt-4 flex items-center justify-end gap-2 border-t border-outline-variant/20">
               <button
                 className="px-4 py-2 rounded bg-surface-container text-on-surface font-headline-sm text-headline-sm hover:bg-surface-container-high transition-colors"
-                onClick={() => setIsDrawerOpen(false)}
+                onClick={closeDrawer}
                 type="button"
               >
                 Cancel

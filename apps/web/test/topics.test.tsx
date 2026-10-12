@@ -89,7 +89,7 @@ describe('ProjectTopicsPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('opens and closes the Add Topic slide-over drawer', () => {
+  it('opens and closes the Add Topic slide-over drawer with clean, curriculum-agnostic inputs', () => {
     renderTopicsPage();
 
     const addTopicBtn = screen.getByRole('button', {
@@ -99,11 +99,58 @@ describe('ProjectTopicsPage', () => {
 
     expect(screen.getByText('Add Curriculum Topic')).toBeInTheDocument();
     expect(screen.getByText(/Manual Topology/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Topic Title/i)).toBeInTheDocument();
+
+    const titleInput = screen.getByLabelText(
+      /Topic Title/i,
+    ) as HTMLInputElement;
+    expect(titleInput).toBeInTheDocument();
+    // Verify NOT pre-filled with template strings
+    expect(titleInput.value).toBe('');
+    expect(screen.queryByText(/Vector Clocks/i)).not.toBeInTheDocument();
+
+    const descriptionInput = screen.getByLabelText(
+      /Conceptual Bounds & Key Assertions/i,
+    ) as HTMLTextAreaElement;
+    expect(descriptionInput.value).toBe('');
+    expect(
+      screen.queryByText(/happens-before relations/i),
+    ).not.toBeInTheDocument();
+
     expect(screen.getByLabelText(/Parent Module/i)).toBeInTheDocument();
     expect(
       screen.getByLabelText(/Pedagogical Depth \(Bloom's Taxonomy\)/i),
     ).toBeInTheDocument();
+
+    // Verify Bloom's Taxonomy options are standard educational levels
+    expect(screen.getByText(/Level 1: Remember/i)).toBeInTheDocument();
+    expect(screen.getByText(/Level 2: Understand/i)).toBeInTheDocument();
+    expect(screen.getByText(/Level 3: Apply/i)).toBeInTheDocument();
+    expect(screen.queryByText(/concurrency races/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Distributed protocol design/i),
+    ).not.toBeInTheDocument();
+
+    // Verify Primary Corroborating Source is corpus-scoped and not hardcoded to OS textbook
+    const sourceSelect = screen.getByLabelText(
+      /Primary Corroborating Source/i,
+    ) as HTMLSelectElement;
+    expect(sourceSelect).toBeInTheDocument();
+    expect(sourceSelect.textContent).toContain(
+      'All Project Resources (Corpus-wide)',
+    );
+    expect(sourceSelect.textContent).not.toContain(
+      'Silberschatz_OS_Deadlocks_Ch8.pdf',
+    );
+
+    // Fill in a custom Linked Lists topic
+    fireEvent.change(titleInput, { target: { value: 'Singly Linked Lists' } });
+    fireEvent.change(descriptionInput, {
+      target: {
+        value:
+          'Focus on node structure, next pointer manipulation, and traversal.',
+      },
+    });
+    expect(titleInput.value).toBe('Singly Linked Lists');
 
     // Close drawer
     const closeBtn = screen.getByRole('button', { name: /Close Drawer/i });

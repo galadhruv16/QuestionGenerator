@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      "colors": {
+        "primary-container": "#3157d5",
+        "surface-container-highest": "#e4e1e6",
+        "surface-container-high": "#eae7eb",
+        "secondary-fixed": "#89f5e7",
+        "surface-bright": "#fbf8fc",
+        "on-primary-fixed-variant": "#0038b6",
+        "on-error-container": "#93000a",
+        "background": "#fbf8fc",
+        "outline": "#747685",
+        "secondary-fixed-dim": "#6bd8cb",
+        "primary-fixed": "#dde1ff",
+        "tertiary-container": "#4d4fda",
+        "inverse-on-surface": "#f3f0f4",
+        "surface-container": "#f0edf1",
+        "inverse-surface": "#303033",
+        "tertiary-fixed": "#e1e0ff",
+        "on-primary-container": "#d8ddff",
+        "on-primary-fixed": "#001452",
+        "surface-container-low": "#f6f2f7",
+        "surface-dim": "#dcd9dd",
+        "error-container": "#ffdad6",
+        "on-tertiary-fixed-variant": "#2f2ebe",
+        "on-primary": "#ffffff",
+        "on-tertiary-fixed": "#07006c",
+        "surface-tint": "#2c53d1",
+        "primary": "#063cbc",
+        "secondary": "#006a61",
+        "on-tertiary-container": "#dddbff",
+        "on-surface": "#1b1b1e",
+        "on-secondary-container": "#006f66",
+        "on-error": "#ffffff",
+        "on-secondary": "#ffffff",
+        "surface-container-lowest": "#ffffff",
+        "secondary-container": "#86f2e4",
+        "surface": "#fbf8fc",
+        "inverse-primary": "#b7c4ff",
+        "primary-fixed-dim": "#b7c4ff",
+        "on-surface-variant": "#444654",
+        "tertiary-fixed-dim": "#c0c1ff",
+        "error": "#ba1a1a",
+        "on-tertiary": "#ffffff",
+        "surface-variant": "#e4e1e6",
+        "on-background": "#1b1b1e",
+        "on-secondary-fixed-variant": "#005049",
+        "on-secondary-fixed": "#00201d",
+        "tertiary": "#3332c2",
+        "outline-variant": "#c4c5d6"
+      },
+      "borderRadius": {
+        "DEFAULT": "0.125rem",
+        "lg": "0.25rem",
+        "xl": "0.5rem",
+        "full": "0.75rem"
+      },
+      "spacing": {
+        "space-xl": "2rem",
+        "space-sm": "0.5rem",
+        "space-lg": "1.25rem",
+        "space-xs": "0.25rem",
+        "space-md": "0.75rem",
+        "margin": "1rem",
+        "gutter": "1rem",
+        "gutter-desktop": "1.5rem",
+        "margin-desktop": "2rem"
+      },
+      "fontFamily": {
+        "editorial-quote": [
+          "Newsreader"
+        ],
+        "body-sm": [
+          "Geist"
+        ],
+        "body-md": [
+          "Geist"
+        ],
+        "display-lg": [
+          "Newsreader"
+        ],
+        "body-lg": [
+          "Geist"
+        ],
+        "headline-md": [
+          "Geist"
+        ],
+        "headline-lg": [
+          "Newsreader"
+        ],
+        "label-sm": [
+          "JetBrains Mono"
+        ],
+        "headline-sm": [
+          "Geist"
+        ],
+        "display-lg-mobile": [
+          "Newsreader"
+        ],
+        "label-md": [
+          "JetBrains Mono"
+        ]
+      },
+      "fontSize": {
+        "editorial-quote": [
+          "18px",
+          {
+            "lineHeight": "28px",
+            "fontWeight": "400"
+          }
+        ],
+        "body-sm": [
+          "13px",
+          {
+            "lineHeight": "20px",
+            "fontWeight": "400"
+          }
+        ],
+        "body-md": [
+          "14px",
+          {
+            "lineHeight": "22px",
+            "fontWeight": "400"
+          }
+        ],
+        "display-lg": [
+          "40px",
+          {
+            "lineHeight": "48px",
+            "letterSpacing": "-0.02em",
+            "fontWeight": "500"
+          }
+        ],
+        "body-lg": [
+          "16px",
+          {
+            "lineHeight": "26px",
+            "fontWeight": "400"
+          }
+        ],
+        "headline-md": [
+          "20px",
+          {
+            "lineHeight": "28px",
+            "letterSpacing": "-0.01em",
+            "fontWeight": "600"
+          }
+        ],
+        "headline-lg": [
+          "28px",
+          {
+            "lineHeight": "36px",
+            "letterSpacing": "-0.015em",
+            "fontWeight": "500"
+          }
+        ],
+        "label-sm": [
+          "11px",
+          {
+            "lineHeight": "14px",
+            "letterSpacing": "0.03em",
+            "fontWeight": "500"
+          }
+        ],
+        "headline-sm": [
+          "16px",
+          {
+            "lineHeight": "24px",
+            "letterSpacing": "-0.005em",
+            "fontWeight": "600"
+          }
+        ],
+        "display-lg-mobile": [
+          "30px",
+          {
+            "lineHeight": "38px",
+            "letterSpacing": "-0.015em",
+            "fontWeight": "500"
+          }
+        ],
+        "label-md": [
+          "12px",
+          {
+            "lineHeight": "16px",
+            "letterSpacing": "0.02em",
+            "fontWeight": "500"
+          }
+        ]
+      }
+    }
+  }
+};</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased"><header class="fixed top-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-md border-b border-outline-variant"><div class="h-16 w-full px-margin-desktop flex items-center justify-between"><div class="flex items-center gap-space-lg"><a class="flex items-center gap-space-sm group text-decoration-none" data-path="product" href="#"><span class="material-symbols-outlined text-primary text-[22px]">shapes</span><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface">GroundQ</span><span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-surface-container-high text-on-surface-variant">v1.4</span></a><nav class="hidden lg:flex items-center gap-space-xs ml-space-md" data-active-classes="bg-surface-container-high text-on-surface font-headline-sm rounded"><a aria-current="page" class="px-space-md py-space-xs transition-colors bg-surface-container-high text-on-surface font-headline-sm rounded" data-path="product" href="#">Product</a><a class="px-space-md py-space-xs rounded font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" data-path="how-it-works" href="#">How it works</a><a class="px-space-md py-space-xs rounded font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" data-path="features" href="#">Features</a><a class="px-space-md py-space-xs rounded font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" data-path="validation" href="#">Validation</a><a class="px-space-md py-space-xs rounded font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" data-path="question-bank" href="#">Question Bank</a></nav></div><div class="flex items-center gap-space-md"><a class="hidden sm:inline-flex px-space-md py-space-xs rounded font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="sign-in" href="#">Sign in</a><a class="inline-flex items-center justify-center px-space-lg py-space-xs h-8 rounded bg-primary-container text-on-primary font-label-md text-label-md hover:bg-primary transition-all active:scale-[0.985]" data-path="get-started" href="#">Get started</a><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="w-full pt-16 bg-surface"><div class="flex flex-col w-full text-on-surface">
+<!-- ========================================================================= -->
+<!-- HERO SECTION                                                              -->
+<!-- ========================================================================= -->
+<section class="w-full px-margin-desktop py-space-xl lg:py-24 bg-surface flex flex-col items-center">
+<div class="max-w-6xl w-full flex flex-col items-center text-center">
+<!-- Overline Pill -->
+<div class="inline-flex items-center gap-space-xs px-3 py-1 rounded-full bg-surface-container-high border border-outline-variant text-on-surface-variant mb-space-lg shadow-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider font-semibold">Grounded knowledge. Better questions.</span>
+</div>
+<!-- Main Headline -->
+<h1 class="font-display-lg text-display-lg max-w-4xl text-on-surface mb-space-md tracking-tight">
+        Turn your study material into <span class="italic font-editorial-quote font-normal text-primary">better questions.</span>
+</h1>
+<!-- Subtitle -->
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mb-space-xl">
+        GroundQ transforms your own notes, textbooks, and presentations into thoughtful, configurable questions strictly grounded in the material you provide.
+      </p>
+<!-- CTAs -->
+<div class="flex flex-wrap items-center justify-center gap-space-md mb-20">
+<a class="inline-flex items-center justify-center px-6 py-2.5 h-10 rounded bg-primary-container text-on-primary font-label-md text-label-md hover:bg-primary transition-all active:scale-[0.985] shadow-sm font-medium" href="#blueprint">
+          Create your first project
+        </a>
+<a class="inline-flex items-center justify-center px-6 py-2.5 h-10 rounded bg-surface-container-lowest border border-outline-variant text-on-surface font-label-md text-label-md hover:bg-surface-container transition-all active:scale-[0.985] shadow-sm" href="#how-it-works">
+          See how it works
+        </a>
+</div>
+<!-- Realistic Interactive Product-Interface Preview -->
+<div class="w-full grid grid-cols-1 lg:grid-cols-12 gap-gutter-desktop text-left" id="blueprint">
+<!-- Left Card: Blueprint Config Panel -->
+<div class="lg:col-span-5 bg-surface-container-lowest rounded-xl border border-outline-variant p-6 shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between pb-4 mb-5 border-b border-outline-variant">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">tune</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Question Blueprint</span>
+</div>
+<span class="font-label-sm text-label-sm bg-surface-container-high px-2 py-0.5 rounded text-on-surface-variant">Target: 20 Items</span>
+</div>
+<!-- Distribution 1: Topics -->
+<div class="space-y-3 mb-5">
+<div class="flex justify-between items-center text-on-surface-variant font-label-sm text-label-sm">
+<span class="uppercase tracking-wider">Topic Distribution</span>
+<span class="font-label-sm text-label-sm text-primary">100% Corpus Matched</span>
+</div>
+<div class="space-y-2">
+<div>
+<div class="flex justify-between text-body-sm text-body-sm mb-1 text-on-surface">
+<span>Deadlocks &amp; Concurrency</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">40%</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary-container rounded-full" style="width: 40%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-body-sm text-body-sm mb-1 text-on-surface">
+<span>Virtual Memory Management</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">35%</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary-container rounded-full" style="width: 35%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-body-sm text-body-sm mb-1 text-on-surface">
+<span>Preemptive CPU Scheduling</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">25%</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary-container rounded-full" style="width: 25%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Distribution 2: Bloom & Difficulty -->
+<div class="grid grid-cols-2 gap-4 mb-5 pt-3 border-t border-outline-variant">
+<div>
+<span class="block font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant mb-2">Bloom Taxonomy</span>
+<div class="space-y-1.5 font-label-sm text-label-sm text-on-surface">
+<div class="flex justify-between bg-surface-container-low px-2 py-1 rounded">
+<span>Apply</span>
+<span class="font-semibold text-primary">30%</span>
+</div>
+<div class="flex justify-between bg-surface-container-low px-2 py-1 rounded">
+<span>Analyze</span>
+<span class="font-semibold text-primary">50%</span>
+</div>
+<div class="flex justify-between bg-surface-container-low px-2 py-1 rounded">
+<span>Evaluate</span>
+<span class="font-semibold text-primary">20%</span>
+</div>
+</div>
+</div>
+<div>
+<span class="block font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant mb-2">Cognitive Load</span>
+<div class="space-y-1.5 font-label-sm text-label-sm text-on-surface">
+<div class="flex justify-between bg-surface-container-low px-2 py-1 rounded">
+<span>Medium</span>
+<span class="font-semibold text-on-surface-variant">40%</span>
+</div>
+<div class="flex justify-between bg-surface-container-low px-2 py-1 rounded">
+<span>Hard</span>
+<span class="font-semibold text-primary">60%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Toggles & Dedup -->
+<div class="p-3 bg-surface-container-low rounded border border-outline-variant flex items-center justify-between mb-5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-[18px]">verified_user</span>
+<span class="font-body-sm text-body-sm font-medium text-on-surface">Semantic De-duplication</span>
+</div>
+<span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed/40 px-2 py-0.5 rounded font-semibold">STRICT</span>
+</div>
+</div>
+<button class="w-full h-9 rounded bg-primary-container text-on-primary font-label-md text-label-md hover:bg-primary transition-all flex items-center justify-center gap-2" type="button">
+<span class="material-symbols-outlined text-[18px]">memory</span>
+            Synthesize Configured Set
+          </button>
+</div>
+<!-- Right Card: Generated Question Preview -->
+<div class="lg:col-span-7 bg-surface-container-lowest rounded-xl border border-outline-variant p-6 shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between pb-4 mb-4 border-b border-outline-variant">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-semibold">Q-0842</span>
+<div class="flex items-center gap-1.5">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant">Analyze</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant">Hard</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant">Scenario-based</span>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+                Valid Spec
+              </span>
+</div>
+<!-- Question Stem -->
+<div class="mb-5">
+<h2 class="font-headline-lg text-headline-lg font-editorial-quote text-on-surface mb-3 leading-snug">
+                A distributed transaction engine maintains 4 worker processes competing for 3 non-preemptible mutex locks. Evaluate under which strict FIFO scheduling constraints a circular wait condition is mathematically guaranteed to induce catastrophic deadlock.
+              </h2>
+<!-- Monospaced Options / Criteria -->
+<div class="space-y-2 mt-4 font-body-sm text-body-sm">
+<div class="p-2.5 rounded bg-surface-container-low border border-outline-variant flex items-start gap-3">
+<span class="font-label-sm text-label-sm font-semibold text-primary">[A]</span>
+<span class="text-on-surface">When lock hold-times are unbounded and resource allocation graphs contain cycles ≥ 3.</span>
+</div>
+<div class="p-2.5 rounded bg-surface-container-low border border-outline-variant flex items-start gap-3">
+<span class="font-label-sm text-label-sm font-semibold text-primary">[B]</span>
+<span class="text-on-surface">When the Coffman hold-and-wait condition is preserved without incremental resource ordering.</span>
+</div>
+<div class="p-2.5 rounded bg-surface-container-low border border-outline-variant flex items-start gap-3">
+<span class="font-label-sm text-label-sm font-semibold text-primary">[C]</span>
+<span class="text-on-surface">When preemption vectors are overridden by symmetric priority escalation policies.</span>
+</div>
+</div>
+</div>
+<!-- Grounded Source Citation Tag -->
+<div class="p-3 bg-secondary-fixed/20 border-l-2 border-secondary rounded-r mb-5">
+<div class="flex items-center gap-1.5 font-label-sm text-label-sm text-secondary font-semibold mb-1">
+<span class="material-symbols-outlined text-[16px]">menu_book</span>
+                DETERMINISTIC GROUNDING CITATION
+              </div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                Silberschatz et al., <span class="text-on-surface font-medium">Operating System Concepts (10th Ed)</span>, Chapter 8: Deadlocks, Section 8.3 “Resource Allocation Graphs”, pp. 318–321.
+              </p>
+</div>
+</div>
+<!-- Validation Checklist Badges -->
+<div class="pt-4 border-t border-outline-variant flex flex-wrap items-center justify-between gap-2">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Verification Pipeline</span>
+<div class="flex flex-wrap items-center gap-2">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm px-2 py-0.5 rounded bg-secondary-fixed/30 text-secondary font-semibold">
+<span class="material-symbols-outlined text-[14px]">check</span> Grounding (100%)
+              </span>
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm px-2 py-0.5 rounded bg-secondary-fixed/30 text-secondary font-semibold">
+<span class="material-symbols-outlined text-[14px]">check</span> Bloom (Analyze)
+              </span>
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm px-2 py-0.5 rounded bg-secondary-fixed/30 text-secondary font-semibold">
+<span class="material-symbols-outlined text-[14px]">check</span> Hard Calibrated
+              </span>
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm px-2 py-0.5 rounded bg-secondary-fixed/30 text-secondary font-semibold">
+<span class="material-symbols-outlined text-[14px]">check</span> Deduplicated
+              </span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ========================================================================= -->
+<!-- SECTION 2: PROBLEM / VALUE PROPOSITION                                   -->
+<!-- ========================================================================= -->
+<section class="w-full px-margin-desktop py-space-xl bg-surface-container-low border-y border-outline-variant flex justify-center">
+<div class="max-w-6xl w-full">
+<div class="mb-space-xl max-w-3xl">
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-widest font-semibold block mb-2">Granular Cognitive Control</span>
+<h2 class="font-display-lg text-display-lg text-on-surface mb-3 tracking-tight">
+          Better questions start with better control.
+        </h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+          Generic AI tools generate repetitive, factual-recall quizzes littered with hallucinated trivia. GroundQ grants curriculum designers and technical educators sovereign control over every cognitive variable.
+        </p>
+</div>
+<!-- Comparison Matrix -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter-desktop">
+<!-- Left: Generic AI -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant space-y-4">
+<div class="flex items-center gap-2 text-error pb-3 border-b border-outline-variant">
+<span class="material-symbols-outlined text-[20px]">cancel</span>
+<span class="font-headline-sm text-headline-sm">Ordinary LLM Prompting</span>
+</div>
+<ul class="space-y-4 font-body-sm text-body-sm text-on-surface-variant">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-outline text-[18px] mt-0.5">remove</span>
+<div>
+<strong class="text-on-surface block font-medium">Shallow Factual Recall</strong>
+                Regurgitates trivial keyword definitions (e.g. “What does CPU stand for?”) rather than testing deep conceptual synthesis.
+              </div>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-outline text-[18px] mt-0.5">remove</span>
+<div>
+<strong class="text-on-surface block font-medium">Repetitive Syntactic Phrasing</strong>
+                Every third question begins with “Which of the following is true...”, resulting in predictable, easily-gamed stems.
+              </div>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-outline text-[18px] mt-0.5">remove</span>
+<div>
+<strong class="text-on-surface block font-medium">Hallucinatory Drift</strong>
+                Invents concepts, phantom page numbers, and erroneous algorithmic properties not present in your designated curriculum.
+              </div>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-outline text-[18px] mt-0.5">remove</span>
+<div>
+<strong class="text-on-surface block font-medium">Monolithic Difficulty</strong>
+                Treats “hard” simply as longer text or obscure vocabulary rather than higher cognitive taxonomy depth.
+              </div>
+</li>
+</ul>
+</div>
+<!-- Right: GroundQ Engine -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border-2 border-primary/20 space-y-4 relative shadow-sm">
+<div class="flex items-center justify-between pb-3 border-b border-outline-variant text-primary">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">verified</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">GroundQ Controllable Engine</span>
+</div>
+<span class="font-label-sm text-label-sm bg-primary-fixed text-on-primary-fixed px-2 py-0.5 rounded font-semibold">Strict Provenance</span>
+</div>
+<ul class="space-y-4 font-body-sm text-body-sm text-on-surface-variant">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">check_circle</span>
+<div>
+<strong class="text-on-surface block font-medium">Zero-Hallucination Corpus Grounding</strong>
+                Every stem, answer, and distractor is deterministically bound to an extracted source fragment from your exact files.
+              </div>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">check_circle</span>
+<div>
+<strong class="text-on-surface block font-medium">Multi-Tier Bloom Taxonomy</strong>
+                Explicitly target higher levels: Application, Analysis, and Evaluation, generating real problem-solving dilemmas.
+              </div>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">check_circle</span>
+<div>
+<strong class="text-on-surface block font-medium">Configurable Distribution Curves</strong>
+                Set exact percentages across modules, cognitive levels, and question formats before launching generation passes.
+              </div>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">check_circle</span>
+<div>
+<strong class="text-on-surface block font-medium">Semantic Orthogonality Verification</strong>
+                Vector embeddings actively prevent question redundancy across parallel assessments and cohorts.
+              </div>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+<!-- ========================================================================= -->
+<!-- SECTION 3: HOW IT WORKS                                                   -->
+<!-- ========================================================================= -->
+<section class="w-full px-margin-desktop py-space-xl bg-surface flex justify-center" id="how-it-works">
+<div class="max-w-6xl w-full">
+<div class="max-w-3xl mb-space-xl">
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-widest font-semibold block mb-2">Workflow</span>
+<h2 class="font-display-lg text-display-lg text-on-surface mb-3 tracking-tight">
+          From study material to question set.
+        </h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+          A verifiable, four-stage extraction process designed to honor the authoritative context of your original academic literature.
+        </p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter-desktop">
+<!-- Step 01 -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant flex flex-col justify-between">
+<div>
+<span class="font-label-sm text-label-sm text-primary font-bold block mb-3">01 / INGESTION</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">Add your material</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Upload PDF textbooks, lecture slides (PPTX), or raw markdown notes. GroundQ parses typography, equations, and hierarchy.
+            </p>
+</div>
+<div class="mt-6 pt-3 border-t border-outline-variant flex items-center gap-2 font-label-sm text-label-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">upload_file</span>
+<span>PDF, DOCX, PPTX, MD</span>
+</div>
+</div>
+<!-- Step 02 -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant flex flex-col justify-between">
+<div>
+<span class="font-label-sm text-label-sm text-primary font-bold block mb-3">02 / TAXONOMY</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">Review your topics</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              GroundQ constructs a topic ontology graph. Re-order prerequisites, prune tangential sections, and weigh module prominence.
+            </p>
+</div>
+<div class="mt-6 pt-3 border-t border-outline-variant flex items-center gap-2 font-label-sm text-label-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">account_tree</span>
+<span>Hierarchical Graph</span>
+</div>
+</div>
+<!-- Step 03 -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant flex flex-col justify-between">
+<div>
+<span class="font-label-sm text-label-sm text-primary font-bold block mb-3">03 / BLUEPRINT</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">Define the blueprint</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Configure target counts, Bloom distributions, cognitive difficulty, scenario ratios, and deduplication thresholds.
+            </p>
+</div>
+<div class="mt-6 pt-3 border-t border-outline-variant flex items-center gap-2 font-label-sm text-label-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">sliders</span>
+<span>Deterministic Matrix</span>
+</div>
+</div>
+<!-- Step 04 -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant flex flex-col justify-between">
+<div>
+<span class="font-label-sm text-label-sm text-primary font-bold block mb-3">04 / SYNTHESIS</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">Generate &amp; review</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              The engine compiles each question with citation anchors, validates against the blueprint, and filters out semantic duplicates.
+            </p>
+</div>
+<div class="mt-6 pt-3 border-t border-outline-variant flex items-center gap-2 font-label-sm text-label-sm text-secondary">
+<span class="material-symbols-outlined text-[16px]">verified</span>
+<span>Export to LMS / QTI</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ========================================================================= -->
+<!-- SECTION 4: MULTIDIMENSIONAL QUESTION CONTROL                              -->
+<!-- ========================================================================= -->
+<section class="w-full px-margin-desktop py-space-xl bg-surface-container-low border-y border-outline-variant flex justify-center">
+<div class="max-w-6xl w-full">
+<div class="max-w-3xl mb-space-xl">
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-widest font-semibold block mb-2">Parametric Matrix</span>
+<h2 class="font-display-lg text-display-lg text-on-surface mb-3 tracking-tight">
+          “Harder” is not a question type.
+        </h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+          True rigor is multidimensional. GroundQ decouples cognitive depth from formatting constraints, allowing you to synthesize assessments that evaluate actual conceptual dexterity.
+        </p>
+</div>
+<!-- Matrix Interactive Demo Card -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-6">
+<!-- Dimension Rows -->
+<div class="space-y-4">
+<!-- Cognitive Level -->
+<div>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant block mb-2">Cognitive Level (Bloom Taxonomy)</span>
+<div class="flex flex-wrap gap-2">
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="cognitive" data-val="Remember" type="button">Remember</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="cognitive" data-val="Understand" type="button">Understand</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="cognitive" data-val="Apply" type="button">Apply</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-primary bg-primary-fixed text-on-primary-fixed font-semibold font-body-sm text-body-sm active-dim" data-dim="cognitive" data-val="Analyze" type="button">Analyze</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="cognitive" data-val="Evaluate" type="button">Evaluate</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="cognitive" data-val="Create" type="button">Create</button>
+</div>
+</div>
+<!-- Difficulty -->
+<div>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant block mb-2">Difficulty / Intricacy</span>
+<div class="flex flex-wrap gap-2">
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="diff" data-val="Easy" type="button">Easy</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="diff" data-val="Medium" type="button">Medium</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-primary bg-primary-fixed text-on-primary-fixed font-semibold font-body-sm text-body-sm active-dim" data-dim="diff" data-val="Hard" type="button">Hard</button>
+</div>
+</div>
+<!-- Question Format -->
+<div>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant block mb-2">Delivery Format</span>
+<div class="flex flex-wrap gap-2">
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="format" data-val="Multiple Choice" type="button">MCQ</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="format" data-val="Short Answer" type="button">Short Answer</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-primary bg-primary-fixed text-on-primary-fixed font-semibold font-body-sm text-body-sm active-dim" data-dim="format" data-val="Long Form Scenario" type="button">Long Answer</button>
+</div>
+</div>
+<!-- Question Style -->
+<div>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant block mb-2">Framing &amp; Style</span>
+<div class="flex flex-wrap gap-2">
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="style" data-val="Conceptual" type="button">Conceptual</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="style" data-val="Comparative" type="button">Comparative</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="style" data-val="Application" type="button">Application</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-primary bg-primary-fixed text-on-primary-fixed font-semibold font-body-sm text-body-sm active-dim" data-dim="style" data-val="Scenario" type="button">Scenario-based</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="style" data-val="Case Study" type="button">Case-based</button>
+<button class="dim-btn px-3 py-1.5 rounded border border-outline-variant bg-surface-container-low font-body-sm text-body-sm text-on-surface hover:bg-surface-container" data-dim="style" data-val="Cause-Effect" type="button">Cause-Effect</button>
+</div>
+</div>
+</div>
+<!-- Formula Output Preview -->
+<div class="p-5 bg-surface-container rounded-lg border border-outline-variant">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-primary text-[18px]">functions</span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-on-surface">Calculated Synthesis Formula</span>
+</div>
+<div class="flex flex-wrap items-center gap-2 font-label-md text-label-md mb-4">
+<span class="bg-surface-container-lowest px-2.5 py-1 rounded border border-outline-variant font-medium" id="f-cog">Analyze</span>
+<span class="text-on-surface-variant font-bold">+</span>
+<span class="bg-surface-container-lowest px-2.5 py-1 rounded border border-outline-variant font-medium" id="f-diff">Hard</span>
+<span class="text-on-surface-variant font-bold">+</span>
+<span class="bg-surface-container-lowest px-2.5 py-1 rounded border border-outline-variant font-medium" id="f-style">Scenario</span>
+<span class="text-on-surface-variant font-bold">+</span>
+<span class="bg-surface-container-lowest px-2.5 py-1 rounded border border-outline-variant font-medium" id="f-form">Long Answer</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface bg-surface-container-lowest p-3 rounded border border-outline-variant italic" id="f-result">
+            “Synthesizes a multi-step production incident. Students must deconstruct deadlock propagation through an asynchronous RPC message queue, calculating race condition risks without simple keyword pattern matching.”
+          </p>
+</div>
+</div>
+</div>
+</section>
+<!-- ========================================================================= -->
+<!-- SECTION 5: GROUNDED GENERATION (PROVENANCE ARCHITECTURE)                   -->
+<!-- ========================================================================= -->
+<section class="w-full px-margin-desktop py-space-xl bg-surface flex justify-center">
+<div class="max-w-6xl w-full">
+<div class="max-w-3xl mb-space-xl">
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-widest font-semibold block mb-2">Corpus Integrity</span>
+<h2 class="font-display-lg text-display-lg text-on-surface mb-3 tracking-tight">
+          Grounded in your material. Not the open web.
+        </h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+          General AI pulls from arbitrary blogs, obsolete forums, and questionable public datasets. GroundQ creates a closed-loop reference boundary directly linked to your syllabus.
+        </p>
+</div>
+<!-- Schematic Flow -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+<div class="p-3 bg-surface-container-low rounded border border-outline-variant text-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant block mb-1">INPUT STAGE</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Your Raw Material</span>
+</div>
+<div class="p-3 bg-surface-container-low rounded border border-outline-variant text-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant block mb-1">PARSING STAGE</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Evidence Chunking</span>
+</div>
+<div class="p-3 bg-surface-container-low rounded border border-outline-variant text-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant block mb-1">COGNITIVE STAGE</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Parametric Synthesis</span>
+</div>
+<div class="p-3 bg-secondary-fixed/30 rounded border border-secondary text-center">
+<span class="font-label-sm text-label-sm text-secondary block mb-1 font-semibold">OUTPUT STAGE</span>
+<span class="font-headline-sm text-headline-sm text-secondary">Verified Question &amp; Citation</span>
+</div>
+</div>
+<!-- UI Inspection Card: Source vs Generated -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter-desktop bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden shadow-sm">
+<!-- Source Inspector (Left) -->
+<div class="lg:col-span-6 p-6 border-b lg:border-b-0 lg:border-r border-outline-variant bg-surface-container-low/40">
+<div class="flex items-center justify-between mb-4">
+<span class="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-primary">description</span>
+              Source Document Anchor
+            </span>
+<span class="font-label-sm text-label-sm bg-surface-container-high px-2 py-0.5 rounded text-on-surface-variant">OS_Unit_3_Lecture_Notes.pdf • p. 42</span>
+</div>
+<div class="p-4 bg-surface-container-lowest rounded border border-outline-variant font-body-sm text-body-sm leading-relaxed text-on-surface-variant">
+            “...When two or more processes request resources that are currently held by other waiting processes, a deadlock state can arise.
+            <mark class="bg-secondary-fixed text-on-surface px-1 py-0.5 rounded font-medium">According to the Coffman conditions, deadlock requires Mutual Exclusion, Hold and Wait, No Preemption, and Circular Wait.</mark>
+            In distributed architectures where resources cannot be forcibly reassigned without state corruption, Circular Wait becomes the single deterministic precursor to systemic transaction freeze...”
+          </div>
+<div class="mt-4 flex items-center gap-2 font-label-sm text-label-sm text-secondary font-medium">
+<span class="material-symbols-outlined text-[16px]">pin_drop</span>
+<span>Anchor Vector: doc-chunk-8832-para-4</span>
+</div>
+</div>
+<!-- Derived Question (Right) -->
+<div class="lg:col-span-6 p-6 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-4">
+<span class="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-secondary flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px]">hub</span>
+                Derived Synthesis
+              </span>
+<span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed/40 px-2 py-0.5 rounded font-semibold">100% Provenance Trace</span>
+</div>
+<p class="font-headline-sm text-headline-sm font-editorial-quote text-on-surface mb-4">
+              “Under non-preemptible allocation rules described in Unit 3, why does the elimination of the Circular Wait condition suffice to prevent transaction freeze even when the remaining three Coffman conditions persist?”
+            </p>
+<div class="p-3 bg-surface-container-low rounded border border-outline-variant font-body-sm text-body-sm text-on-surface-variant">
+<strong class="text-on-surface block font-medium mb-1">Expected Cognitive Key:</strong>
+              Students must articulate that Circular Wait is the structural topological cycle in the resource dependency graph; without a cycle, at least one process is guaranteed to terminate and release mutex handles.
+            </div>
+</div>
+<div class="mt-6 pt-3 border-t border-outline-variant flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span>Verified against hallucinated claims</span>
+<span class="text-secondary flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">check</span> Zero Open-Web Contamination</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ========================================================================= -->
+<!-- SECTION 6: MULTI-PASS VALIDATION                                          -->
+<!-- ========================================================================= -->
+<section class="w-full px-margin-desktop py-space-xl bg-surface-container-low border-y border-outline-variant flex justify-center">
+<div class="max-w-6xl w-full">
+<div class="max-w-3xl mb-space-xl">
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-widest font-semibold block mb-2">Automated Audit</span>
+<h2 class="font-display-lg text-display-lg text-on-surface mb-3 tracking-tight">
+          Generation is only the first step.
+        </h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+          Before any candidate item enters your permanent Question Bank, it undergoes an automated 6-tier validation audit to ensure psychometric integrity and factual compliance.
+        </p>
+</div>
+<!-- Refined Validation UI Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 shadow-sm">
+<div class="flex items-center justify-between pb-4 mb-6 border-b border-outline-variant">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">fact_check</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Automated Validation Pass Results</span>
+</div>
+<span class="font-label-sm text-label-sm px-2.5 py-1 rounded bg-secondary-fixed/40 text-secondary font-semibold">All 6 Passes Passed</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 font-body-sm text-body-sm">
+<div class="p-4 rounded bg-surface-container-low border border-outline-variant">
+<div class="flex items-center justify-between mb-2">
+<span class="font-medium text-on-surface">1. Grounding Integrity</span>
+<span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed/30 px-1.5 py-0.5 rounded font-semibold">100% Cited</span>
+</div>
+<p class="text-on-surface-variant text-[12px]">All key terms and factual propositions map to source anchors in OS_Unit_3.pdf.</p>
+</div>
+<div class="p-4 rounded bg-surface-container-low border border-outline-variant">
+<div class="flex items-center justify-between mb-2">
+<span class="font-medium text-on-surface">2. Topic Alignment</span>
+<span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed/30 px-1.5 py-0.5 rounded font-semibold">Operating Systems</span>
+</div>
+<p class="text-on-surface-variant text-[12px]">Mapped to Chapter 8: Deadlocks with 0.94 cosine similarity score.</p>
+</div>
+<div class="p-4 rounded bg-surface-container-low border border-outline-variant">
+<div class="flex items-center justify-between mb-2">
+<span class="font-medium text-on-surface">3. Bloom Calibration</span>
+<span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed/30 px-1.5 py-0.5 rounded font-semibold">Level 4: Analyze</span>
+</div>
+<p class="text-on-surface-variant text-[12px]">Cognitive verb evaluation confirmed stem requires structural decomposition.</p>
+</div>
+<div class="p-4 rounded bg-surface-container-low border border-outline-variant">
+<div class="flex items-center justify-between mb-2">
+<span class="font-medium text-on-surface">4. Difficulty Index</span>
+<span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed/30 px-1.5 py-0.5 rounded font-semibold">Calibrated Hard</span>
+</div>
+<p class="text-on-surface-variant text-[12px]">Lexical density and distractors tested against empirical misconception bank.</p>
+</div>
+<div class="p-4 rounded bg-surface-container-low border border-outline-variant">
+<div class="flex items-center justify-between mb-2">
+<span class="font-medium text-on-surface">5. Style Compliance</span>
+<span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed/30 px-1.5 py-0.5 rounded font-semibold">Scenario Passed</span>
+</div>
+<p class="text-on-surface-variant text-[12px]">Vignette introduces operational variables and constraint prerequisites.</p>
+</div>
+<div class="p-4 rounded bg-surface-container-low border border-outline-variant">
+<div class="flex items-center justify-between mb-2">
+<span class="font-medium text-on-surface">6. Semantic Similarity</span>
+<span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed/30 px-1.5 py-0.5 rounded font-semibold">Δ = 0.19 (Unique)</span>
+</div>
+<p class="text-on-surface-variant text-[12px]">No lexical or conceptual overlap with existing 42 items in current quiz pool.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ========================================================================= -->
+<!-- SECTION 7: DIVERSITY & DUPLICATE PREVENTION                               -->
+<!-- ========================================================================= -->
+<section class="w-full px-margin-desktop py-space-xl bg-surface flex justify-center">
+<div class="max-w-6xl w-full">
+<div class="max-w-3xl mb-space-xl">
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-widest font-semibold block mb-2">Deduplication Engine</span>
+<h2 class="font-display-lg text-display-lg text-on-surface mb-3 tracking-tight">
+          Different wording isn’t always a different question.
+        </h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+          LLMs are notorious for rephrasing the exact same question three different ways in the same exam. GroundQ uses latent semantic distance calculations to reject disguised duplicates.
+        </p>
+</div>
+<!-- Semantic Demonstration Card -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-6">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Question A -->
+<div class="p-4 bg-surface-container-low rounded border border-outline-variant">
+<span class="font-label-sm text-label-sm text-primary font-bold block mb-1">CANDIDATE ITEM 01</span>
+<p class="font-headline-sm text-headline-sm font-editorial-quote text-on-surface">
+              “What role does virtual memory play in operating system paging systems?”
+            </p>
+</div>
+<!-- Question B -->
+<div class="p-4 bg-surface-container-low rounded border border-outline-variant">
+<span class="font-label-sm text-label-sm text-error font-bold block mb-1">CANDIDATE ITEM 02 (REDUNDANT)</span>
+<p class="font-headline-sm text-headline-sm font-editorial-quote text-on-surface">
+              “Why is virtual memory utilized within modern OS memory paging?”
+            </p>
+</div>
+</div>
+<!-- Similarity Metrics Indicator -->
+<div class="p-4 bg-error-container/20 border-l-4 border-error rounded-r flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-error text-[24px]">difference</span>
+<div>
+<span class="font-headline-sm text-headline-sm text-on-surface block">Semantic Similarity: 0.91 (Cosine Proximity)</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Exceeds allowed uniqueness threshold (0.65 max permitted).</span>
+</div>
+</div>
+<span class="font-label-sm text-label-sm px-3 py-1 rounded bg-error text-on-error font-semibold uppercase tracking-wider self-start md:self-auto">
+            Duplicate Flagged &amp; Rejected
+          </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant text-center italic">
+          GroundQ automatically prompted a secondary pass, substituting Question B with a distinct query regarding Page Fault Handler overhead.
+        </p>
+</div>
+</div>
+</section>
+<!-- ========================================================================= -->
+<!-- SECTION 8: QUESTION BANK MANAGEMENT                                       -->
+<!-- ========================================================================= -->
+<section class="w-full px-margin-desktop py-space-xl bg-surface-container-low border-y border-outline-variant flex justify-center" id="bank">
+<div class="max-w-6xl w-full">
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-space-xl gap-4">
+<div class="max-w-2xl">
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-widest font-semibold block mb-2">Institutional Workspace</span>
+<h2 class="font-display-lg text-display-lg text-on-surface mb-3 tracking-tight">
+            Build a question bank that stays useful.
+          </h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+            Curate, tag, and export institutional assessment batteries. Export directly to Canvas, Blackboard, QTI 2.1, or pristine LaTeX.
+          </p>
+</div>
+<!-- Export Buttons -->
+<div class="flex flex-wrap gap-2">
+<button class="px-3 py-1.5 h-8 rounded bg-surface-container-lowest border border-outline-variant font-label-md text-label-md text-on-surface hover:bg-surface-container transition-all" type="button">QTI 2.1</button>
+<button class="px-3 py-1.5 h-8 rounded bg-surface-container-lowest border border-outline-variant font-label-md text-label-md text-on-surface hover:bg-surface-container transition-all" type="button">Canvas LMS</button>
+<button class="px-3 py-1.5 h-8 rounded bg-surface-container-lowest border border-outline-variant font-label-md text-label-md text-on-surface hover:bg-surface-container transition-all" type="button">LaTeX</button>
+<button class="px-3 py-1.5 h-8 rounded bg-primary-container text-on-primary font-label-md text-label-md hover:bg-primary transition-all" type="button">Export All</button>
+</div>
+</div>
+<!-- Realistic Data Table Preview -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden shadow-sm">
+<!-- Table Filter Bar -->
+<div class="p-3 border-b border-outline-variant bg-surface-container-low flex flex-wrap items-center justify-between gap-3 font-body-sm text-body-sm">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase font-semibold">Filters:</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant text-on-surface">Topic: Concurrency ×</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant text-on-surface">Bloom: Analyze ×</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Showing 4 of 124 Items</span>
+</div>
+<!-- Desktop Table View -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse font-body-sm text-body-sm">
+<thead>
+<tr class="border-b border-outline-variant bg-surface-container-high/40 text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<th class="py-3 px-4">Stem / Proposition</th>
+<th class="py-3 px-4">Topic</th>
+<th class="py-3 px-4">Bloom</th>
+<th class="py-3 px-4">Difficulty</th>
+<th class="py-3 px-4">Citation Provenance</th>
+<th class="py-3 px-4 text-right">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant text-on-surface">
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-3.5 px-4 font-medium max-w-xs truncate">Evaluate deadlock vulnerabilities in semaphore-guarded ring buffers...</td>
+<td class="py-3.5 px-4 text-on-surface-variant">Deadlocks</td>
+<td class="py-3.5 px-4"><span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container-high text-on-surface">Analyze</span></td>
+<td class="py-3.5 px-4"><span class="font-label-sm text-label-sm text-primary font-semibold">Hard</span></td>
+<td class="py-3.5 px-4 font-label-sm text-label-sm text-on-surface-variant">Unit 3, p. 44</td>
+<td class="py-3.5 px-4 text-right"><span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed/40 px-2 py-0.5 rounded font-semibold">Validated</span></td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-3.5 px-4 font-medium max-w-xs truncate">Calculate translation lookaside buffer (TLB) hit ratios during context switches...</td>
+<td class="py-3.5 px-4 text-on-surface-variant">Virtual Memory</td>
+<td class="py-3.5 px-4"><span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container-high text-on-surface">Apply</span></td>
+<td class="py-3.5 px-4"><span class="font-label-sm text-label-sm text-on-surface-variant font-semibold">Medium</span></td>
+<td class="py-3.5 px-4 font-label-sm text-label-sm text-on-surface-variant">Unit 4, p. 112</td>
+<td class="py-3.5 px-4 text-right"><span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed/40 px-2 py-0.5 rounded font-semibold">Validated</span></td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-3.5 px-4 font-medium max-w-xs truncate">Synthesize a priority inversion recovery policy using ceiling inheritance...</td>
+<td class="py-3.5 px-4 text-on-surface-variant">Scheduling</td>
+<td class="py-3.5 px-4"><span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container-high text-on-surface">Create</span></td>
+<td class="py-3.5 px-4"><span class="font-label-sm text-label-sm text-primary font-semibold">Hard</span></td>
+<td class="py-3.5 px-4 font-label-sm text-label-sm text-on-surface-variant">Unit 2, p. 89</td>
+<td class="py-3.5 px-4 text-right"><span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed/40 px-2 py-0.5 rounded font-semibold">Validated</span></td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-3.5 px-4 font-medium max-w-xs truncate">Compare slab allocation efficiency against buddy systems in kernel pools...</td>
+<td class="py-3.5 px-4 text-on-surface-variant">Memory Mgmt</td>
+<td class="py-3.5 px-4"><span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container-high text-on-surface">Evaluate</span></td>
+<td class="py-3.5 px-4"><span class="font-label-sm text-label-sm text-on-surface-variant font-semibold">Medium</span></td>
+<td class="py-3.5 px-4 font-label-sm text-label-sm text-on-surface-variant">Unit 4, p. 138</td>
+<td class="py-3.5 px-4 text-right"><span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed/40 px-2 py-0.5 rounded font-semibold">Validated</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</section>
+<!-- ========================================================================= -->
+<!-- SECTION 9: CLOSING CTA                                                    -->
+<!-- ========================================================================= -->
+<section class="w-full px-margin-desktop py-24 bg-surface flex flex-col items-center text-center">
+<div class="max-w-4xl w-full flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-widest font-semibold block mb-3">Begin Grounding</span>
+<h2 class="font-display-lg text-display-lg text-on-surface mb-space-md tracking-tight">
+        Start with the material you already have.
+      </h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mb-space-lg">
+        Upload your lecture notes, syllabus, or textbook excerpts. Define your cognitive blueprint and let GroundQ handle the synthesis and provenance verification.
+      </p>
+<div class="flex flex-col items-center gap-space-sm mb-space-md">
+<a class="inline-flex items-center justify-center px-8 py-3 h-11 rounded bg-primary-container text-on-primary font-label-md text-label-md hover:bg-primary transition-all active:scale-[0.985] shadow-sm font-semibold" href="#blueprint">
+          Create your first project
+        </a>
+<span class="font-label-sm text-label-sm text-on-surface-variant">No complex setup. Zero prompt engineering required.</span>
+</div>
+</div>
+</section>
+<!-- Minimal JS for Section 4 interactive dimension formula calculation -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const cogButtons = document.querySelectorAll('[data-dim="cognitive"]');
+      const diffButtons = document.querySelectorAll('[data-dim="diff"]');
+      const formatButtons = document.querySelectorAll('[data-dim="format"]');
+      const styleButtons = document.querySelectorAll('[data-dim="style"]');
+
+      const fCog = document.getElementById('f-cog');
+      const fDiff = document.getElementById('f-diff');
+      const fForm = document.getElementById('f-form');
+      const fStyle = document.getElementById('f-style');
+      const fResult = document.getElementById('f-result');
+
+      const descriptions = {
+        'Analyze': 'Requires students to deconstruct a structural scenario into constituent logic rules.',
+        'Remember': 'Requires straightforward factual retrieval directly from assigned chapter sections.',
+        'Understand': 'Requires articulating conceptual mechanisms in the student\'s own vocabulary.',
+        'Apply': 'Requires executing algorithms, calculating mathematical formulas, or diagnosing live inputs.',
+        'Evaluate': 'Requires comparing two viable architectural alternatives and defending trade-offs.',
+        'Create': 'Requires proposing a comprehensive system design adhering to strict resource bounds.'
+      };
+
+      function updateGroup(buttons, targetSpan, dimKey) {
+        buttons.forEach(btn => {
+          btn.addEventListener('click', () => {
+            buttons.forEach(b => {
+              b.classList.remove('border-primary', 'bg-primary-fixed', 'text-on-primary-fixed', 'font-semibold', 'active-dim');
+              b.classList.add('border-outline-variant', 'bg-surface-container-low', 'text-on-surface');
+            });
+            btn.classList.remove('border-outline-variant', 'bg-surface-container-low', 'text-on-surface');
+            btn.classList.add('border-primary', 'bg-primary-fixed', 'text-on-primary-fixed', 'font-semibold', 'active-dim');
+            
+            targetSpan.textContent = btn.getAttribute('data-val');
+
+            const currentCog = fCog.textContent;
+            const currentDiff = fDiff.textContent;
+            const currentStyle = fStyle.textContent;
+            const currentFormat = fForm.textContent;
+
+            fResult.innerHTML = `&ldquo;Configured for <strong>${currentDiff}</strong> complexity with <strong>${currentCog}</strong> depth formatted as a <strong>${currentStyle}</strong> (${currentFormat}). ${descriptions[currentCog] || 'Evaluates multi-variable comprehension with strict source attribution.'}&rdquo;`;
+          });
+        });
+      }
+
+      updateGroup(cogButtons, fCog, 'cognitive');
+      updateGroup(diffButtons, fDiff, 'diff');
+      updateGroup(formatButtons, fForm, 'format');
+      updateGroup(styleButtons, fStyle, 'style');
+    });
+  </script>
+</div></main><footer class="w-full bg-surface-container-lowest border-t border-outline-variant py-space-xl"><div class="w-full px-margin-desktop"><div class="grid grid-cols-1 md:grid-cols-4 gap-gutter-desktop pb-space-lg mb-space-lg border-b border-outline-variant"><div class="space-y-space-sm md:col-span-1"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-primary text-[20px]">shapes</span><span class="font-headline-sm text-headline-sm text-on-surface">GroundQ</span></div><p class="font-body-sm text-body-sm text-on-surface-variant">Scholarly-grounded question synthesis and psychometric validation workspace for rigorous curricula.</p></div><div class="space-y-space-xs"><h4 class="font-label-md text-label-md text-on-surface uppercase">Architecture</h4><ul class="space-y-space-xs"><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface">Algorithmic Synthesis</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface">Source Attribution</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface">Distractor Rigor</li></ul></div><div class="space-y-space-xs"><h4 class="font-label-md text-label-md text-on-surface uppercase">Integrity &amp; Ethics</h4><ul class="space-y-space-xs"><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface">Deterministic Trace</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface">Citation Guarantee</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface">Academic Audits</li></ul></div><div class="space-y-space-xs"><h4 class="font-label-md text-label-md text-on-surface uppercase">Institutional</h4><ul class="space-y-space-xs"><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface">Research Partnerships</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface">Psychometric Reports</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface">API Specifications</li></ul></div></div><div class="flex flex-col sm:flex-row items-center justify-between gap-space-sm pt-space-xs"><p class="font-label-sm text-label-sm text-on-surface-variant">© 2025 GroundQ Academic Systems. Grounding integrity verified via deterministic source anchors.</p><div class="flex items-center gap-space-md"><span class="font-label-sm text-label-sm text-secondary flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">verified</span>100% Corpus Grounded</span><a class="font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface" data-path="product" href="#">Terms</a><a class="font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface" data-path="product" href="#">Privacy</a></div></div></div></footer></body></html>

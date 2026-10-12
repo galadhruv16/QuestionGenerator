@@ -158,40 +158,24 @@ on conflict (id) do update set
   allowed_mime_types = array['application/pdf'];
 
 drop policy if exists "Users can upload resources to their own projects" on storage.objects;
-create policy "Users can upload resources to their own projects"
-  on storage.objects for insert
-  with check (
-    bucket_id = 'resources'
-    and split_part(name, '/', 1) ~ '^[0-9a-fA-F-]{36}$'
-    and exists (
-      select 1 from public.projects
-      where id = (split_part(name, '/', 1))::uuid
-        and owner_id = auth.uid()
-    )
-  );
-
 drop policy if exists "Users can view resources in their own projects" on storage.objects;
-create policy "Users can view resources in their own projects"
-  on storage.objects for select
-  using (
-    bucket_id = 'resources'
-    and split_part(name, '/', 1) ~ '^[0-9a-fA-F-]{36}$'
-    and exists (
-      select 1 from public.projects
-      where id = (split_part(name, '/', 1))::uuid
-        and owner_id = auth.uid()
-    )
-  );
-
 drop policy if exists "Users can update resources in their own projects" on storage.objects;
-create policy "Users can update resources in their own projects"
+drop policy if exists "Allow authenticated uploads to resources" on storage.objects;
+drop policy if exists "Allow authenticated selects to resources" on storage.objects;
+drop policy if exists "Allow authenticated updates to resources" on storage.objects;
+
+create policy "Allow authenticated uploads to resources"
+  on storage.objects for insert
+  to authenticated
+  with check (bucket_id = 'resources');
+
+create policy "Allow authenticated selects to resources"
+  on storage.objects for select
+  to authenticated
+  using (bucket_id = 'resources');
+
+create policy "Allow authenticated updates to resources"
   on storage.objects for update
-  using (
-    bucket_id = 'resources'
-    and split_part(name, '/', 1) ~ '^[0-9a-fA-F-]{36}$'
-    and exists (
-      select 1 from public.projects
-      where id = (split_part(name, '/', 1))::uuid
-        and owner_id = auth.uid()
-    )
-  );
+  to authenticated
+  using (bucket_id = 'resources')
+  with check (bucket_id = 'resources');

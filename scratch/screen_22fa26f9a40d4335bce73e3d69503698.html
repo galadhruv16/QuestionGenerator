@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=JetBrains+Mono:wght@100..900&family=Newsreader:wght@100..900&display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"background":"#fbf8fc","surface-container-lowest":"#ffffff","outline":"#747685","surface-dim":"#dcd9dd","surface-container":"#f0edf1","surface-tint":"#2c53d1","on-tertiary-fixed-variant":"#2f2ebe","surface-variant":"#e4e1e6","tertiary":"#3332c2","on-surface-variant":"#444654","on-primary":"#ffffff","on-background":"#1b1b1e","surface-bright":"#fbf8fc","on-surface":"#1b1b1e","surface-container-low":"#f6f2f7","secondary-container":"#86f2e4","tertiary-container":"#4d4fda","secondary-fixed-dim":"#6bd8cb","tertiary-fixed-dim":"#c0c1ff","surface-container-high":"#eae7eb","inverse-on-surface":"#f3f0f4","outline-variant":"#c4c5d6","on-secondary":"#ffffff","on-tertiary-container":"#dddbff","inverse-surface":"#303033","on-tertiary-fixed":"#07006c","on-tertiary":"#ffffff","primary-container":"#3157d5","primary":"#063cbc","on-primary-container":"#d8ddff","surface-container-highest":"#e4e1e6","error":"#ba1a1a","on-error-container":"#93000a","inverse-primary":"#b7c4ff","surface":"#fbf8fc","secondary":"#006a61","on-primary-fixed-variant":"#0038b6","on-primary-fixed":"#001452","secondary-fixed":"#89f5e7","on-secondary-fixed":"#00201d","primary-fixed":"#dde1ff","primary-fixed-dim":"#b7c4ff","on-secondary-fixed-variant":"#005049","error-container":"#ffdad6","on-secondary-container":"#006f66","tertiary-fixed":"#e1e0ff","on-error":"#ffffff"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"margin-desktop":"2rem","space-lg":"1.25rem","space-md":"0.75rem","gutter":"1rem","gutter-desktop":"1.5rem","space-sm":"0.5rem","space-xl":"2rem","space-xs":"0.25rem","margin":"1rem"},"fontFamily":{"label-sm":["JetBrains Mono"],"headline-md":["Geist"],"body-sm":["Geist"],"editorial-quote":["Newsreader"],"headline-sm":["Geist"],"body-lg":["Geist"],"headline-lg":["Newsreader"],"label-md":["JetBrains Mono"],"display-lg":["Newsreader"],"body-md":["Geist"],"display-lg-mobile":["Newsreader"]},"fontSize":{"label-sm":["11px",{"lineHeight":"14px","letterSpacing":"0.03em","fontWeight":"500"}],"headline-md":["20px",{"lineHeight":"28px","letterSpacing":"-0.01em","fontWeight":"600"}],"body-sm":["13px",{"lineHeight":"20px","fontWeight":"400"}],"editorial-quote":["18px",{"lineHeight":"28px","fontWeight":"400"}],"headline-sm":["16px",{"lineHeight":"24px","letterSpacing":"-0.005em","fontWeight":"600"}],"body-lg":["16px",{"lineHeight":"26px","fontWeight":"400"}],"headline-lg":["28px",{"lineHeight":"36px","letterSpacing":"-0.015em","fontWeight":"500"}],"label-md":["12px",{"lineHeight":"16px","letterSpacing":"0.02em","fontWeight":"500"}],"display-lg":["40px",{"lineHeight":"48px","letterSpacing":"-0.02em","fontWeight":"500"}],"body-md":["14px",{"lineHeight":"22px","fontWeight":"400"}],"display-lg-mobile":["30px",{"lineHeight":"38px","letterSpacing":"-0.015em","fontWeight":"500"}]}}}};</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased"><header class="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 w-full px-margin-desktop flex items-center justify-between"><div class="flex items-center gap-space-md"><img alt="Brand logo. - Primary color: #3157d5
+- Font: newsreader
+- Mode: light
+- Roundness: rounded-sm
+" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WyoJTJ0F1EpGvOmAqXH3haRa1RFyYPI4AU7nnHRV0JfYTD6GWMJLzTtaKttnyIRTmy3uCVv6XHR9U11p4UnP5N8spuf7XCWZrhpCL2PuCDSHqkbwa6FKTS30P0dR4BHtTOilfUW7vOBBaQmsmrJ_EWffNJlgIHBOEIHzR4FLYP0XG9GzGXbm-QNyzrBYON_gHP1PpHGX7DwAdSS8kBa0tgWO0sJIZ-p36ZJ1P4rALsERocElW0cVTqCONT"/><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface">GroundQ</span><span class="px-space-xs py-0.5 rounded-DEFAULT bg-surface-container font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">WORKSPACE</span><span class="text-outline-variant font-label-md text-label-md">/</span><div class="flex items-center gap-space-xs"><span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Context:</span><button class="flex items-center gap-space-xs px-space-sm py-1 rounded-DEFAULT bg-surface-container-low hover:bg-surface-container text-on-surface font-body-sm text-body-sm transition-colors" type="button"><span>Biochem Core Syllabus v3</span><span class="material-symbols-outlined text-[16px] text-on-surface-variant">unfold_more</span></button></div></div><div class="flex items-center gap-space-lg"><nav class="flex items-center gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-medium rounded-lg"><a aria-current="page" class="px-space-md py-1.5 transition-colors bg-primary-container text-on-primary-container font-medium rounded-lg" data-path="workspace-overview" href="#">Overview</a><a class="px-space-md py-1.5 rounded-lg font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="workspace-documentation" href="#">Documentation</a></nav><div class="flex items-center gap-space-md pl-space-md"><button aria-label="Command Menu" class="flex items-center gap-space-xs px-space-sm py-1 rounded-DEFAULT bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm shadow-[0_1px_4px_rgba(0,0,0,0.02)] transition-colors" type="button"><span class="material-symbols-outlined text-[16px]">terminal</span><span>⌘K</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></div></header><main class="w-full pt-16 bg-surface min-h-[calc(100vh-80px)]"><div class="flex flex-col w-full">
+<!-- Interactive Prototype Controller Strip (Demo Switcher) -->
+<aside aria-label="Reviewer Workspace Mode Switcher" class="w-full bg-surface-container-high px-margin-desktop py-space-xs text-on-surface-variant text-label-sm font-label-sm">
+<div class="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<span class="inline-flex items-center gap-1.5 px-space-xs py-0.5 rounded-DEFAULT bg-surface-container font-medium text-primary">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+          STATE INSPECTOR
+        </span>
+<span class="hidden sm:inline text-outline">|</span>
+<span class="text-on-surface-variant hidden md:inline">GroundQ Verification State Switcher:</span>
+</div>
+<div class="flex items-center gap-1.5 flex-wrap">
+<button class="px-space-sm py-1 rounded-DEFAULT bg-surface-container-lowest text-primary shadow-sm hover:bg-surface-container transition-all" id="btn-mode-table" onclick="setScreenView('table')" type="button">All Resources (5)</button>
+<button class="px-space-sm py-1 rounded-DEFAULT bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" id="btn-mode-drawer" onclick="setScreenView('drawer')" type="button">Details Drawer</button>
+<button class="px-space-sm py-1 rounded-DEFAULT bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" id="btn-mode-modal" onclick="setScreenView('modal')" type="button">Upload Dialog</button>
+<button class="px-space-sm py-1 rounded-DEFAULT bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" id="btn-mode-empty" onclick="setScreenView('empty')" type="button">Empty State</button>
+<button class="px-space-sm py-1 rounded-DEFAULT bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" id="btn-mode-error" onclick="setScreenView('error')" type="button">OCR Alert Mode</button>
+</div>
+</div>
+</aside>
+<!-- Project Context Subheader Bar -->
+<header class="w-full bg-surface-container-lowest shadow-[0_1px_3px_rgba(0,0,0,0.03)] px-margin-desktop py-space-md">
+<div class="max-w-[1440px] mx-auto flex flex-col gap-space-md">
+<!-- Top Level Breadcrumb & External Actions -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-xs flex-wrap font-label-sm text-label-sm text-on-surface-variant">
+<a class="hover:text-primary transition-colors flex items-center gap-1" href="#">
+<span class="material-symbols-outlined text-[15px]">arrow_back</span>
+<span>All projects</span>
+</a>
+<span class="text-outline-variant font-label-md text-label-md">/</span>
+<span class="text-on-surface font-label-sm text-label-sm">CS-842</span>
+<span class="text-outline-variant font-label-md text-label-md">/</span>
+<span class="text-primary font-medium">Resources</span>
+</div>
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-xs px-space-sm py-1 rounded-DEFAULT bg-surface-container font-label-sm text-label-sm text-on-surface">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span>Active Corpus: <strong class="text-on-surface font-semibold">3 / 5 Ready</strong></span>
+</div>
+<div class="hidden md:flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+<span>Synced: Today, 14:22</span>
+</div>
+</div>
+</div>
+<!-- Project Entity Header with Identity -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md pt-space-xs">
+<div class="flex items-start gap-space-md">
+<div class="w-12 h-12 rounded-lg bg-surface-container-low flex items-center justify-center p-1.5 shadow-sm shrink-0">
+<img alt="GroundQ Verified Ingestion Core" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WyoJTJ0F1EpGvOmAqXH3haRa1RFyYPI4AU7nnHRV0JfYTD6GWMJLzTtaKttnyIRTmy3uCVv6XHR9U11p4UnP5N8spuf7XCWZrhpCL2PuCDSHqkbwa6FKTS30P0dR4BHtTOilfUW7vOBBaQmsmrJ_EWffNJlgIHBOEIHzR4FLYP0XG9GzGXbm-QNyzrBYON_gHP1PpHGX7DwAdSS8kBa0tgWO0sJIZ-p36ZJ1P4rALsERocElW0cVTqCONT"/>
+</div>
+<div>
+<div class="flex items-center gap-space-sm flex-wrap">
+<h1 class="font-headline-lg text-headline-lg tracking-tight text-on-surface">Distributed Systems Spring 2025 (CS-842)</h1>
+<span class="px-space-xs py-0.5 rounded-DEFAULT bg-surface-container font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">SEC-01 · GRADUATE</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Authoritative knowledge base for fault tolerance, consensus protocols, and remote procedural primitives.</p>
+</div>
+</div>
+<!-- Project Pipeline Guard Status -->
+<div class="hidden lg:flex flex-col items-end gap-1">
+<div class="flex items-center gap-space-xs text-secondary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">lock_open</span>
+<span>Ingestion Pipeline: Deterministic</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline">Engine: GroundQ ChunkAnchor v1.4.2</span>
+</div>
+</div>
+<!-- Academic Workflow Pipeline Tabs -->
+<nav aria-label="Project Pipeline Stages" class="flex items-center gap-space-xs pt-space-xs -mb-space-md overflow-x-auto">
+<!-- Active Tab: Resources -->
+<a class="flex items-center gap-space-xs px-space-md py-2.5 bg-surface-container-lowest text-primary font-body-sm text-body-sm font-medium shadow-[0_2px_0_0_#3157d5] whitespace-nowrap" href="#resources">
+<span class="material-symbols-outlined text-[18px]">folder_open</span>
+<span>Resources</span>
+<span class="ml-1 px-1.5 py-0.2 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm font-semibold">5</span>
+</a>
+<!-- Inactive Disabled Stage: Topics -->
+<div class="flex items-center gap-space-xs px-space-md py-2.5 text-outline cursor-not-allowed font-body-sm text-body-sm whitespace-nowrap group relative" title="Unlocked when corpus is verified">
+<span class="material-symbols-outlined text-[18px]">account_tree</span>
+<span>Topics</span>
+<span class="px-1.5 py-0.2 rounded-DEFAULT bg-surface-container text-outline font-label-sm text-label-sm">Requires ready resources</span>
+</div>
+<!-- Inactive Disabled Stage: Generation -->
+<div class="flex items-center gap-space-xs px-space-md py-2.5 text-outline cursor-not-allowed font-body-sm text-body-sm whitespace-nowrap group relative">
+<span class="material-symbols-outlined text-[18px]">neurology</span>
+<span>Generation</span>
+<span class="px-1.5 py-0.2 rounded-DEFAULT bg-surface-container-high text-outline font-label-sm text-label-sm">Upcoming step</span>
+</div>
+<!-- Inactive Disabled Stage: Question Bank -->
+<div class="flex items-center gap-space-xs px-space-md py-2.5 text-outline cursor-not-allowed font-body-sm text-body-sm whitespace-nowrap group relative">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+<span>Question Bank</span>
+<span class="px-1.5 py-0.2 rounded-DEFAULT bg-surface-container-high text-outline font-label-sm text-label-sm">Upcoming step</span>
+</div>
+</nav>
+</div>
+</header>
+<!-- Workspace Canvas -->
+<section class="w-full px-margin-desktop py-space-xl">
+<div class="max-w-[1440px] mx-auto flex flex-col gap-space-lg">
+<!-- Section Title & Subheading -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-space-md">
+<div class="max-w-2xl">
+<div class="flex items-center gap-space-xs mb-1">
+<span class="material-symbols-outlined text-[14px] text-secondary">database</span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Project Resources · Local-First Ingestion</span>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface font-headline-lg">Study resources</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1.5">
+            Uploaded PDFs become the project's authoritative source material for grounded question generation. Parsing is run deterministically to extract text, page boundaries, and cryptographic chunk anchors.
+          </p>
+</div>
+<!-- Primary Operational CTAs -->
+<div class="flex items-center gap-space-sm shrink-0">
+<button class="flex items-center gap-space-xs px-space-md py-2 rounded-DEFAULT bg-surface-container-lowest text-on-surface hover:bg-surface-container font-body-sm text-body-sm shadow-sm transition-all active:scale-[0.985]" onclick="refreshCorpus()" type="button">
+<span class="material-symbols-outlined text-[17px] text-on-surface-variant">sync</span>
+<span>Refresh resources</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-lg py-2 rounded-DEFAULT bg-primary text-on-primary font-body-sm text-body-sm font-medium shadow-sm hover:bg-primary-container transition-all active:scale-[0.985]" onclick="openUploadModal()" type="button">
+<span class="material-symbols-outlined text-[18px]">upload_file</span>
+<span>+ Upload PDF</span>
+</button>
+</div>
+</div>
+<!-- Filter, Search & Status Summary Ribbon -->
+<div class="w-full bg-surface-container-lowest rounded-DEFAULT p-space-md shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-space-md">
+<!-- Search Bar with Monospace Hotkey Hint -->
+<div class="relative flex-1 max-w-md">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant">search</span>
+<input class="w-full pl-9 pr-14 py-2 bg-surface text-on-surface placeholder:text-outline rounded-DEFAULT text-body-sm font-body-sm focus:outline-none focus:ring-1 focus:ring-primary shadow-inner" id="resource-search" placeholder="Filter by document name or SHA hash..." type="text"/>
+<span class="absolute right-2.5 top-1/2 -translate-y-1/2 font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-1 py-0.5 rounded-DEFAULT">/</span>
+</div>
+<!-- Segmented Controls: Type & Status Filters -->
+<div class="flex flex-wrap items-center gap-space-sm">
+<div class="flex items-center gap-1 bg-surface rounded-DEFAULT p-0.5">
+<span class="font-label-sm text-label-sm text-on-surface-variant px-2">Type:</span>
+<select class="bg-transparent text-on-surface font-body-sm text-body-sm py-1 pr-6 pl-1 focus:outline-none cursor-pointer">
+<option value="all">All Types (4)</option>
+<option value="study">Study Material</option>
+<option value="pyq">PYQ (Exams)</option>
+<option value="syllabus">Syllabus</option>
+<option value="other">Reference</option>
+</select>
+</div>
+<div class="flex items-center gap-1 bg-surface rounded-DEFAULT p-0.5">
+<span class="font-label-sm text-label-sm text-on-surface-variant px-2">Status:</span>
+<select class="bg-transparent text-on-surface font-body-sm text-body-sm py-1 pr-6 pl-1 focus:outline-none cursor-pointer">
+<option value="all">All States</option>
+<option value="ready">Ready (3)</option>
+<option value="processing">Processing (1)</option>
+<option value="unprocessed">Ready to process (1)</option>
+<option value="failed">Failed (1)</option>
+</select>
+</div>
+<div class="h-5 w-px bg-surface-variant hidden sm:block"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant ml-1">Showing <strong>5 of 5</strong> resources (32.3 MB)</span>
+</div>
+</div>
+<!-- MAIN STATE 1: Operational Resource Table -->
+<div class="w-full bg-surface-container-lowest rounded-DEFAULT shadow-sm overflow-hidden flex flex-col" id="section-resource-table">
+<!-- Table Desktop View -->
+<div class="overflow-x-auto w-full">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<th class="py-space-sm px-space-md" scope="col">Resource Name & Cryptographic Fingerprint</th>
+<th class="py-space-sm px-space-md" scope="col">Type</th>
+<th class="py-space-sm px-space-md" scope="col">Pages</th>
+<th class="py-space-sm px-space-md" scope="col">Size</th>
+<th class="py-space-sm px-space-md min-w-[280px]" scope="col">Status & Verification Evidence</th>
+<th class="py-space-sm px-space-md text-right" scope="col">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container font-body-sm text-body-sm">
+<!-- Row 1: READY (Silberschatz) -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group cursor-pointer" onclick="openDetailsDrawer('Silberschatz_OS_Deadlocks_Ch8.pdf')">
+<td class="py-space-md px-space-md">
+<div class="flex items-start gap-space-sm">
+<div class="w-8 h-8 rounded-DEFAULT bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+</div>
+<div class="min-w-0">
+<div class="font-medium text-on-surface hover:text-primary transition-colors flex items-center gap-1.5">
+<span class="truncate">Silberschatz_OS_Deadlocks_Ch8.pdf</span>
+<span class="material-symbols-outlined text-[14px] text-secondary" title="Grounding anchors active">check_circle</span>
+</div>
+<div class="flex items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant mt-0.5">
+<span class="text-outline">SHA-256:</span>
+<code class="text-on-surface">7b1e..49f0</code>
+<span>•</span>
+<span>Added Sep 24, 2024</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md whitespace-nowrap">
+<span class="px-space-xs py-0.5 rounded-DEFAULT bg-surface-container text-on-surface font-label-sm text-label-sm">Study Material</span>
+</td>
+<td class="py-space-md px-space-md font-label-sm text-label-sm text-on-surface whitespace-nowrap">
+                  148 pp
+                </td>
+<td class="py-space-md px-space-md font-label-sm text-label-sm text-on-surface-variant whitespace-nowrap">
+                  14.2 MB
+                </td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-space-xs">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-DEFAULT bg-secondary-container/40 text-secondary font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[12px]">done_all</span>
+                        READY
+                      </span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">v1.4 Parser</span>
+<span class="text-outline">•</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">2h ago</span>
+</div>
+<div class="text-label-sm font-label-sm text-on-surface-variant flex items-center gap-1">
+<span>148 pp indexed</span>
+<span class="text-outline">·</span>
+<span class="text-secondary font-medium">312 text anchors locked</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md text-right whitespace-nowrap" onclick="event.stopPropagation()">
+<div class="flex items-center justify-end gap-1">
+<button class="px-space-sm py-1 rounded-DEFAULT bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm transition-all" onclick="openDetailsDrawer('Silberschatz_OS_Deadlocks_Ch8.pdf')" title="Inspect page breakdown" type="button">
+                      View details
+                    </button>
+<button class="p-1 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" onclick="triggerReprocess('Silberschatz_OS_Deadlocks_Ch8.pdf')" title="Reprocess chunks" type="button">
+<span class="material-symbols-outlined text-[17px]">replay</span>
+</button>
+<button class="p-1 rounded-DEFAULT text-on-surface-variant hover:text-error hover:bg-surface-container transition-all" title="Archive resource" type="button">
+<span class="material-symbols-outlined text-[17px]">archive</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2: PROCESSING (Tanenbaum) -->
+<tr class="bg-primary/5 hover:bg-primary/10 transition-colors group">
+<td class="py-space-md px-space-md">
+<div class="flex items-start gap-space-sm">
+<div class="w-8 h-8 rounded-DEFAULT bg-primary text-on-primary flex items-center justify-center shrink-0 mt-0.5 animate-pulse">
+<span class="material-symbols-outlined text-[18px]">cached</span>
+</div>
+<div class="min-w-0">
+<div class="font-medium text-on-surface flex items-center gap-1.5">
+<span class="truncate">Tanenbaum_Distributed_RPC_Ch4.pdf</span>
+</div>
+<div class="flex items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant mt-0.5">
+<span class="text-outline">SHA-256:</span>
+<code class="text-on-surface">3c9d..88a1</code>
+<span>•</span>
+<span>Original PDF preserved</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md whitespace-nowrap">
+<span class="px-space-xs py-0.5 rounded-DEFAULT bg-surface-container text-on-surface font-label-sm text-label-sm">Study Material</span>
+</td>
+<td class="py-space-md px-space-md font-label-sm text-label-sm text-on-surface-variant whitespace-nowrap">
+<span class="italic text-outline">Reading...</span>
+</td>
+<td class="py-space-md px-space-md font-label-sm text-label-sm text-on-surface-variant whitespace-nowrap">
+                  8.4 MB
+                </td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center gap-space-xs">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-DEFAULT bg-primary text-on-primary font-label-sm text-label-sm font-semibold">
+<span class="w-2 h-2 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></span>
+                        PROCESSING
+                      </span>
+<span class="font-label-sm text-label-sm text-primary font-medium">Stage 2 of 3: Page decomposition</span>
+<span class="text-outline">•</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Elapsed: 42s</span>
+</div>
+<!-- Minimal Progress Bar -->
+<div class="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
+<div class="bg-primary h-1.5 rounded-full w-[64%] transition-all duration-500"></div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md text-right whitespace-nowrap">
+<div class="flex items-center justify-end gap-1">
+<button class="px-space-sm py-1 rounded-DEFAULT bg-surface-container text-error hover:bg-error-container hover:text-on-error-container font-label-sm text-label-sm transition-all" type="button">
+                      Cancel
+                    </button>
+</div>
+</td>
+</tr>
+<!-- Row 3: READY TO PROCESS (Midterm Solutions) -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group">
+<td class="py-space-md px-space-md">
+<div class="flex items-start gap-space-sm">
+<div class="w-8 h-8 rounded-DEFAULT bg-surface-container text-on-surface-variant flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]">quiz</span>
+</div>
+<div class="min-w-0">
+<div class="font-medium text-on-surface flex items-center gap-1.5">
+<span class="truncate">Midterm_Exam_2023_Solutions.pdf</span>
+</div>
+<div class="flex items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant mt-0.5">
+<span class="text-outline">SHA-256:</span>
+<code class="text-on-surface">d490..11a8</code>
+<span>•</span>
+<span>Staged locally</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md whitespace-nowrap">
+<span class="px-space-xs py-0.5 rounded-DEFAULT bg-secondary-fixed/50 text-secondary font-label-sm text-label-sm font-medium">PYQ (2022-2024)</span>
+</td>
+<td class="py-space-md px-space-md font-label-sm text-label-sm text-on-surface whitespace-nowrap">
+                  32 pp
+                </td>
+<td class="py-space-md px-space-md font-label-sm text-label-sm text-on-surface-variant whitespace-nowrap">
+                  5.1 MB
+                </td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-space-xs">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-DEFAULT bg-surface-container-high text-on-surface font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[12px] text-on-surface-variant">pause</span>
+                        READY TO PROCESS
+                      </span>
+</div>
+<div class="text-label-sm font-label-sm text-on-surface-variant">
+                      Uploaded · Manual start required to prevent unneeded tokenization
+                    </div>
+</div>
+</td>
+<td class="py-space-md px-space-md text-right whitespace-nowrap">
+<div class="flex items-center justify-end gap-1.5">
+<button class="px-space-md py-1 rounded-DEFAULT bg-primary text-on-primary hover:bg-primary-container font-label-sm text-label-sm font-medium shadow-sm transition-all active:scale-[0.985]" onclick="startProcessingSimulation(this)" type="button">
+                      Start processing
+                    </button>
+<button class="p-1 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" title="Remove staged file" type="button">
+<span class="material-symbols-outlined text-[17px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 4: FAILED (Scanned Note) -->
+<tr class="bg-error-container/20 hover:bg-error-container/30 transition-colors group cursor-pointer" onclick="openDetailsDrawer('Historical_Scanned_Notes_1998.pdf')">
+<td class="py-space-md px-space-md">
+<div class="flex items-start gap-space-sm">
+<div class="w-8 h-8 rounded-DEFAULT bg-error-container text-error flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]">error</span>
+</div>
+<div class="min-w-0">
+<div class="font-medium text-error flex items-center gap-1.5">
+<span class="truncate">Historical_Scanned_Notes_1998.pdf</span>
+<span class="material-symbols-outlined text-[14px] text-error">warning</span>
+</div>
+<div class="flex items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant mt-0.5">
+<span class="text-outline">SHA-256:</span>
+<code class="text-on-surface">e11a..00ff</code>
+<span>•</span>
+<span>Failed 18m ago</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md whitespace-nowrap">
+<span class="px-space-xs py-0.5 rounded-DEFAULT bg-surface-container text-on-surface font-label-sm text-label-sm">Reference</span>
+</td>
+<td class="py-space-md px-space-md font-label-sm text-label-sm text-outline whitespace-nowrap">
+                  —
+                </td>
+<td class="py-space-md px-space-md font-label-sm text-label-sm text-on-surface-variant whitespace-nowrap">
+                  3.8 MB
+                </td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-space-xs">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-DEFAULT bg-error text-on-error font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[12px]">cancel</span>
+                        FAILED
+                      </span>
+<span class="font-label-sm text-label-sm text-error font-medium">Scanned document detected</span>
+</div>
+<div class="text-label-sm font-label-sm text-on-error-container line-clamp-1">
+                      No extractable text. OCR parsing is disabled in local-first standard tier.
+                    </div>
+</div>
+</td>
+<td class="py-space-md px-space-md text-right whitespace-nowrap" onclick="event.stopPropagation()">
+<div class="flex items-center justify-end gap-1">
+<button class="px-space-sm py-1 rounded-DEFAULT bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm transition-all" onclick="openDetailsDrawer('Historical_Scanned_Notes_1998.pdf')" type="button">
+                      View details
+                    </button>
+<button class="px-space-sm py-1 rounded-DEFAULT bg-surface-container-lowest text-error hover:bg-error-container hover:text-on-error-container font-label-sm text-label-sm transition-all" type="button">
+                      Retry
+                    </button>
+<button class="p-1 rounded-DEFAULT text-on-surface-variant hover:text-error hover:bg-surface-container transition-all" title="Archive" type="button">
+<span class="material-symbols-outlined text-[17px]">archive</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 5: READY (Syllabus) -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group cursor-pointer" onclick="openDetailsDrawer('CS842_Course_Syllabus_2025.pdf')">
+<td class="py-space-md px-space-md">
+<div class="flex items-start gap-space-sm">
+<div class="w-8 h-8 rounded-DEFAULT bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]">menu_book</span>
+</div>
+<div class="min-w-0">
+<div class="font-medium text-on-surface hover:text-primary transition-colors flex items-center gap-1.5">
+<span class="truncate">CS842_Course_Syllabus_2025.pdf</span>
+<span class="material-symbols-outlined text-[14px] text-secondary">check_circle</span>
+</div>
+<div class="flex items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant mt-0.5">
+<span class="text-outline">SHA-256:</span>
+<code class="text-on-surface">5a23..dd1b</code>
+<span>•</span>
+<span>Added Aug 12, 2024</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md whitespace-nowrap">
+<span class="px-space-xs py-0.5 rounded-DEFAULT bg-surface-container text-on-surface font-label-sm text-label-sm">Syllabus</span>
+</td>
+<td class="py-space-md px-space-md font-label-sm text-label-sm text-on-surface whitespace-nowrap">
+                  14 pp
+                </td>
+<td class="py-space-md px-space-md font-label-sm text-label-sm text-on-surface-variant whitespace-nowrap">
+                  820 KB
+                </td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-space-xs">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-DEFAULT bg-secondary-container/40 text-secondary font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[12px]">done_all</span>
+                        READY
+                      </span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">14 pp indexed</span>
+</div>
+<div class="text-label-sm font-label-sm text-on-surface-variant">
+                      Course outcome mapping and module boundaries verified
+                    </div>
+</div>
+</td>
+<td class="py-space-md px-space-md text-right whitespace-nowrap" onclick="event.stopPropagation()">
+<div class="flex items-center justify-end gap-1">
+<button class="px-space-sm py-1 rounded-DEFAULT bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm transition-all" onclick="openDetailsDrawer('CS842_Course_Syllabus_2025.pdf')" type="button">
+                      View details
+                    </button>
+<button class="p-1 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" title="Archive" type="button">
+<span class="material-symbols-outlined text-[17px]">archive</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Operational Footer Status -->
+<div class="px-space-md py-space-sm bg-surface-container-low flex flex-col sm:flex-row items-center justify-between gap-space-sm text-label-sm font-label-sm text-on-surface-variant">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[16px] text-secondary">verified</span>
+<span>Deterministic Parser v1.4.2 Active · Zero-LLM Token Cost for Storage</span>
+</div>
+<div class="flex items-center gap-space-md">
+<span>Storage consumed: <strong class="text-on-surface">32.32 MB</strong></span>
+<span>Chunk hash tree: <code class="text-primary font-semibold">root#6f8a..</code></span>
+</div>
+</div>
+</div>
+<!-- MAIN STATE 2: Empty State Container (Hidden by default, shown via inspector) -->
+<div class="hidden w-full bg-surface-container-lowest rounded-DEFAULT p-space-xl text-center shadow-sm flex flex-col items-center" id="section-empty-state">
+<div class="w-16 h-16 rounded-full bg-surface-container-low text-primary flex items-center justify-center mb-space-md">
+<span class="material-symbols-outlined text-[32px]">post_add</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface">Upload study resources to begin</h3>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-md mt-1 mb-space-lg">
+          GroundQ relies on local PDFs to guarantee hallucination-free question generation. Ingest your lecture slides, textbooks, or course syllabi.
+        </p>
+<!-- Academic Roadmap Step Sequence -->
+<div class="w-full max-w-2xl bg-surface-container-low rounded-DEFAULT p-space-md mb-space-lg">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-space-sm text-left font-label-sm text-label-sm">
+<div class="p-space-xs bg-surface-container-lowest rounded-DEFAULT flex flex-col gap-1 shadow-sm">
+<span class="text-primary font-bold">STEP 01</span>
+<span class="text-on-surface font-medium">Upload PDF</span>
+<span class="text-on-surface-variant text-[11px]">Preserved in root</span>
+</div>
+<div class="p-space-xs bg-surface-container-lowest rounded-DEFAULT flex flex-col gap-1 shadow-sm">
+<span class="text-outline font-bold">STEP 02</span>
+<span class="text-on-surface font-medium">Process manually</span>
+<span class="text-on-surface-variant text-[11px]">Zero unwanted tokens</span>
+</div>
+<div class="p-space-xs bg-surface-container-lowest rounded-DEFAULT flex flex-col gap-1 shadow-sm">
+<span class="text-outline font-bold">STEP 03</span>
+<span class="text-on-surface font-medium">Extract chunks</span>
+<span class="text-on-surface-variant text-[11px]">Pages & anchors locked</span>
+</div>
+<div class="p-space-xs bg-surface-container-lowest rounded-DEFAULT flex flex-col gap-1 shadow-sm">
+<span class="text-outline font-bold">STEP 04</span>
+<span class="text-on-surface font-medium">Build topics</span>
+<span class="text-on-surface-variant text-[11px]">Next pipeline step</span>
+</div>
+</div>
+</div>
+<button class="flex items-center gap-space-xs px-space-lg py-2.5 rounded-DEFAULT bg-primary text-on-primary font-body-sm text-body-sm font-medium shadow-sm hover:bg-primary-container transition-all active:scale-[0.985]" onclick="openUploadModal()" type="button">
+<span class="material-symbols-outlined text-[18px]">upload_file</span>
+<span>+ Upload study resources</span>
+</button>
+</div>
+<!-- MAIN STATE 3: OCR Error Alert Mode Container -->
+<div class="hidden w-full bg-surface-container-lowest rounded-DEFAULT p-space-lg shadow-sm flex flex-col gap-space-md" id="section-error-state">
+<div class="flex items-start gap-space-md bg-error-container/30 p-space-md rounded-DEFAULT">
+<span class="material-symbols-outlined text-error text-[28px] shrink-0">report_problem</span>
+<div class="flex-1">
+<h4 class="font-headline-sm text-headline-sm text-error font-semibold">Corpus Ingestion Blocked: 1 Scanned Document Detected</h4>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">
+              GroundQ's deterministic engine relies on digital text layers and vector font glyphs. Scanned document <code class="font-label-sm text-label-sm text-on-surface bg-surface-container px-1 py-0.5 rounded">Historical_Scanned_Notes_1998.pdf</code> does not contain selectable text.
+            </p>
+<div class="mt-space-md flex flex-wrap items-center gap-space-sm font-body-sm text-body-sm">
+<button class="px-space-md py-1.5 rounded-DEFAULT bg-error text-on-error font-medium hover:opacity-90 transition-all" type="button">
+                Replace with OCRed digital copy
+              </button>
+<button class="px-space-md py-1.5 rounded-DEFAULT bg-surface-container text-on-surface hover:bg-surface-container-high transition-all" onclick="setScreenView('table')" type="button">
+                Dismiss and ignore non-blocking error
+              </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Slide-Over Docked Details Drawer (Level 2 Elevation) -->
+<aside aria-label="Resource Inspector" class="hidden fixed inset-y-0 right-0 z-50 w-full sm:w-[460px] bg-surface-container-lowest shadow-2xl flex flex-col" id="resource-details-drawer">
+<!-- Drawer Header -->
+<div class="px-space-lg py-space-md bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[20px] text-primary">description</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Resource Inspector</h3>
+</div>
+<button class="p-1 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" onclick="closeDetailsDrawer()" type="button">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<!-- Drawer Content Scrollable Area -->
+<div class="flex-1 overflow-y-auto p-space-lg flex flex-col gap-space-lg">
+<!-- Resource Identity & Status Pill -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase text-outline">Resource ID</span>
+<span class="font-label-sm text-label-sm text-on-surface bg-surface-container px-1.5 py-0.5 rounded-DEFAULT">res_9f8c12a7d</span>
+</div>
+<h4 class="font-headline-md text-headline-md text-on-surface font-headline-md break-all" id="drawer-resource-name">
+          Silberschatz_OS_Deadlocks_Ch8.pdf
+        </h4>
+<div class="flex items-center gap-2 mt-1">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-DEFAULT bg-secondary-container/50 text-secondary font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[14px]">done_all</span>
+            VERIFIED & READY
+          </span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Type: Study Material</span>
+</div>
+</div>
+<!-- Metadata Key-Value Matrix -->
+<div class="w-full bg-surface-container-low rounded-DEFAULT p-space-md flex flex-col gap-space-sm font-body-sm text-body-sm">
+<div class="flex justify-between items-center">
+<span class="text-on-surface-variant">Pages extracted:</span>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">148 / 148 pages</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-on-surface-variant">File size:</span>
+<span class="font-label-sm text-label-sm text-on-surface">14.2 MB (14,882,410 bytes)</span>
+</div>
+<div class="flex justify-between items-start">
+<span class="text-on-surface-variant">SHA-256 Checksum:</span>
+<div class="flex items-center gap-1">
+<code class="font-label-sm text-label-sm text-primary bg-surface-container-lowest px-1 py-0.5 rounded-DEFAULT">7b1e...49f0</code>
+<button class="text-outline hover:text-on-surface" title="Copy Checksum" type="button">
+<span class="material-symbols-outlined text-[14px]">content_copy</span>
+</button>
+</div>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-on-surface-variant">Storage location:</span>
+<span class="font-label-sm text-label-sm text-on-surface">Local-root /cs842/blobs/</span>
+</div>
+</div>
+<!-- Parsing Engine & Chunk Telemetry -->
+<div class="flex flex-col gap-space-xs">
+<span class="font-label-sm text-label-sm uppercase text-on-surface-variant tracking-wider">Parsing & Chunking Engine</span>
+<div class="p-space-md bg-surface-container-lowest rounded-DEFAULT shadow-sm flex flex-col gap-space-xs">
+<div class="flex items-center justify-between font-label-sm text-label-sm">
+<span class="text-on-surface font-semibold">GroundQ Deterministic Engine v1.4.2</span>
+<span class="text-secondary font-medium">Non-LLM</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            Text elements indexed using token-level spatial bounding coordinates. Ready for strict citation anchors.
+          </p>
+<div class="grid grid-cols-2 gap-space-xs pt-space-xs font-label-sm text-label-sm">
+<div class="p-space-xs bg-surface-container rounded-DEFAULT">
+<span class="text-outline block text-[10px]">EVIDENCE CHUNKS</span>
+<span class="text-on-surface font-bold text-headline-sm font-headline-sm">312</span>
+</div>
+<div class="p-space-xs bg-surface-container rounded-DEFAULT">
+<span class="text-outline block text-[10px]">AVG TOKEN LENGTH</span>
+<span class="text-on-surface font-bold text-headline-sm font-headline-sm">240</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Run History Audit Trail -->
+<div class="flex flex-col gap-space-xs">
+<span class="font-label-sm text-label-sm uppercase text-on-surface-variant tracking-wider">Ingestion Run History</span>
+<div class="space-y-space-xs">
+<div class="p-space-sm bg-surface-container-low rounded-DEFAULT flex items-center justify-between font-label-sm text-label-sm">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="text-on-surface font-medium">Run #1 (Initial extraction)</span>
+</div>
+<span class="text-on-surface-variant">28.4s elapsed</span>
+</div>
+<div class="px-space-sm text-[11px] font-label-sm text-outline flex justify-between">
+<span>Started: 12:14:02 UTC</span>
+<span>Completed: 12:14:30 UTC</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Drawer Sticky Action Footer -->
+<div class="p-space-md bg-surface-container-low flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<button class="flex-1 flex items-center justify-center gap-1.5 px-space-md py-2 rounded-DEFAULT bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-sm text-label-sm shadow-sm transition-all" onclick="alert('Chunk index manifest downloaded.')" type="button">
+<span class="material-symbols-outlined text-[16px]">file_download</span>
+<span>Export Manifest</span>
+</button>
+<button class="flex-1 flex items-center justify-center gap-1.5 px-space-md py-2 rounded-DEFAULT bg-primary text-on-primary hover:bg-primary-container font-label-sm text-label-sm font-medium shadow-sm transition-all" onclick="triggerReprocess('Silberschatz_OS_Deadlocks_Ch8.pdf')" type="button">
+<span class="material-symbols-outlined text-[16px]">replay</span>
+<span>Reprocess Chunks</span>
+</button>
+</div>
+<button class="w-full text-center py-1.5 text-error hover:bg-error-container hover:text-on-error-container rounded-DEFAULT font-label-sm text-label-sm transition-all" onclick="confirmArchive()" type="button">
+        Archive this resource
+      </button>
+</div>
+</aside>
+<!-- Upload Modal Dialog (Level 3 Elevation) -->
+<div class="hidden fixed inset-0 z-50 bg-inverse-surface/20 backdrop-blur-[2px] flex items-center justify-center p-space-md" id="upload-modal-backdrop">
+<div class="w-full max-w-xl bg-surface-container-lowest rounded-lg shadow-2xl overflow-hidden flex flex-col">
+<!-- Modal Header -->
+<div class="px-space-lg py-space-md bg-surface-container-low flex items-center justify-between">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface">Upload study resource</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Deterministically anchored to project CS-842</p>
+</div>
+<button class="p-1 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all" onclick="closeUploadModal()" type="button">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<!-- Modal Body -->
+<div class="p-space-lg flex flex-col gap-space-lg">
+<!-- Resource Type Radio Selector -->
+<div>
+<label class="block font-label-sm text-label-sm uppercase text-on-surface-variant mb-space-xs font-semibold">
+            Resource Classification
+          </label>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-space-xs">
+<label class="flex flex-col items-center justify-center p-space-sm rounded-DEFAULT bg-surface-container cursor-pointer hover:bg-primary/10 transition-colors has-[:checked]:bg-primary/15 has-[:checked]:text-primary">
+<input checked="" class="sr-only" name="res-type" type="radio" value="study"/>
+<span class="material-symbols-outlined text-[20px] mb-1">menu_book</span>
+<span class="font-label-sm text-label-sm text-center">Study Material</span>
+</label>
+<label class="flex flex-col items-center justify-center p-space-sm rounded-DEFAULT bg-surface-container cursor-pointer hover:bg-primary/10 transition-colors has-[:checked]:bg-primary/15 has-[:checked]:text-primary">
+<input class="sr-only" name="res-type" type="radio" value="pyq"/>
+<span class="material-symbols-outlined text-[20px] mb-1">quiz</span>
+<span class="font-label-sm text-label-sm text-center">PYQ (Exams)</span>
+</label>
+<label class="flex flex-col items-center justify-center p-space-sm rounded-DEFAULT bg-surface-container cursor-pointer hover:bg-primary/10 transition-colors has-[:checked]:bg-primary/15 has-[:checked]:text-primary">
+<input class="sr-only" name="res-type" type="radio" value="syllabus"/>
+<span class="material-symbols-outlined text-[20px] mb-1">fact_check</span>
+<span class="font-label-sm text-label-sm text-center">Syllabus</span>
+</label>
+<label class="flex flex-col items-center justify-center p-space-sm rounded-DEFAULT bg-surface-container cursor-pointer hover:bg-primary/10 transition-colors has-[:checked]:bg-primary/15 has-[:checked]:text-primary">
+<input class="sr-only" name="res-type" type="radio" value="other"/>
+<span class="material-symbols-outlined text-[20px] mb-1">article</span>
+<span class="font-label-sm text-label-sm text-center">Reference</span>
+</label>
+</div>
+</div>
+<!-- Drag & Drop Zone -->
+<div class="p-space-xl rounded-DEFAULT bg-surface-container-low flex flex-col items-center justify-center text-center cursor-pointer hover:bg-surface-container transition-all">
+<div class="w-12 h-12 rounded-full bg-surface-container-lowest text-primary flex items-center justify-center mb-space-sm shadow-sm">
+<span class="material-symbols-outlined text-[24px]">cloud_upload</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface font-medium">Drop PDF here, or <span class="text-primary underline">browse local files</span></p>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-1">PDF format only (Max 25 MB per document)</span>
+</div>
+<!-- Staged File Active Progress Simulation -->
+<div class="bg-surface-container-lowest rounded-DEFAULT p-space-md shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm min-w-0">
+<span class="material-symbols-outlined text-primary text-[22px]">picture_as_pdf</span>
+<div class="min-w-0">
+<p class="font-body-sm text-body-sm font-medium text-on-surface truncate">Distributed_Consensus_Raft_Whitepaper.pdf</p>
+<span class="font-label-sm text-label-sm text-on-surface-variant">5.7 MB of 8.4 MB (68%)</span>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-error p-1" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+<div class="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
+<div class="bg-primary h-1.5 rounded-full w-[68%] transition-all"></div>
+</div>
+</div>
+<!-- Warning / Edge-Case Notice Container -->
+<div class="p-space-sm bg-surface-container-low rounded-DEFAULT flex items-start gap-space-xs font-body-sm text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px] text-secondary shrink-0 mt-0.5">shield</span>
+<p class="text-[12px] leading-relaxed">
+<strong class="text-on-surface">Local-First Guard:</strong> Uploading stores the file directly in the workspace. Parsing starts manually upon confirmation to prevent unneeded tokenization and background cost.
+          </p>
+</div>
+</div>
+<!-- Modal Footer -->
+<div class="px-space-lg py-space-md bg-surface-container-low flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-outline">SHA verification on commit</span>
+<div class="flex items-center gap-space-sm">
+<button class="px-space-md py-2 rounded-DEFAULT bg-surface-container-lowest hover:bg-surface-container text-on-surface font-body-sm text-body-sm transition-all" onclick="closeUploadModal()" type="button">
+            Cancel
+          </button>
+<button class="px-space-lg py-2 rounded-DEFAULT bg-primary text-on-primary font-body-sm text-body-sm font-medium shadow-sm hover:bg-primary-container transition-all active:scale-[0.985]" onclick="confirmUploadStaged()" type="button">
+            Confirm & Staging
+          </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+  // UI Interactive State Switcher for GroundQ Reviewers
+  function setScreenView(mode) {
+    const tableSec = document.getElementById('section-resource-table');
+    const emptySec = document.getElementById('section-empty-state');
+    const errorSec = document.getElementById('section-error-state');
+    const drawer = document.getElementById('resource-details-drawer');
+    const modal = document.getElementById('upload-modal-backdrop');
+
+    // Reset button states
+    const buttons = ['btn-mode-table', 'btn-mode-drawer', 'btn-mode-modal', 'btn-mode-empty', 'btn-mode-error'];
+    buttons.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.className = 'px-space-sm py-1 rounded-DEFAULT bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all';
+      }
+    });
+
+    const activeBtn = document.getElementById('btn-mode-' + mode);
+    if (activeBtn) {
+      activeBtn.className = 'px-space-sm py-1 rounded-DEFAULT bg-surface-container-lowest text-primary shadow-sm hover:bg-surface-container font-semibold transition-all';
+    }
+
+    // Default visibilities
+    tableSec.classList.remove('hidden');
+    emptySec.classList.add('hidden');
+    errorSec.classList.add('hidden');
+    drawer.classList.add('hidden');
+    modal.classList.add('hidden');
+
+    if (mode === 'drawer') {
+      drawer.classList.remove('hidden');
+    } else if (mode === 'modal') {
+      modal.classList.remove('hidden');
+    } else if (mode === 'empty') {
+      tableSec.classList.add('hidden');
+      emptySec.classList.remove('hidden');
+    } else if (mode === 'error') {
+      errorSec.classList.remove('hidden');
+    }
+  }
+
+  function openDetailsDrawer(fileName) {
+    const drawer = document.getElementById('resource-details-drawer');
+    const nameEl = document.getElementById('drawer-resource-name');
+    if (nameEl && fileName) {
+      nameEl.textContent = fileName;
+    }
+    drawer.classList.remove('hidden');
+  }
+
+  function closeDetailsDrawer() {
+    document.getElementById('resource-details-drawer').classList.add('hidden');
+  }
+
+  function openUploadModal() {
+    document.getElementById('upload-modal-backdrop').classList.remove('hidden');
+  }
+
+  function closeUploadModal() {
+    document.getElementById('upload-modal-backdrop').classList.add('hidden');
+  }
+
+  function confirmUploadStaged() {
+    closeUploadModal();
+    alert('Resource "Distributed_Consensus_Raft_Whitepaper.pdf" staged. Manual start is ready.');
+  }
+
+  function triggerReprocess(name) {
+    alert('Deterministically reprocessing "' + name + '". Chunk anchor index will be recalculated.');
+  }
+
+  function confirmArchive() {
+    if (confirm('Archive this resource? Active topic grounded citations will show a fallback warning.')) {
+      closeDetailsDrawer();
+    }
+  }
+
+  function startProcessingSimulation(btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="inline-block w-3 h-3 border-2 border-on-primary border-t-transparent rounded-full animate-spin mr-1"></span> Processing...';
+    setTimeout(() => {
+      btn.innerHTML = 'Completed';
+      btn.className = 'px-space-md py-1 rounded-DEFAULT bg-secondary-container text-secondary font-label-sm text-label-sm font-semibold';
+    }, 1500);
+  }
+
+  function refreshCorpus() {
+    const btn = event.currentTarget;
+    const icon = btn.querySelector('.material-symbols-outlined');
+    if (icon) {
+      icon.classList.add('animate-spin');
+      setTimeout(() => {
+        icon.classList.remove('animate-spin');
+      }, 700);
+    }
+  }
+</script></main><footer class="w-full bg-surface-container-lowest shadow-[0_-1px_6px_rgba(0,0,0,0.02)]"><div class="w-full px-margin-desktop py-space-md flex flex-col md:flex-row items-center justify-between gap-space-md font-body-sm text-body-sm text-on-surface-variant"><div class="flex items-center gap-space-md flex-wrap"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[16px] text-secondary">verified_user</span><span class="font-label-sm text-label-sm uppercase tracking-wide text-on-surface">ISO/IEC 42001 Audited</span></div><span class="text-outline-variant font-label-md text-label-md">•</span><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[16px] text-on-surface-variant">school</span><span class="font-body-sm text-body-sm">Academic Integrity Protocol v2.4</span></div></div><div class="flex items-center gap-space-lg flex-wrap"><div class="flex items-center gap-space-xs"><span class="w-2 h-2 rounded-full bg-secondary"></span><span class="font-label-sm text-label-sm text-on-surface-variant">Grounding Latency: 42ms</span></div><span class="text-outline-variant font-label-md text-label-md">•</span><span class="font-label-sm text-label-sm text-on-surface-variant">Hash: <code class="font-label-sm text-label-sm text-on-surface">0x7F4B..9C</code></span></div></div></footer></body></html>

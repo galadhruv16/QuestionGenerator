@@ -9,6 +9,7 @@ import {
 import { LandingPage } from './pages/LandingPage';
 import { ProjectResourcesPage } from './pages/ProjectResourcesPage';
 import { ProjectTopicsPage } from './pages/ProjectTopicsPage';
+import { ProjectGenerationPage } from './pages/ProjectGenerationPage';
 import { WorkspacePage } from './pages/WorkspacePage';
 
 export function App() {
@@ -64,6 +65,14 @@ export function App() {
             </ProtectedRoute>
           }
           path="/app/projects/:projectId/topics"
+        />
+        <Route
+          element={
+            <ProtectedRoute>
+              <ProjectGenerationPage />
+            </ProtectedRoute>
+          }
+          path="/app/projects/:projectId/generation"
         />
       </Routes>
     </BrowserRouter>

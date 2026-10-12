@@ -234,6 +234,37 @@ resourcesRouter.post('/', async (request, response, next) => {
       });
     }
 
+    const bucketObjectKey = existing.storage_path.startsWith('resources/')
+      ? existing.storage_path.slice('resources/'.length)
+      : existing.storage_path;
+
+    const parentPath = bucketObjectKey.split('/').slice(0, -1).join('/');
+    const filename = bucketObjectKey.split('/').pop();
+
+    const { data: fileData, error: fileCheckError } = await client.storage
+      .from('resources')
+      .list(parentPath, {
+        search: filename,
+      });
+
+    const fileExists =
+      !fileCheckError &&
+      Array.isArray(fileData) &&
+      fileData.some((f) => f.name === filename);
+
+    if (!fileExists) {
+      return response.status(422).json({
+        error: {
+          code: 'UNPROCESSABLE_RESOURCE',
+          message:
+            'Uploaded file not found in storage. Ensure file was successfully uploaded to Supabase Storage before finalization.',
+          details: fileCheckError
+            ? { storage_error: fileCheckError.message }
+            : {},
+        },
+      });
+    }
+
     const updatePayload: Record<string, unknown> = {
       original_filename,
       resource_kind,
@@ -473,13 +504,33 @@ resourcesRouter.get('/:resourceId/status', async (request, response, next) => {
       .select('*')
       .eq('resource_id', parsedResourceId.data)
       .order('created_at', { ascending: false })
-      .limit(1);
+      .limit(5);
 
     if (runsError) throw runsError;
 
+    const { count: chunkCount } = await client
+      .from('resource_chunks')
+      .select('*', { count: 'exact', head: true })
+      .eq('resource_id', parsedResourceId.data);
+
+    const { data: chunksData } = await client
+      .from('resource_chunks')
+      .select('token_count')
+      .eq('resource_id', parsedResourceId.data);
+
+    const totalTokens =
+      chunksData?.reduce((acc, c) => acc + (c.token_count ?? 0), 0) ?? 0;
+    const avgTokens =
+      chunksData && chunksData.length > 0
+        ? Math.round(totalTokens / chunksData.length)
+        : 0;
+
     return response.json({
       data: {
+        avg_token_length: avgTokens,
+        chunk_count: chunkCount ?? 0,
         processing_run: runs?.[0] ?? null,
+        processing_runs: runs ?? [],
         resource_id: resource.id,
         resource_status: resource.status,
       },

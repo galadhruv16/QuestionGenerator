@@ -33,6 +33,24 @@ export interface ResourceItem {
   storage_path: string;
 }
 
+export interface ProcessingRunItem {
+  id: string;
+  status: string;
+  started_at?: string;
+  completed_at?: string;
+  error_message?: string;
+  metadata?: Record<string, unknown>;
+  parser_version?: string;
+  chunking_version?: string;
+}
+
+export interface DrawerStatusDetails {
+  avg_token_length?: number;
+  chunk_count?: number;
+  processing_run?: ProcessingRunItem | null;
+  processing_runs?: ProcessingRunItem[];
+}
+
 export const mockDemoResources: ResourceItem[] = [
   {
     checksum_sha256: '7b1e84df9a49f0',
@@ -138,6 +156,8 @@ export function ProjectResourcesPage({
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedDrawerResource, setSelectedDrawerResource] =
     useState<ResourceItem | null>(null);
+  const [drawerDetails, setDrawerDetails] =
+    useState<DrawerStatusDetails | null>(null);
 
   // Upload Form state
   const [uploadKind, setUploadKind] = useState<ResourceKind>('STUDY_MATERIAL');
@@ -283,6 +303,31 @@ export function ProjectResourcesPage({
     return () => clearInterval(interval);
   }, [resources, loadData]);
 
+  // Fetch real-time run telemetry and chunks stats when side drawer opens
+  useEffect(() => {
+    if (!selectedDrawerResource || !projectId) {
+      setDrawerDetails(null);
+      return;
+    }
+
+    let isMounted = true;
+    void apiRequest(
+      `/projects/${projectId}/resources/${selectedDrawerResource.id}/status`,
+    )
+      .then((payload) => {
+        if (isMounted && payload.data) {
+          setDrawerDetails(payload.data);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load resource status for drawer:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedDrawerResource?.id, projectId]);
+
   const filteredResources = resources.filter((item) => {
     if (activeView === 'empty') return false;
     if (
@@ -326,20 +371,21 @@ export function ProjectResourcesPage({
           method: 'POST',
         });
       }
-    } catch {
-      // Fallback for mock demo
+      setResources((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                processing_stage: 'Stage 1 of 3: Retrieving document',
+                status: 'PROCESSING',
+              }
+            : r,
+        ),
+      );
+    } catch (err: unknown) {
+      console.error('Failed to trigger resource processing:', err);
+      void loadData();
     }
-    setResources((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              processing_stage: 'Stage 1 of 3: Text extraction',
-              status: 'PROCESSING',
-            }
-          : r,
-      ),
-    );
   };
 
   const handleArchiveResource = async (id: string) => {
@@ -349,12 +395,13 @@ export function ProjectResourcesPage({
           method: 'POST',
         });
       }
-    } catch {
-      // Fallback for mock demo
-    }
-    setResources((prev) => prev.filter((r) => r.id !== id));
-    if (selectedDrawerResource?.id === id) {
-      setSelectedDrawerResource(null);
+      setResources((prev) => prev.filter((r) => r.id !== id));
+      if (selectedDrawerResource?.id === id) {
+        setSelectedDrawerResource(null);
+      }
+    } catch (err: unknown) {
+      console.error('Failed to archive resource:', err);
+      void loadData();
     }
   };
 
@@ -392,6 +439,7 @@ export function ProjectResourcesPage({
     if (!stagedFile) return;
 
     try {
+      setUploadError(null);
       setUploadProgress(20);
       const initPayload = await apiRequest(
         `/projects/${projectId}/resources/upload-init`,
@@ -414,12 +462,28 @@ export function ProjectResourcesPage({
         ? storage_path.slice('resources/'.length)
         : storage_path;
 
-      await getSupabaseClient()
+      const { error: uploadError } = await getSupabaseClient()
         .storage.from('resources')
         .upload(bucketObjectKey, stagedFile, {
           contentType: 'application/pdf',
           upsert: true,
         });
+
+      if (uploadError) {
+        console.error('Supabase Storage upload error:', uploadError);
+        const errorMsg = uploadError.message ?? '';
+        const isBucketNotFound =
+          errorMsg.toLowerCase().includes('bucket not found') ||
+          (uploadError as unknown as { statusCode?: string }).statusCode ===
+            '404';
+
+        if (isBucketNotFound) {
+          throw new Error(
+            "Storage bucket 'resources' does not exist in Supabase. Please create the 'resources' bucket in your Supabase Dashboard under Storage.",
+          );
+        }
+        throw new Error(`Storage upload failed: ${errorMsg}`);
+      }
 
       setUploadProgress(85);
 
@@ -452,30 +516,12 @@ export function ProjectResourcesPage({
       if (activeView === 'empty') {
         setActiveView('table');
       }
-    } catch {
-      // Mock demo fallback when API is offline
-      setUploadProgress(100);
-      const simulatedResource: ResourceItem = {
-        checksum_sha256: Math.random().toString(16).substring(2, 10),
-        created_at: new Date().toISOString(),
-        evidence_summary:
-          'Uploaded · Manual start required to prevent unneeded tokenization',
-        file_size_bytes: stagedFile.size,
-        id: `res_${Math.random().toString(36).substring(2, 9)}`,
-        original_filename: stagedFile.name,
-        page_count: null,
-        resource_kind: uploadKind,
-        status: 'READY_TO_PROCESS',
-        storage_path: `resources/projects/${projectId ?? 'default'}/${stagedFile.name}`,
-      };
-
-      setResources((prev) => [simulatedResource, ...prev]);
-      setStagedFile(null);
+    } catch (err: unknown) {
+      console.error('Upload failed:', err);
+      setUploadError(
+        err instanceof Error ? err.message : 'Upload failed. Please try again.',
+      );
       setUploadProgress(null);
-      setIsUploadOpen(false);
-      if (activeView === 'empty') {
-        setActiveView('table');
-      }
     }
   };
 
@@ -609,13 +655,13 @@ export function ProjectResourcesPage({
                 <Icon name="tree" size={16} />
                 <span>Topics</span>
               </Link>
-              <div className="flex items-center gap-2 px-4 py-2.5 text-outline cursor-not-allowed font-body-sm text-body-sm whitespace-nowrap">
+              <Link
+                className="flex items-center gap-2 px-4 py-2.5 text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm transition-colors whitespace-nowrap"
+                to={`/app/projects/${projectId ?? 'demo'}/generation`}
+              >
                 <Icon name="spark" size={16} />
                 <span>Generation</span>
-                <span className="px-1.5 py-0.5 rounded bg-surface-container-high text-outline font-label-sm text-label-sm">
-                  Upcoming step
-                </span>
-              </div>
+              </Link>
               <div className="flex items-center gap-2 px-4 py-2.5 text-outline cursor-not-allowed font-body-sm text-body-sm whitespace-nowrap">
                 <Icon name="verified" size={16} />
                 <span>Question Bank</span>
@@ -1389,7 +1435,9 @@ export function ProjectResourcesPage({
                       EVIDENCE CHUNKS
                     </span>
                     <span className="text-on-surface font-bold text-headline-sm font-headline-sm">
-                      {selectedDrawerResource.evidence_tokens ?? 0}
+                      {drawerDetails?.chunk_count ??
+                        selectedDrawerResource.evidence_tokens ??
+                        0}
                     </span>
                   </div>
                   <div className="p-2.5 bg-surface-container rounded border border-outline-variant/20">
@@ -1397,7 +1445,12 @@ export function ProjectResourcesPage({
                       AVG TOKEN LENGTH
                     </span>
                     <span className="text-on-surface font-bold text-headline-sm font-headline-sm">
-                      240
+                      {drawerDetails?.avg_token_length &&
+                      drawerDetails.avg_token_length > 0
+                        ? drawerDetails.avg_token_length
+                        : selectedDrawerResource.status === 'READY'
+                          ? 240
+                          : 0}
                     </span>
                   </div>
                 </div>
@@ -1409,25 +1462,114 @@ export function ProjectResourcesPage({
               <span className="font-label-sm text-label-sm uppercase text-on-surface-variant tracking-wider font-semibold">
                 Ingestion Run History
               </span>
-              <div className="space-y-1.5">
-                <div className="p-3 bg-surface-container-low rounded flex items-center justify-between font-label-sm text-label-sm border border-outline-variant/20">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-secondary" />
-                    <span className="text-on-surface font-medium">
-                      Run #1 (Initial extraction)
-                    </span>
-                  </div>
-                  <span className="text-on-surface-variant">28.4s elapsed</span>
-                </div>
-                <div className="px-3 text-[11px] font-label-sm text-outline flex justify-between">
-                  <span>
-                    Started:{' '}
-                    {new Date(
-                      selectedDrawerResource.created_at,
-                    ).toLocaleTimeString()}
-                  </span>
-                  <span>Completed: deterministic</span>
-                </div>
+              <div className="space-y-2">
+                {(() => {
+                  const runs =
+                    drawerDetails?.processing_runs &&
+                    drawerDetails.processing_runs.length > 0
+                      ? drawerDetails.processing_runs
+                      : drawerDetails?.processing_run
+                        ? [drawerDetails.processing_run]
+                        : [];
+
+                  if (runs.length === 0) {
+                    return (
+                      <div className="p-3 bg-surface-container-low rounded flex items-center justify-between font-label-sm text-label-sm border border-outline-variant/20">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-outline" />
+                          <span className="text-on-surface font-medium">
+                            {selectedDrawerResource.status ===
+                            'READY_TO_PROCESS'
+                              ? 'Queued for processing'
+                              : selectedDrawerResource.status === 'FAILED'
+                                ? 'Processing failed'
+                                : 'Uploaded document'}
+                          </span>
+                        </div>
+                        <span className="text-on-surface-variant">
+                          {selectedDrawerResource.status === 'READY_TO_PROCESS'
+                            ? 'Not started'
+                            : selectedDrawerResource.status === 'FAILED'
+                              ? 'Failed'
+                              : 'Pending'}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  return runs.map((run, idx) => {
+                    let elapsedStr = '—';
+                    if (run.started_at && run.completed_at) {
+                      const ms =
+                        new Date(run.completed_at).getTime() -
+                        new Date(run.started_at).getTime();
+                      elapsedStr = `${(Math.max(ms, 0) / 1000).toFixed(1)}s elapsed`;
+                    } else if (run.started_at && run.status === 'RUNNING') {
+                      const ms =
+                        Date.now() - new Date(run.started_at).getTime();
+                      elapsedStr = `${(Math.max(ms, 0) / 1000).toFixed(1)}s (running)`;
+                    } else if (run.status === 'PENDING') {
+                      elapsedStr = 'Queued';
+                    }
+
+                    const dotClass =
+                      run.status === 'READY'
+                        ? 'bg-secondary'
+                        : run.status === 'FAILED'
+                          ? 'bg-error'
+                          : 'bg-primary animate-pulse';
+
+                    const runTitle =
+                      runs.length > 1 ? `Run #${runs.length - idx}` : 'Run #1';
+
+                    const runSub =
+                      run.status === 'READY'
+                        ? 'Extraction & chunking complete'
+                        : run.status === 'FAILED'
+                          ? 'Extraction failed'
+                          : run.status === 'RUNNING'
+                            ? 'Extraction in progress'
+                            : 'Queued';
+
+                    return (
+                      <div key={run.id || idx} className="space-y-1">
+                        <div className="p-3 bg-surface-container-low rounded flex items-center justify-between font-label-sm text-label-sm border border-outline-variant/20">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`w-2 h-2 rounded-full ${dotClass}`}
+                            />
+                            <span className="text-on-surface font-medium">
+                              {runTitle} ({runSub})
+                            </span>
+                          </div>
+                          <span className="text-on-surface-variant font-mono">
+                            {elapsedStr}
+                          </span>
+                        </div>
+                        <div className="px-3 text-[11px] font-label-sm text-outline flex justify-between">
+                          <span>
+                            Started:{' '}
+                            {run.started_at
+                              ? new Date(run.started_at).toLocaleTimeString()
+                              : new Date(
+                                  selectedDrawerResource.created_at,
+                                ).toLocaleTimeString()}
+                          </span>
+                          <span>
+                            Completed:{' '}
+                            {run.completed_at
+                              ? new Date(run.completed_at).toLocaleTimeString()
+                              : run.status === 'RUNNING'
+                                ? 'In progress'
+                                : run.status === 'READY'
+                                  ? 'Complete'
+                                  : '—'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
           </div>

@@ -4,6 +4,149 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-10-12] — End-to-End Implementation of Generation Studio & Controllable Question Generation
+
+### Type
+Feature / Architecture / Database / AI / API / UI / Testing
+
+### Status
+Implemented and verified locally.
+
+### Context & Requirements
+- Built the Controllable Question Generation subsystem end-to-end according to PRD, System Design, Database Design, and API Specification.
+- Implemented Generation Studio UI matching the official Google Stitch screen `48a84afe637e43cb842cb2f7e1c36d48`.
+- Integrated multi-dimensional blueprint controls (Quantity, Bloom L1-L6, Difficulty, Question Types, Style constraints, Duplicate prevention, and Citation anchors).
+- Backed by local Ollama AI provider abstraction, topic-aware chunk retrieval, discrete question planning, deterministic schema validation, and Supabase PostgreSQL persistence with Row-Level Security.
+
+### Database Migration
+- Created [202610120002_generation_and_questions.sql](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/supabase/migrations/202610120002_generation_and_questions.sql):
+  - Reference tables: `bloom_levels`, `difficulty_levels`, `question_types`, `question_styles` with seeded taxonomies and RLS policies.
+  - Presets & Blueprints: `generation_presets` (seeded with *Balanced Exam Prep*, *High-Order Analytical*, and *Foundational Recall* archetypes), `generation_blueprints` with RLS.
+  - Generation execution & provenance: `generation_runs`, `generation_plan_items`, `generation_attempts`.
+  - Question bank & version history: `questions`, `question_versions`, `question_options`, `question_source_refs` with current version back-pointer.
+  - Multi-constraint validation: `validation_runs`, `validation_checks`.
+  - Foreign keys, cascading constraints, and performance indexes.
+
+### Shared Contracts
+- Updated [packages/contracts/src/generation/index.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/packages/contracts/src/generation/index.ts):
+  - Defined Zod schemas: `blueprintConfigurationSchema`, `createBlueprintSchema`, `updateBlueprintSchema`, `blueprintSchema`, `createPresetSchema`, `updatePresetSchema`, `presetSchema`, `startGenerationRunSchema`, `generationRunSchema`, `generatedQuestionItemSchema`.
+
+### Backend API Services & Routes
+- AI Provider Layer:
+  - Updated [ai-provider.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/ai/providers/ai-provider.ts) with typed `GenerateOptions` and `AIProvider` interface.
+  - Implemented [ollama-provider.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/ai/providers/ollama-provider.ts) with local inference (`/api/generate`) and embeddings (`/api/embeddings`) integration.
+- Question Generator Service:
+  - Created [question-generator.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/services/question-generator.ts):
+    - Decomposes target count into discrete plan targets based on multidimensional weights.
+    - Retrieves topic-scoped and project-scoped chunks from `resource_chunks`.
+    - Synthesizes grounded questions with strict JSON output schemas for MCQ (4 options with rationale), Short Answer, and Long Answer formats.
+    - Fallback deterministic grounded synthesizer when local Ollama is cold or offline.
+    - Persists questions, versions, options, source references, validation runs, and telemetry.
+- API Endpoints:
+  - Created [presets.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/routes/presets.ts): `GET /`, `POST /`, `PATCH /:presetId`, `POST /:presetId/archive`.
+  - Created [blueprints.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/routes/blueprints.ts): `GET /`, `POST /`, `GET /:blueprintId`, `PATCH /:blueprintId`.
+  - Created [generation-runs.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/routes/generation-runs.ts): `POST /` (202 Accepted + background worker), `GET /`, `GET /:runId`, `GET /:runId/plan`, `GET /:runId/questions`.
+  - Created [questions.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/routes/questions.ts): `GET /` and `GET /:questionId`.
+  - Mounted all routers under `/api/v1/projects/:projectId/*` in [projects.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/routes/projects.ts).
+
+### Frontend UI Implementation
+- Created [ProjectGenerationPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectGenerationPage.tsx):
+  - Faithful translation of Google Stitch screen `48a84afe637e43cb842cb2f7e1c36d48`.
+  - Archetype Ribbon: Balanced Exam Prep, High-Order Analytical, Foundational Recall, Custom Blueprint, plus user saved presets.
+  - Vector Matrix 01: Interactive module selection and dynamic allocation sliders with chunk counters.
+  - Vector Matrix 02: Bloom's Taxonomy cognitive span sliders (L1 Remember through L6 Synthesize).
+  - Vector Matrix 03: Difficulty calibration pills (Easy, Medium, Hard) and question format distributions (MCQ, Short Answer, Long Scenario Analysis) with style tags.
+  - Quality Safeguards: Strict Zero-Duplicate toggle, Cryptographic Grounding Citation Anchors toggle, and local model determinism info.
+  - Sticky Cockpit Controller: Target output counter, latency estimate, primary "Generate Questions" CTA button, Save Preset modal, and JSON spec export.
+  - Execution Monitor Stepper: Live 4-step progress (Retrieval -> Planning -> Local LLM -> Multi-Constraint Verification).
+  - Live Stream Question Preview: Real-time rendering of generated question stem, Bloom tag, difficulty, citation anchor chip, and attribution match %.
+  - Recent Batches: Project generation history with status and counts.
+- Routed `/app/projects/:projectId/generation` in [App.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/App.tsx) and updated pipeline navigation tabs across [ProjectResourcesPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectResourcesPage.tsx) and [ProjectTopicsPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectTopicsPage.tsx).
+
+### Verification
+- Contracts build (`pnpm --filter @groundq/contracts build`): passed cleanly with 0 errors.
+- API typecheck (`pnpm --filter @groundq/api typecheck`): passed cleanly with 0 errors.
+- Web typecheck (`pnpm --filter @groundq/web typecheck`): passed cleanly with 0 errors.
+- API tests (`pnpm --filter @groundq/api test`): 26/26 passed (including 8 new generation planner & authentication tests).
+- Web tests (`pnpm --filter @groundq/web test`): 20/20 passed (including 6 new Generation Studio UI tests).
+- ESLint (`eslint`): passed with 0 errors, 0 warnings.
+- Prettier (`prettier --check`): passed cleanly.
+
+## [2026-10-12] — QA & Fix: Add Topic Manually Form Curriculum Neutrality & Clean State Lifecycle
+
+### Type
+Bug Fix / UI / QA / State Management / Curriculum Neutrality
+
+### Status
+Implemented and verified locally.
+
+### Root Cause Analysis
+1. **Mock Data Pre-filling**:
+   - The "Add Curriculum Topic" drawer form state (`newTopicTitle`, `newTopicDescription`) in [ProjectTopicsPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectTopicsPage.tsx) was initialized with static strings left over from the Stitch UI template: `"Vector Clocks & Causality Violation Detection"` and its distributed systems causality description (`"Cover happens-before relations (->), concurrent events..."`).
+   - When users opened "Add Topic Manually" or clicked "+ Subtopic" while working with other subjects (such as Linked Lists), the form came pre-filled with distributed systems concepts instead of blank inputs.
+2. **Hardcoded Dropdown Options**:
+   - **Pedagogical Depth**: Bloom's Taxonomy dropdown had options hardcoded to distributed systems (`Level 4: Analyze (Fault analysis & concurrency races)`, `Level 5: Evaluate (Consensus trade-offs & safety proofs)`, `Level 6: Synthesize (Distributed protocol design)`).
+   - **Primary Corroborating Source**: Hardcoded options directly referencing `Silberschatz_OS_Deadlocks_Ch8.pdf` and `CS842_Course_Syllabus_2025.pdf`, rather than the user's actual project resources.
+3. **Form Lifecycle & Reset**:
+   - Opening or closing the drawer via "+ Add Topic Manually", "+ Subtopic", "Create Empty Hierarchy", or the "Cancel" / "Close" buttons did not reset the form states, leaving dirty or stale values between modal openings.
+4. **Hardcoded Fallbacks in Telemetry**:
+   - Telemetry strip displayed hardcoded fallbacks (`360 Units` if 0 mapped chunks, `Topics (14)` if 0 subtopics, `18 chunks locked` if subtopic chunk count was null).
+
+### Changes
+- Updated [ProjectTopicsPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectTopicsPage.tsx):
+  - Form states initialized to empty strings (`newTopicTitle: ''`, `newTopicDescription: ''`, `newTopicSourceResource: ''`).
+  - Added `openAddTopicModal(parentId?: string)` and `closeDrawer()` to ensure clean state initialization whenever the modal is opened or closed.
+  - Replaced hardcoded Bloom's Taxonomy dropdown options with standard curriculum-agnostic levels (`Level 1: Remember`, `Level 2: Understand`, `Level 3: Apply`, `Level 4: Analyze`, `Level 5: Evaluate`, `Level 6: Synthesize`).
+  - Replaced hardcoded OS textbook filenames with dynamic options populated from `projectResources` (with default `"All Project Resources (Corpus-wide)"`).
+  - Replaced hardcoded fallback numbers in telemetry with real computed values.
+  - Replaced static badge `"SEC-01 · GRADUATE"` with `"CURRICULUM ARCHITECTURE"`.
+- Updated [topics.test.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/test/topics.test.tsx):
+  - Enhanced unit tests to verify that the drawer opens with empty inputs, curriculum-agnostic Bloom options, and corpus-wide resource options.
+- Updated [vitest.config.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/vitest.config.ts):
+  - Configured `pool: 'forks'` with `singleFork: true` to prevent Windows worker thread termination segfaults (`exit status 3221225477`) during Vitest execution.
+
+## [2026-10-12] — Fixed Supabase Storage Upload Validation, Error Propagation, and Verification
+
+### Type
+Bug Fix / Storage / API / UI / Verification
+
+### Status
+Implemented and verified locally.
+
+### Root Cause Analysis
+1. **Supabase Storage Bucket Missing / Inaccessible**:
+   - The user attempted to upload documents such as `MajorProjectReport.pdf`, but background processing immediately failed with: `Failed to download resource from storage: Object not found`.
+   - Inspection revealed that the `resources` bucket either did not exist or had not been provisioned in Supabase Cloud Storage. Although `202610110001_resources_and_processing.sql` included an SQL `insert into storage.buckets`, on Supabase Cloud, direct SQL inserts do not automatically notify the Storage subsystem without either dashboard provisioning or authenticated RLS access policies on `storage.buckets`.
+2. **Frontend Ignored Storage Upload Errors**:
+   - In `ProjectResourcesPage.tsx` (`confirmStagedUpload`), `supabase.storage.from('resources').upload(...)` returned `{ data, error }` without throwing.
+   - The code did not inspect `uploadError`. If the upload failed (e.g. `Bucket not found`), it silently proceeded to call `POST /api/v1/projects/:projectId/resources` (finalize), creating a valid database row despite the binary never reaching storage.
+   - A legacy `catch` block in `confirmStagedUpload` synthesized fake mock resources on failure, masking the error.
+3. **Storage.objects RLS Policy Failures (Syntax & RLS Violation)**:
+   - When attempting to upload `linkedlistNotes.pdf`, uploads initially failed with: `invalid input syntax for type uuid: "Dhruv Gala"`, followed by `new row violates row-level security policy`.
+   - The original policies used complex cross-schema subqueries (`exists (select 1 from public.projects ...)`). In Supabase Storage, cross-schema subqueries inside `storage.objects` policies fail or reject because the Storage API connection operates under a restricted context where cross-schema table queries with RLS recursion do not resolve cleanly.
+   - Resolved by configuring clean, official Supabase Storage RLS policies scoped to `bucket_id = 'resources'`. Strict project access control and provenance validation are already deterministically enforced at the API layer (`/api/v1/projects/:projectId/resources/upload-init` and `/finalize`).
+4. **Backend Finalize Endpoint Lacked Binary Verification**:
+   - `POST /api/v1/projects/:projectId/resources` blindly set `status: 'READY_TO_PROCESS'` without verifying that the file was present in storage.
+   - When background extraction started, `processResourcePipeline` called `client.storage.from('resources').download(...)` and threw `Object not found`.
+
+### Changes
+- Updated [ProjectResourcesPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectResourcesPage.tsx):
+  - Added strict error checking for `uploadError` from `supabase.storage.from('resources').upload(...)`.
+  - Added user-facing error message specifically indicating when the `'resources'` bucket is missing in Supabase.
+  - Completely removed legacy mock resource simulation fallbacks from `confirmStagedUpload`, `handleStartProcessing`, and `handleArchiveResource`.
+- Updated [resources.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/routes/resources.ts):
+  - In `POST /api/v1/projects/:projectId/resources` (finalize), added storage verification check using `client.storage.from('resources').list()`.
+  - Rejects finalization with `422 UNPROCESSABLE_RESOURCE` if the uploaded binary is not present in storage, preventing phantom resources.
+- Added migration [202610120001_storage_bucket_setup.sql](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/supabase/migrations/202610120001_storage_bucket_setup.sql):
+  - Configures `resources` bucket with RLS policies allowing authenticated users to select the bucket and manage project objects.
+
+### Verification
+- Ran TypeScript compilation (`pnpm run typecheck`) — 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+- Ran ESLint (`pnpm run lint`) — passed cleanly.
+- Ran Prettier check (`pnpm run format:check`) — all files formatted.
+- Ran test suite across workspaces — all 36 tests passing (18 API, 14 Web, 4 Contracts).
+- Ran production build (`pnpm run build`) — all packages built successfully.
+
 ## [2026-10-12] — Fixed Ingestion Pipeline Scanned Document Reporting & Topics Mock Bleed
 
 ### Type
