@@ -14,8 +14,10 @@ const envSchema = z.object({
   WEB_ORIGIN: z.string().url().default('http://localhost:5173'),
   SUPABASE_URL: optionalString.pipe(z.string().url().optional()),
   SUPABASE_ANON_KEY: optionalString,
+  GEMINI_API_KEY: optionalString,
+  GEMINI_MODEL: z.string().default('gemini-flash-latest'),
   OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),
-  OLLAMA_MODEL: z.string().optional(),
+  OLLAMA_MODEL: z.string().default('qwen2.5:7b'),
   EMBEDDING_MODEL: z.string().default('nomic-embed-text'),
 });
 

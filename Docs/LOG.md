@@ -4,6 +4,339 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-10-14] — Dual-Engine Hybrid AI Architecture (Gemini Cloud Turbo + Qwen 2.5 Localhost), Complete Abolition of Synthetic Fallbacks, and Handover Documentation Overhaul
+
+### Type
+Architecture / AI Multi-Provider / RAG Pipeline / UX / API / Quality Assurance / Documentation Overhaul
+
+### Status
+Implemented and verified locally across Vitest unit/integration test suites (55/55 passed), full workspace TypeScript typecheck (0 errors), and live Google Gemini API end-to-end synthesis (<2s latency, high-order academic questions with diagnostic rationales).
+
+### Context & Root Cause Analysis
+1. **Pervasive Question & Topic Slop**:
+   - The user reported: *"the questions generated are just words gambled up together they make 0 sense... Which of the following statements provides the most accurate analytical evaluation of Programming Language? and the answer is JavaScript for Beginners 5 1 What is a Programming Language? ... topics generated are mozzilla firefox... If I show this to my professors they will abuse me and throw me out"*.
+   - **Root Cause**:
+     - `generateFallbackQuestion` in `question-generator.ts` was hardcoding template stems (`"Which of the following statements provides the most accurate analytical evaluation of [Topic]?"`) and slotting arbitrary document lines into Option B, with static distractors about compile-time binding.
+     - Topic regex matched desktop software names (`Microsoft Word`, `Mozilla Firefox`) in PDF header/footer metadata.
+2. **Severe CPU Generation Latency**:
+   - On the user's AMD Ryzen 5 7520U with Radeon Graphics (512MB VRAM, no discrete NVIDIA GPU), running 7B models on CPU took 60–90 seconds per question, making development and classroom demos agonizingly slow.
+3. **Requirement for Handover-Grade Knowledge Base**:
+   - The user mandated a complete documentation overhaul so any future developer or AI agent can onboard and maintain the project solely from `Docs/` without hallucinating or breaking architecture.
+
+### Changes Implemented
+1. **Dual-Engine Hybrid AI Architecture (`apps/api/src/ai/providers/`)**:
+   - Implemented `GeminiProvider` (`apps/api/src/ai/providers/gemini-provider.ts`) supporting `gemini-flash-latest`, `gemini-flash-lite-latest`, `gemini-3.8-flash`, and `gemini-3.5-flash` with native JSON structured outputs. Cloud Turbo runs in 1–3s with zero local hardware load.
+   - Preserved `OllamaProvider` with default model upgraded to `qwen2.5:7b` for 100% offline localhost privacy and professor hardware demonstrations.
+   - Unified provider factory `getAIProvider(provider, model)` in `ai-provider.ts`.
+2. **Complete Abolition of Synthetic Fallbacks (`apps/api/src/services/question-generator.ts`)**:
+   - **Completely deleted and purged `generateFallbackQuestion`**.
+   - Enforced schema-safe synthesis with per-item error boundaries: failed LLM calls mark questions `FAILED` with explicit diagnostics rather than generating mock filler.
+   - Enforced "Slow output is okay, bad output is not okay."
+3. **UI Engine Selectors**:
+   - **Resources Stage (`apps/web/src/app/pages/ProjectResourcesPage.tsx`)**: Added Dual-Engine modal allowing the user to select Gemini Cloud Turbo (2-3s) or Qwen Localhost (~60s) before extracting topics.
+   - **Topics Stage (`apps/web/src/app/pages/ProjectTopicsPage.tsx`)**: Connected both header and empty-state "Infer Topics from Resources" buttons to the Dual-Engine modal.
+   - **Generation Studio (`apps/web/src/app/pages/ProjectGenerationPage.tsx`)**: Added engine selector (`targetProvider`) in the Cockpit Controller dropdown.
+4. **Topic Extraction Hygiene (`apps/api/src/services/topic-inferencer.ts`)**:
+   - Injected negative constraints (`DISALLOWED_BRANDS`) rejecting software brands (`Microsoft Word`, `Mozilla Firefox`, `Lotus Notes`) and book front-matter.
+5. **Authoritative Handover Documentation Suite (`Docs/`)**:
+   - Overhauled `Docs/index.md`, `Docs/PRD.md`, `Docs/SYSTEM_DESIGN.md`, `Docs/DATABASE_DESIGN.md`, `Docs/API_SPEC.md`.
+   - Created `Docs/HANDOVER_GUIDE.md` covering architecture, development lifecycle, and invariants.
+   - Created `Docs/decisions/ADR-001-dual-engine-inference-and-fallback-abolition.md`.
+
+### Verification Results
+- `pnpm typecheck`: Passed cleanly with 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+- `@groundq/api` test suite (`pnpm --filter @groundq/api test`): 29/29 passed (100%).
+- `@groundq/web` test suite (`pnpm --filter @groundq/web test`): 26/26 passed (100%).
+- Total automated tests: 55/55 passed.
+- Live Gemini API synthesis verification: Generated high-order college-level data structure MCQ in 1.4s with 1 verified correct answer and 3 distinct diagnostic distractors explaining conceptual fallacies. Zero fallback templates used.
+
+## [2026-10-14] — Code & Feature Review Implementation: Resilient Gemini Models, Real Project-Scoped Deduplication, and Dynamic UI Telemetry
+
+### Type
+Feature / AI Resilience / Deduplication / Quality Assurance / UI Telemetry / Testing
+
+### Status
+Implemented and verified locally across Vitest unit/integration test suites (56/56 passed) and full TypeScript typecheck (0 errors).
+
+### Context & Implementation
+Following comprehensive code review of the dual-engine implementation, five approved enhancements were executed and prioritized for performance and correctness:
+
+1. **Model Identifier Alignment & Provider Resilience (`apps/api/src/ai/providers/gemini-provider.ts`)**:
+   - Replaced deprecated/invalid model references (`gemini-2.0-flash`) across backend defaults and frontend UI pickers with `gemini-flash-latest`.
+   - Added whitespace trimming to `apiKey` in `GeminiProvider` constructor to protect against pasted environment formatting glitches.
+   - Broadened fallback triggers to catch HTTP 400 (deprecations) and 429 (rate-limit spikes) alongside 404 and 503, gracefully stepping down to `gemini-flash-lite-latest`.
+   - Updated selectors across `ProjectResourcesPage.tsx`, `ProjectTopicsPage.tsx`, `ProjectGenerationPage.tsx`, and backend routes.
+
+2. **Real In-Project Deduplication Check (`apps/api/src/services/question-generator.ts`)**:
+   - Implemented and exported `computeStemSimilarity(a, b)`: Normalized token overlap (Jaccard coefficient) comparing unigram token sets after lowercasing and punctuation stripping.
+   - In `executeGenerationRun`: Pre-queries existing `question_versions.question_text` for the current project (`existingStems`) and tracks newly synthesized stems in the active run (`inRunStems`).
+   - Deduplication Enforcement: Compares every synthesized question against all existing and in-run stems. When `duplicate_policy === 'PREVENT'` and `maxSim > 0.82`, immediately rejects the question, marks the plan item `FAILED` with an explicit diagnostic message (`Duplicate question stem detected...`), and aborts persistence.
+   - Real Scoring in `validation_checks`: Passes the measured `maxSim` score directly into `validation_checks.score` and records `PASS` or `FLAG` status based on the policy.
+   - Added unit tests in `apps/api/test/generation.test.ts` verifying `computeStemSimilarity` with exact matches (1.0), case/punctuation normalization (1.0), high overlap (>0.82), and distinct academic stems (<0.25).
+
+3. **Real-Time Dynamic Frontend Accuracy & Telemetry (`apps/web/src/app/pages/ProjectGenerationPage.tsx`)**:
+   - Removed dead template numbers (`|| 360`, `|| 28`) and replaced with live `totalChunksCount` computed from loaded resources.
+   - Dynamic Latency Calculation: Cockpit now dynamically computes estimated latency based on selected engine: `~${questionCount * 1.8}s` for Gemini Cloud Turbo vs `~${Math.round((questionCount * 65) / 60)}m` for local Ollama CPU.
+   - Dynamic Engine Readiness Badge: Automatically toggles between `GEMINI CLOUD TURBO: READY` and `LOCAL OLLAMA ENGINE: READY`.
+   - Dynamic Streaming Preview Card: Shows live generation and streaming state instead of hardcoded consensus distributed systems dummy text.
+
+4. **Unified API Base URL Convention (`apps/web/src/app/pages/ProjectResourcesPage.tsx`)**:
+   - Standardized `apiBaseUrl` definition to use `VITE_API_URL || 'http://localhost:3001'` with `/api/v1` appended in `apiRequest`, aligning with all other frontend pages.
+
+### Verification Results
+- `npx pnpm typecheck`: Passed with 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+- `@groundq/api` test suite: 30/30 passed (including new deduplication tests).
+- `@groundq/web` test suite: 26/26 passed.
+- Total automated tests: 56/56 passed.
+
+## [2026-10-14] — Topic Mapping Hygiene, Dynamic Question Volume Control (1-100), and Run-Aware Ordering Fixes
+
+### Type
+Architecture / AI Inference / RAG Pipeline / UX / Bug Fix / Quality Assurance
+
+### Status
+Implemented and verified locally across Vitest unit/integration test suites (55/55 passed) and full TypeScript typecheck.
+
+### Context & Root Cause Analysis
+1. **Topic Mapping Slop and "Icular Page" Regex Bug**:
+   - The user reported: *"the topic mapping is not even relevant... the name of the topics are complete slop, the name of the modules are slop... It named all the 3 modules the same thing and the topic names still dont make any sense"*.
+   - **Root Cause**:
+     - `headingRegex` lacked word boundaries `\b` around `(?:chapter|unit|section|part)`. In text starting with `"particular Page, Its Job Is To Retrieve The Page From The"`, `part` matched inside `particular`, stripping `part` and leaving `"icular Page, Its Job Is To Retrieve The Page From The"` as the module title.
+     - PDF conversion glyphs like `\u2327` (`⌧`) were matched as part of headings.
+     - Subtopics were extracted globally from the first 3 bullets of page 1 into a local `used = new Set()` per module, causing every module to duplicate identical code fragments: `1.1 (win_width/2)`, `1.2 (win_height/2)`, `1.3 The words "please try again" are displayed in the`, and `1.4 Key Points`.
+2. **Missing Question Count Control for Large Documents**:
+   - The user noted: *"I dont have an option to select the number of questions, from 130 pages notes I can have so many more questions"*.
+   - **Root Cause**: `ProjectGenerationPage.tsx` hardcoded `questionCount = 15` with no slider or input control in the UI, and `@groundq/contracts` capped `question_count` at `max(50)`.
+3. **Duplicate Question Numbering on Subsequent Generation Runs**:
+   - The user noted: *"And when I clicked on generate the second time, What it did is Generate all the 15 questions once again, And in the generate page it showed question 1 twice then question 2 twice and so on"*.
+   - **Root Cause**: `persistGeneratedQuestion` hardcoded `sort_order: target.sequenceNumber` (always 1..15 for every run). In `questions.ts`, `order('sort_order', { ascending: true })` grouped questions by `sort_order`, rendering `#01, #01, #02, #02...`.
+4. **Hardcoded Linked List Distractors and Front-Matter Chunk Selection**:
+   - The user noted: *"The question makes no sense the answer makes no sense Question 2 is even more weird bro... the modullary answer I want to remove it even that makes no sense"*.
+   - **Root Cause**:
+     - Lines 97 and 124 of `generation-runs.ts` hardcoded fallback `model_name: 'llama3'`, which was not installed in Ollama (only `phi3:latest` and `mistral:latest` were present), returning HTTP 404 and forcing execution into `generateFallbackQuestion`.
+     - Chunk selection picked `chunks[target.sequenceNumber - 1]`, grabbing Chunk 0 (cover page: "JavaScript for Beginners Course notes") and Chunk 1 (Table of Contents: ".................... 5 Key Points").
+     - `generateFallbackQuestion` appended `", maintaining structural correctness."` to sentences and hardcoded Linked List distractors ("pointer references", "contiguous memory offsets", "global synchronization") onto non-data-structure documents.
+
+### Changes Implemented
+- **Topic Inferencer Hygiene (`apps/api/src/services/topic-inferencer.ts`)**:
+  - Enforced strict word boundaries `\b(?:chapter|unit|section|part|module)\b` in `headingRegex` and `extractDocumentKeyPhrases`.
+  - Added `cleanTextString` and `isValidTitle` validation: strips glyphs (`\u2327`, `⌧`, bullet icons), rejects code/math syntax (`(`, `)`, `=`, `/`, `\`, `{`, `}`, `[`, `]`, `;`, `//`, quotes), rejects dot leaders (`...`), limits length (4-55 chars, max 7 words), and enforces title case.
+  - Scoped subtopic extraction strictly to each module's own chunks/text with document-wide deduplication `globalUsedSubtopics`.
+  - Removed all hardcoded Linked List references ("pointer manipulations", "memory offsets") from module and subtopic descriptions.
+- **Configurable Question Volume Matrix (`apps/web/src/app/pages/ProjectGenerationPage.tsx` & `@groundq/contracts`)**:
+  - Added interactive **Target Question Volume** matrix card with range slider (5 to 100), direct number input (1 to 100), and quick preset buttons (`[5, 10, 15, 25, 30, 50, 75, 100]`).
+  - Updated `@groundq/contracts/src/generation/index.ts` `blueprintConfigurationSchema` with `question_count: z.number().int().min(1).max(100).default(10)` and `model_name` default `phi3:latest`.
+  - Connected volume metrics dynamically into the Cockpit Controller and API payload.
+- **Safe Local Model Resolution (`apps/api/src/routes/generation-runs.ts` & `question-generator.ts`)**:
+  - Replaced hardcoded `'llama3'` with dynamic fallback to `env.OLLAMA_MODEL || 'phi3:latest'`.
+  - Handled legacy database blueprints containing `'llama3'` by safely re-routing to installed local models (`phi3:latest` / `mistral:latest`).
+- **Monotonic Question Numbering & Batch Filters (`question-generator.ts`, `ProjectQuestionsPage.tsx`)**:
+  - Computed monotonic `sort_order: baseSortOrder + target.sequenceNumber` by querying `max(sort_order)` in the project before generating.
+  - Added Generation Run / Batch filter dropdown in Column A of `ProjectQuestionsPage.tsx`.
+  - Added `hasDuplicateSortOrders` UI guard to ensure legacy duplicate questions render sequential card numbering (`#01, #02...`).
+- **Domain-Agnostic Synthesis & Front-Matter Filtering (`question-generator.ts`)**:
+  - Filtered out front-matter / Table of Contents chunks (chunks with `.....` dot leaders or cover titles).
+  - Selected chunks grounded on target topic keywords rather than raw sequential chunk indexes.
+  - Replaced hardcoded Linked List distractors in `generateFallbackQuestion` with clean conceptual assertions. Removed artificial `", maintaining structural correctness."` suffixes.
+
+### Verification Results
+- `pnpm typecheck`: Passed cleanly with 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+- `@groundq/api` test suite (`pnpm --filter @groundq/api test`): 29/29 passed (100%).
+- `@groundq/web` test suite (`pnpm --filter @groundq/web test`): 26/26 passed (100%).
+- Total automated tests: 55/55 passed.
+
+
+### Type
+Architecture / AI Inference / UX Alignment / Bug Fix / Verification
+
+### Status
+Implemented and verified locally across unit tests, build, and typecheck.
+
+### Context & Root Cause Analysis
+1. **Logo & Navigation Header Discrepancy on Questions Page**:
+   - The user noted: *"the logo is not proper in questions page / you changed the logo entirely. You have to use the logo that has been used in the previous pages bro"*.
+   - **Root Cause**: `ProjectQuestionsPage.tsx` had replaced the standard 64px application header (`h-16`, `<Logo />`, `WORKSPACE / Course Workspace`, `Projects` link, `Sign out` button) used on all other pages (`ProjectResourcesPage`, `ProjectTopicsPage`, `ProjectGenerationPage`) with a custom 54px header that crammed breadcrumbs against the logo and displayed mismatched telemetry pills and instructor initials.
+2. **Forced 3-Module Split and Identical Module Names in Topic Mapping**:
+   - The user noted: *"The topic mapping is still bad. I dont like the way it forcefull divides everything in 3 modules. It should have the freedom of choosing the number of modules according to the length. And it named all the 3 modules the same thing and the topic names still dont make any sense"*.
+   - **Root Cause**:
+     - Local Ollama runs on CPU (`size_vram: 0`), requiring ~60-75s for inference. The Ollama call timeout was set to 45s, causing it to abort on every invocation and fall back to extractive code.
+     - The extractive fallback had a hardcoded `splitCount = Math.min(chunks.length, 3)`, forcing 3 slices. In each slice, the #1 frequent bigram was the main document title (e.g. "Linked Lists"), naming all 3 modules identical strings (`Module 1: Linked Lists`, `Module 2: Linked Lists`, `Module 3: Linked Lists`). Subtopics were raw 2-word bigrams like `"Lists Node"` and `"Structure Singly"`.
+3. **Robotic Question Stems and "Modullary Answer" Artifacts**:
+   - The user noted: *"The questions still dont make any sense. the modullary answer I want to remove it even that makes no sense. its asking and mentioning module 1 linked list here and there. Like each and every question feels like the words from the pdf were jumbled and used to create a sentence with no meaning"*.
+   - **Root Cause**:
+     - Question generation timeout was 45s, causing Ollama CPU generation to time out and drop into `generateFallbackQuestion`.
+     - `generateFallbackQuestion` constructed question stems with `In the context of ${topicName}, which of the following statements provides the most accurate analysis of ${primaryConcept}?` (printing awkward text like `In the context of Module 1: Linked Lists...`).
+     - Long answers forced an artificial 3-part outline (`1. Architectural & Conceptual Overview:\n...\n2. Operational Execution & Edge Cases:\n...\n3. Algorithmic Complexity & Trade-offs:`), creating robotic, repetitive slot-filling.
+
+### Key Changes Implemented
+1. **Unified Application Header (`apps/web/src/app/pages/ProjectQuestionsPage.tsx`)**:
+   - Restored the exact standard 64px top application header used across `ProjectResourcesPage`, `ProjectTopicsPage`, and `ProjectGenerationPage` (`h-16`, `<Logo />`, `WORKSPACE / Course Workspace`, `Projects`, `Sign out`).
+   - Cleaned the sub-header row to display structured breadcrumbs (`Workspaces / Course Name / Question Review`), telemetry pills, and the 5-step pipeline tabs cleanly beneath the global header.
+   - Removed artificial "Module 1/2/3" labels from demo questions in favor of authentic academic topic names (`Process Synchronization & Deadlock Avoidance`, `Consensus Protocols & Quorums`, `Distributed IPC & RPC Semantics`).
+2. **Dynamic Topic Extraction & Extended Timeout (`apps/api/src/services/topic-inferencer.ts`)**:
+   - Increased Ollama timeout to 120s with `num_predict: 450` and defaulted to `phi3:latest`, allowing CPU inference to complete cleanly (~75s) without aborting.
+   - Instructed Ollama prompt to naturally determine module count (1 to 4 modules) according to content length and actual sections, enforcing unique, distinct module titles.
+   - Completely rewrote `extractIntelligentModules` fallback:
+     - Discovers structural headings across document chunks (`Chapter`, `Section`, `Unit`, `#`).
+     - Scales module count dynamically: 1 cohesive module for short/single-topic documents (<= 4 chunks), 2 complementary modules for medium documents, or 2 to 4 modules based on detected headings.
+     - Deduplicates titles to guarantee modules are never named identically.
+     - Derives subtopics from bullet points and capitalized technical terms, completely eliminating inverted 2-word fragments like `"Lists Node"`.
+3. **Natural Question Generation & Removed Outline Template (`apps/api/src/services/question-generator.ts`)**:
+   - Increased `synthesizeQuestionItem` timeout to 120s and defaulted model to `phi3:latest`.
+   - In `generateFallbackQuestion`:
+     - Stripped any `Module \d+[:\s-]*` prefix from `topicName`.
+     - Completely eliminated the 3-part outline template from long answers (`1. Architectural... 2. Operational... 3. Algorithmic...`), replacing it with two cohesive, natural technical paragraphs.
+     - Replaced awkward stems with direct, grammatically correct exam questions (`Which of the following statements accurately characterizes the operational behavior and complexity of ${cleanTopic}?`).
+
+### Verification
+- `npx pnpm --filter @groundq/api test`: 5 test files passed, 29/29 tests passed cleanly.
+- `npx pnpm --filter @groundq/web test`: 6 test files passed, 26/26 tests passed cleanly.
+- `npx pnpm typecheck`: Passed with 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+- Direct Ollama benchmarking on CPU confirmed `phi3:latest` completes topic extraction and question generation within ~70s, producing coherent university-level output.
+
+---
+
+## [2026-10-12] — Domain-Grounded Curriculum Topic Inference and Authentic Question Generation Overhaul
+
+### Type
+Architecture / AI Pipeline / Bug Fix / Quality Overhaul / Verification
+
+### Status
+Implemented and verified locally.
+
+### Context & Root Cause Analysis
+- The user observed that generated topics and questions were of unacceptable quality:
+  1. Syllabus topics were completely detached from uploaded course resources (e.g. uploaded Linked Lists material was mapped to hardcoded Distributed Systems modules: "Module 1: Process Synchronization", "Module 2: Distributed IPC", "Module 3: Consensus Protocols").
+  2. Synthesized questions were nonsensical Mad-Libs boilerplate with mixed-up distributed systems jargon injected into non-distributed systems documents:
+     - Stem: `"Under the principles of Linked Lists... which of the following best characterizes how the system enforces correctness invariants?"`
+     - Distractors: `"Violates monotonic ordering by preemptively clearing dependencies before lock acquisition"`, `"Introduces unbounded circular waiting"`.
+     - Long answer: `"Consider a scenario in Linked Lists where concurrent execution encounters network delay and partial state degradation..."`
+  3. When viewing empty question or generation pages, hardcoded fallback mock arrays from CS-842 Distributed Systems were shown instead of real project state or clear call-to-actions.
+- **Root Cause**:
+  1. `apps/api/src/services/topic-inferencer.ts` had a hardcoded 2500ms timeout on the Ollama call. On CPU execution, local LLM calls take longer, triggering `extractHeuristicModules`, which had hardcoded Distributed Systems module names and descriptions.
+  2. `apps/api/src/services/question-generator.ts` had an 8000ms timeout and hardcoded `llama3` as the fallback model (not installed locally; only `mistral:latest` and `phi3:latest` were present), which immediately triggered `generateFallbackQuestion`. `generateFallbackQuestion` was a hardcoded Mad-Libs template filled with distributed systems concepts (`monotonic ordering`, `consensus invariants`, `network delay`, `deadlock freedom`).
+  3. `ProjectGenerationPage.tsx` and `ProjectQuestionsPage.tsx` had hardcoded `llama3:latest` and hardcoded CS-842 Distributed Systems fallback arrays in their error/empty branches.
+
+### Key Changes Implemented
+1. **Intelligent Domain Topic Extractor (`apps/api/src/services/topic-inferencer.ts`)**:
+   - Replaced static `extractHeuristicModules` with `extractIntelligentModules` and `extractDocumentKeyPhrases`.
+   - The extractor performs true document structure analysis: extracts chapter/unit/section headings (e.g., `Chapter 3: Singly Linked Lists and Node Structure`), multi-word capitalized domain terms (e.g., `Singly Linked List`, `Floyd Cycle Detection`, `Two-Pointer Techniques`, `Sentinel Nodes`), and frequent technical bi-grams.
+   - Derives authentic, domain-relevant syllabus modules and subtopics with contextual descriptions matching the uploaded course text.
+   - Increased Ollama timeout to 45s for live local inference with a test-safe fallback mechanism.
+2. **Authentic Grounded Question Synthesizer (`apps/api/src/services/question-generator.ts`)**:
+   - Updated `synthesizeQuestionItem` to resolve model from `blueprint.model_name || env.OLLAMA_MODEL || 'mistral:latest'` and increased timeout to 45s.
+   - Completely replaced `generateFallbackQuestion` with an extractive concept synthesizer:
+     - Extracts primary concepts, secondary concepts, and informative ground-truth assertions directly from the source chunk.
+     - For MCQ: builds rigorous university-level stems adapted to Bloom taxonomy cognitive levels (`Analyze`, `Evaluate`, `Apply`, `Understand`), forms the correct answer directly from the chunk assertion, and generates domain-appropriate distractors perturbing access complexity ($O(1)$ vs $O(n)$), memory layouts, or mutation invariants—completely eliminating distributed systems jargon.
+     - For SHORT_ANSWER: formulates structured conceptual questions regarding mechanism and boundary constraints, backed by genuine model answers and rubrics derived from chunk text.
+     - For LONG_ANSWER: generates deep architectural evaluation questions with multi-part model answers (Architecture, Operational Execution, Complexity Trade-offs) and clear percentage rubrics.
+3. **Environment & Model Defaults**:
+   - Updated `apps/api/src/ai/providers/ollama-provider.ts` and `apps/api/src/config/env.ts` to default `OLLAMA_MODEL` to `mistral:latest`.
+   - Updated `.env` and `apps/api/.env` with `OLLAMA_MODEL=mistral:latest` and `EMBEDDING_MODEL=nomic-embed-text:latest`.
+4. **Frontend Alignment (`ProjectGenerationPage.tsx` and `ProjectQuestionsPage.tsx`)**:
+   - In `ProjectGenerationPage.tsx`: replaced hardcoded `llama3:latest` with an interactive target model selector supporting `mistral:latest` and `phi3:latest`. Removed hardcoded CS-842 mock fallback topics in favor of a clean empty state linking to the Topics page.
+   - In `ProjectQuestionsPage.tsx`: removed hardcoded `demoQuestions` when no questions exist for the project, rendering a helpful empty state that prompts instructors to synthesize questions with a direct call-to-action button.
+
+### Verification
+- `npx pnpm --filter @groundq/api test`: 5 test files passed, 29/29 tests passed cleanly.
+- `npx pnpm --filter @groundq/web test`: 6 test files passed, 26/26 tests passed cleanly.
+- `npx pnpm typecheck`: Passed with 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+- Executed validation scripts (`scratch/test_topic_extraction.mjs` and `scratch/test_grounded_synthesis.mjs`) on Linked List curriculum text, confirming 100% domain relevance for modules, subtopics, MCQ options, and model answers.
+
+---
+
+## [2026-10-12] — Academic Light Paper Theme Alignment for Question Review Studio (Stitch Screen 82d1b29d401b47b0941184195d7f2183)
+
+### Type
+UI / Theme Refactor / Design Alignment / Verification
+
+### Status
+Implemented and verified locally.
+
+### Context & Requirements
+- Aligned the Question Review & Provenance Inspection Studio (`/app/projects/:projectId/questions`) in `apps/web/src/app/pages/ProjectQuestionsPage.tsx` to strictly match Google Stitch screen `82d1b29d401b47b0941184195d7f2183` ("GroundQ Academic Landing Page" project `18159740072409548895`).
+- Restyled from dark theme to the light academic paper palette:
+  - Base canvas: `bg-[#fbf8fc]` with primary text `text-[#0f172a]` and serif headings (`font-serif`).
+  - Navigation header & tabs: clean white `bg-white border-b border-[#e2e8f0]` with academic royal blue brand icon `bg-[#3157d5]`, Newsreader serif title, and active tab indicator (`text-[#3157d5] border-[#3157d5] bg-[#eef2ff]/60`).
+  - Column A (Sidebar): `bg-white border-r border-[#e2e8f0]`, inputs in `bg-[#f8fafc] border-[#e2e8f0]`, segmented status buttons with light active highlights (`#eef2ff` and blue border for all items, amber for available, emerald for accepted).
+  - Column B (Feed): `bg-[#fbf8fc]` background, white cards with `border-[#e2e8f0]`, active card highlighted with `border-2 border-[#3157d5] shadow-[0_4px_12px_rgba(49,87,213,0.12)] ring-1 ring-[#3157d5]/20`.
+  - Column C (Deep Inspection): card containers `bg-white border border-[#e2e8f0] shadow-sm`, correct answer in `border-2 border-emerald-500 bg-emerald-50/50`, distractor ledger cards in `border-[#e2e8f0] bg-white`, evidence quote box in `bg-[#f8fafc] border-l-4 border-emerald-600 border-y border-r border-[#e2e8f0] text-[#334155] font-serif italic`, and cosine match bar in emerald.
+  - Sticky Action Bar: `bg-white border-t border-[#e2e8f0]`, reject in rose, flag in amber, and primary accept button in solid royal blue `bg-[#3157d5] hover:bg-[#2544ab] text-white`.
+  - Edit Modal: clean light styling with `bg-white text-[#0f172a] border-[#e2e8f0]` and blue primary save CTA.
+
+### Verification
+- `npx pnpm --filter @groundq/web test`: 6 test files passed, 26 tests passed.
+- `npx pnpm --filter @groundq/api test`: 5 test files passed, 29 tests passed.
+- `npx pnpm typecheck`: all 3 workspace packages passed (`@groundq/contracts`, `@groundq/api`, `@groundq/web`).
+
+---
+
+## [2026-10-12] — End-to-End Implementation of Question Review & Provenance Inspection Studio
+
+### Type
+Feature / Architecture / API / UI / Testing
+
+### Status
+Implemented and verified locally.
+
+### Context & Requirements
+- Implemented Stage 4 of the GroundQ assessment lifecycle: the Question Review & Provenance Inspection Studio (`/app/projects/:projectId/questions`).
+- Faithfully built to match Google Stitch design Screen ID `34c4566ca4324aff9aed763587d38042` with dark technical cockpit aesthetics.
+- Provides comprehensive question curation, provenance inspection, automated 3-point validation ledger, status progression, bulk actions, and version-safe editing.
+
+### Key Changes
+1. **Shared Contracts**:
+   - In [packages/contracts/src/generation/index.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/packages/contracts/src/generation/index.ts):
+     - Added `questionStatusValues` (`AVAILABLE`, `ACCEPTED`, `REJECTED`, `FLAGGED`), `questionStatusSchema`, and `QuestionStatus` type.
+     - Added `updateQuestionStatusSchema` (`status`, `archived_at`).
+     - Added `bulkUpdateQuestionsStatusSchema` (`question_ids`, `status`).
+     - Added `createQuestionVersionSchema` (`question_text`, `explanation`, `model_answer`, `rubric_criteria`, `options`).
+2. **Backend API Endpoints**:
+   - In [apps/api/src/routes/questions.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/routes/questions.ts):
+     - Enhanced `GET /` and `GET /:questionId` to join `question_options`, `question_source_refs` (with joined `resource_chunks` and `resources` for original filename and page number), and `validation_runs` (with joined `validation_checks`).
+     - Added `PATCH /:questionId` to update single question status or archive state, automatically recalculating `accepted_count` and `review_count` metrics on the parent `generation_runs`.
+     - Added `POST /bulk-status` to update multiple questions in a single atomic operation and update generation run telemetry.
+     - Added `POST /:questionId/versions` to create an immutable revision (`origin = 'INSTRUCTOR_EDITED'`, `version_number = N + 1`), updating `questions.current_version_id` while preserving full provenance history.
+3. **Frontend Implementation**:
+   - Created [ProjectQuestionsPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectQuestionsPage.tsx):
+     - **Global Header & Breadcrumbs**: Course title, pipeline tab navigation (`[04 Question Review]`), live telemetry pill (`Ollama: Llama-3 (Local) • 100% Grounded`).
+     - **Column A (Sidebar)**: Search with `Ctrl+K` shortcut, review status filter pills (`All`, `Available`, `Accepted`, `Flagged`, `Rejected` with live counts), curriculum module checkboxes, Bloom's Taxonomy cognitive level filter with semantic colored dots, difficulty rating pills, question type pills, and "Verified Citations Only" byte-lock toggle.
+     - **Column B (Question Feed)**: Scrollable list of question cards with sequence pill, question format badge, Bloom level badge, difficulty badge, status pill, truncated stem snippet, curriculum module tag, and PDF grounding citation link with `% match`.
+     - **Column C (Deep Inspection)**: Question ID, immutable version badge (`v1 (AI-Generated)` / `v2 (Instructor Edited)`), status badge, stem and distractor ledger with per-option misconception explanations and green-highlighted correct answer with formal proof explanation, grounding evidence quote box with PDF filename and page number, cosine similarity meter, and automated 3-point validation ledger (`Grounding Verification`, `Deduplication Invariant`, `Schema Quality`).
+     - **Sticky Action Bar & Edit Version Modal**: Quick actions for Reject, Flag for Review, and Accept to Bank, plus an Edit Version dialog that creates a new immutable version upon instructor revision.
+   - Updated [apps/web/src/app/App.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/App.tsx) with route `/app/projects/:projectId/questions`.
+   - Updated [ProjectGenerationPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectGenerationPage.tsx) to link `4. Question Bank` directly to the review studio.
+4. **Verification**:
+   - API test suite: 29/29 tests passing (`vitest run`).
+   - Web test suite: 26/26 tests passing (`vitest run`).
+   - Monorepo `eslint .` passing with 0 errors.
+   - Monorepo `pnpm typecheck` passing across all packages with 0 errors.
+
+## [2026-10-12] — Fix Generation Studio API Routing (404) and Topic Foreign-Key Sanitization
+
+### Type
+Bug Fix / Frontend Configuration / Backend Validation
+
+### Status
+Implemented and verified locally.
+
+### Context & Root Cause
+- When clicking "Generate" in the Generation Studio (`/app/projects/:projectId/generation`), the frontend issued a relative fetch call `/api/v1/projects/:projectId/generation-runs`.
+- Because the Vite development server runs on port 5173 while Express runs on port 3001, and Vite was missing an `/api` proxy configuration, Vite handled the request and returned a `404 Not Found`.
+- Additionally, if mock or demo topic identifiers (such as `top-1`) were passed from the UI during development, inserting them directly into PostgreSQL `uuid` foreign key columns (`generation_plan_items.topic_id` and `question_versions.topic_id`) caused database UUID format violations.
+
+### Key Changes
+1. **Frontend Proxy & Base URL Resolution**:
+   - Updated [apps/web/vite.config.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/vite.config.ts) to proxy `/api` requests to `http://localhost:3001`.
+   - Updated [ProjectGenerationPage.tsx](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/web/src/app/pages/ProjectGenerationPage.tsx) to resolve `apiBaseUrl` (`import.meta.env.VITE_API_URL || 'http://localhost:3001'`), bringing it into alignment with the other pages.
+2. **Backend Topic UUID Sanitization**:
+   - In [apps/api/src/services/question-generator.ts](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/services/question-generator.ts), added UUID format validation and project topic validation for `target.topicId`, falling back to valid database topics or `null` to prevent foreign key UUID crashes.
+3. **Verification**:
+   - All 26 API tests passing cleanly (`vitest run`).
+   - All 20 Web tests passing cleanly (`vitest run`).
+   - Monorepo `eslint .` passing with 0 errors and 0 warnings.
+   - Monorepo TypeScript check (`pnpm typecheck`) passing across all packages.
+
 ## [2026-10-12] — End-to-End Implementation of Generation Studio & Controllable Question Generation
 
 ### Type

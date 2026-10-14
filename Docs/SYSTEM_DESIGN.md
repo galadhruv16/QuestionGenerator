@@ -1,14 +1,14 @@
 # Syllabus-Grounded Controllable Question Generation
 
-## System Design & Architecture Specification — V1
+## System Design & Architecture Specification — V1.1
 
-**Document status:** Frozen for V1 implementation  
+**Document status:** Authoritative Architectural Specification  
 **Audience:** Developers, AI coding agents, reviewers, and project team  
-**Primary purpose:** Authoritative technical specification for implementing V1  
-**Deployment target:** Local application execution only  
-**AI inference target:** Local Ollama runtime  
-**Managed backend services:** Supabase Cloud  
-**Repository style:** Monorepo  
+**Primary purpose:** Authoritative technical specification for implementing and maintaining V1  
+**Deployment target:** Local application execution (Node.js/Express + Vite/React)  
+**AI inference target:** Dual-Engine AI Inference Runtime: Google Gemini Cloud Turbo (Primary) + Localhost Ollama Qwen 2.5 (Offline/Demo)  
+**Managed backend services:** Supabase Cloud (PostgreSQL, pgvector, Auth, Storage)  
+**Repository style:** Monorepo (pnpm workspaces)  
 
 ---
 
@@ -38,7 +38,7 @@ The system is a **role-neutral, authenticated question-generation platform**.
 
 The core workflow is:
 
-> User provides study resources → system processes and indexes them → user configures a multidimensional question blueprint → local LLM generates questions grounded in the provided resources → validation checks the questions → invalid questions are regenerated or sent for manual review → accepted questions are stored in the project's question bank.
+> User provides study resources → system processes and indexes them → user configures a multidimensional question blueprint → Dual-Engine AI synthesis (Gemini 2.0 Flash or Ollama Qwen 2.5) generates questions grounded in the provided resources → multi-constraint validation checks the questions → invalid questions undergo JSON self-healing or are sent for manual review → accepted questions are stored in the project's monotonic question bank.
 
 The product is intentionally **not**:
 
@@ -57,54 +57,50 @@ The product is intentionally **not**:
 
 ## 3.1 Local application execution
 
-V1 does **not** deploy the React frontend or Node backend as public production services.
-
-They run locally:
+V1 runs the React frontend and Node backend as local application services:
 
 ```text
 Browser
   ↓
-localhost React application
+localhost React application (Vite on :5173)
   ↓
-localhost Node/Express API
+localhost Node/Express API (Express on :3001)
 ```
 
-## 3.2 Local AI inference
+## 3.2 Dual-Engine AI inference architecture
 
-LLM inference is performed locally using **Ollama**.
+V1 implements a first-class **Dual-Engine AI architecture** to balance frontier speed with offline independence:
 
-No paid or cloud LLM API is required for V1.
-
-The application must not depend on a cloud LLM for its core functionality.
+1. **Google Gemini API (Cloud Turbo - Default)**:
+   - Primary model: `gemini-2.0-flash` (sub-3s generation, university-grade reasoning, strict JSON adherence).
+   - Secondary model: `gemini-1.5-flash` (high throughput fallback).
+   - Used for rapid topic inference and fast batch question generation without hardware thermal throttling.
+2. **Local Ollama (Offline / Demonstration)**:
+   - Primary model: `qwen2.5:7b` (recommended 7B model for deep instruction-following on capable hardware).
+   - Fallback model: `qwen2.5:3b` (lower resource footprint).
+   - Used for 100% offline classroom demonstrations and private on-device generation.
+3. **Local Vector Embeddings**:
+   - `nomic-embed-text` hosted locally on Ollama (768 dimensions), keeping resource chunk indexing 100% local and free.
 
 ## 3.3 Cloud-managed application services
 
-Although the application and LLM run locally, V1 may use Supabase Cloud for:
+The system utilizes Supabase Cloud for:
 
-- Authentication
-- Google OAuth
-- PostgreSQL
-- pgvector
-- Object/file storage
+- Authentication (Supabase Auth & Google OAuth)
+- PostgreSQL (Transactional application state, user ownership, monotonic question bank)
+- pgvector (Vector embeddings storage & HNSW similarity search)
+- Supabase Storage (Original PDF, DOCX, and PPTX resources)
 
-This is intentional. V1 is **local-execution**, not fully offline.
+Internet connectivity is required for Supabase services and Gemini API calls; when running Ollama offline, vector retrieval queries Supabase pgvector while inference runs locally.
 
-Therefore internet connectivity is required for Supabase services and Google OAuth.
+## 3.4 Zero synthetic slot-filling fallback policy
 
-## 3.4 V2 is separate
+Under no circumstances may the system fall back to synthetic template slot-filling (such as inserting document headings or raw lines into hardcoded questions like *"Which of the following describes [Topic]?"*). 
 
-V2 may introduce:
-
-- public deployment
-- hosted frontend/backend
-- cloud LLM APIs
-- remote inference servers
-- concurrent multi-user workloads
-- production infrastructure
-
-V1 must not be expanded solely to prepare for those V2 requirements.
-
-The architecture may use clean abstractions that make future replacement possible, but V1 implementation must remain simple.
+If an AI provider call fails or produces unparseable JSON:
+1. The provider executes an automated structural JSON self-healing loop.
+2. If self-healing fails, the question is flagged with `validation_status: 'failed'` and an explicit diagnostic error message.
+3. Slow execution is acceptable; fake educational output is strictly prohibited.
 
 ---
 
@@ -121,7 +117,7 @@ The architecture may use clean abstractions that make future replacement possibl
                          ┌─────────────────────────────┐
                          │      React + TypeScript     │
                          │      Vite + Tailwind        │
-                         │      shadcn/ui              │
+                         │   Engine Selector Switcher  │
                          └──────────────┬──────────────┘
                                         │
                               REST / JSON API
@@ -135,22 +131,20 @@ The architecture may use clean abstractions that make future replacement possibl
                          │ Topics / Blueprints        │
                          │ Generation / Retrieval     │
                          │ Validation / Questions     │
-                         └───────┬───────────┬─────────┘
-                                 │           │
-                  ┌──────────────┘           └────────────────┐
-                  │                                           │
-                  ▼                                           ▼
-      ┌────────────────────────────┐              ┌────────────────────────┐
-      │       Supabase Cloud       │              │    Local Ollama        │
-      │                            │              │                        │
-      │ PostgreSQL                 │              │ Lightweight LLM         │
-      │ pgvector                   │              │ Local embeddings*       │
-      │ Supabase Auth              │              │ Local inference API     │
-      │ Google OAuth integration   │              │                        │
-      │ Supabase Storage           │              └────────────────────────┘
+                         └───────┬──────┬──────────────┘
+                                 │      │
+                  ┌──────────────┘      └────────────────────────────┐
+                  │                                                 │
+                  ▼                                                 ▼
+      ┌────────────────────────────┐              ┌─────────────────────────────────┐
+      │       Supabase Cloud       │              │       AI Provider Layer         │
+      │                            │              ├────────────────┬────────────────┤
+      │ PostgreSQL                 │              │ Google Gemini  │  Local Ollama  │
+      │ pgvector                   │              │ (Cloud Turbo)  │ (Local Offline)│
+      │ Supabase Auth              │              │ gemini-2.0-flash│ qwen2.5:7b     │
+      │ Google OAuth integration   │              │ gemini-1.5-flash│ nomic-embed    │
+      │ Supabase Storage           │              └────────────────┴────────────────┘
       └────────────────────────────┘
-
-* Exact embedding runtime/model is a replaceable implementation detail.
 ```
 
 Supabase provides hosted PostgreSQL, Auth and Storage, while pgvector provides vector storage/search inside Postgres. See: https://supabase.com/docs/guides/database/extensions/pgvector and https://supabase.com/docs/guides/storage
@@ -872,54 +866,66 @@ The system is intended specifically to generate higher-order questions rather th
 For each planned question:
 
 ```text
-1. Receive Question Target
-2. Retrieve relevant resource chunks
-3. Construct grounded context
-4. Construct structured generation prompt
-5. Call local Ollama model
-6. Parse structured output
-7. Perform deterministic validation
-8. Perform semantic validation
-9. Perform duplicate detection
-10. Perform batch-level diversity checks where applicable
-11. Accept or regenerate
+1. Receive Question Target (Topic, Bloom level, Difficulty, Style, Format)
+2. Retrieve relevant resource chunks via pgvector cosine similarity
+3. Filter out front-matter / table-of-contents noise
+4. Construct grounded synthesis context with exact citation byte-spans
+5. Construct structured generation prompt with negative brand constraints
+6. Invoke selected AI Provider (Gemini 2.0 Flash or Ollama Qwen 2.5)
+7. Parse structured JSON output with automated self-healing/repair loop
+8. Perform deterministic validation (format, option count, single answer)
+9. Perform semantic validation (grounding, cognitive alignment, distractor plausibility)
+10. Perform duplicate detection against batch and project questions
+11. If validation passes: accept and assign monotonic sequence number
+12. If validation fails: trigger retry or mark as review-required (ZERO synthetic slot-filling)
 ```
 
-The LLM output must conform to a machine-readable schema.
+The LLM output must conform strictly to the machine-readable Zod schema (`CandidateQuestionSchema`).
 
-Free-form LLM output must not be used as the authoritative application object.
+Under no circumstances may the system slot raw document lines or headings into fill-in-the-blank question templates (`generateFallbackQuestion` is abolished).
 
 ---
 
 # 23. AI Provider Abstraction
 
-V1 implements exactly one provider:
+V1 implements a unified provider abstraction supporting two parallel engines:
 
 ```text
-AIProvider
-   └── OllamaProvider
+                      ┌──────────────────────┐
+                      │      AIProvider      │
+                      │     (Interface)      │
+                      └──────────┬───────────┘
+                                 │
+                 ┌───────────────┴───────────────┐
+                 ▼                               ▼
+    ┌─────────────────────────┐     ┌─────────────────────────┐
+    │     GeminiProvider      │     │     OllamaProvider      │
+    ├─────────────────────────┤     ├─────────────────────────┤
+    │ gemini-2.0-flash        │     │ qwen2.5:7b              │
+    │ gemini-1.5-flash        │     │ qwen2.5:3b              │
+    │ Cloud Turbo (1–3s)      │     │ Local Offline (60–90s)  │
+    │ Native JSON schema mode │     │ Local HTTP endpoint     │
+    │ generativelanguage API  │     │ nomic-embed embeddings  │
+    └─────────────────────────┘     └─────────────────────────┘
 ```
 
-The backend should expose an internal interface conceptually equivalent to:
+The provider abstraction exposes:
 
-```text
-generate(...)
-embed(...)
+```typescript
+export interface AIProvider {
+  name: 'gemini' | 'ollama';
+  defaultModel: string;
+  generate(prompt: string, options?: GenerationOptions): Promise<string>;
+  generateStructured<T>(prompt: string, schema: z.ZodType<T>, options?: GenerationOptions): Promise<T>;
+  embed?(text: string | string[]): Promise<number[][]>;
+}
 ```
 
-The rest of the application must depend on this interface rather than hard-coding Ollama calls in business logic.
+The provider factory `getAIProvider(provider?: 'gemini' | 'ollama', model?: string)` dynamically instantiates the requested provider:
+- If `provider === 'gemini'` (default), it reads `process.env.GEMINI_API_KEY` and calls the Google Gemini API with `responseMimeType: "application/json"`.
+- If `provider === 'ollama'`, it communicates with the local Ollama daemon on `process.env.OLLAMA_BASE_URL` (default `http://localhost:11434`).
 
-V2 may add:
-
-```text
-AIProvider
-├── OllamaProvider
-├── OpenAIProvider
-├── GeminiProvider
-└── OtherProvider
-```
-
-V2 providers are **not implemented in V1**.
+Business logic (topic inferencer, question generator, validation) interacts exclusively through this abstraction and never directly invokes HTTP endpoints or client libraries.
 
 ---
 

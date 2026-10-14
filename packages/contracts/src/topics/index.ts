@@ -77,6 +77,8 @@ export const reorderTopicsRequestSchema = z.object({
 export type ReorderTopicsRequest = z.infer<typeof reorderTopicsRequestSchema>;
 
 export const inferTopicsRequestSchema = z.object({
+  model_name: z.string().optional(),
+  model_provider: z.enum(['gemini', 'ollama']).optional(),
   resource_ids: z.array(z.string().uuid()).optional(),
 });
 

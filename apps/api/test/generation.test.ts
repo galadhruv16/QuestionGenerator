@@ -1,13 +1,44 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
-import { buildGenerationPlan } from '../src/services/question-generator.js';
+import {
+  buildGenerationPlan,
+  computeStemSimilarity,
+} from '../src/services/question-generator.js';
 
 describe('generation planner and routes', () => {
   const dummyProjectId = '123e4567-e89b-12d3-a456-426614174000';
   const dummyRunId = '223e4567-e89b-12d3-a456-426614174000';
-  const dummyBlueprintId = '323e4567-e89b-12d3-a456-426614174000';
-  const dummyPresetId = '423e4567-e89b-12d3-a456-426614174000';
+
+  it('accurately computes stem similarity for deduplication policy enforcement', () => {
+    // 1. Exact match returns 1.0
+    const exact = computeStemSimilarity(
+      'How does the Banker algorithm prevent deadlock?',
+      'How does the Banker algorithm prevent deadlock?',
+    );
+    expect(exact).toBe(1.0);
+
+    // 2. Normalization: different casing and punctuation returns 1.0
+    const normalized = computeStemSimilarity(
+      'How does the Banker Algorithm prevent deadlock?!',
+      'how does the banker algorithm prevent deadlock',
+    );
+    expect(normalized).toBe(1.0);
+
+    // 3. High overlap returns > 0.82
+    const highOverlap = computeStemSimilarity(
+      'In distributed systems how does the Banker algorithm prevent deadlock in threads',
+      'In distributed systems how does the Banker algorithm prevent deadlock for threads',
+    );
+    expect(highOverlap).toBeGreaterThan(0.82);
+
+    // 4. Distinct concepts return low similarity
+    const distinct = computeStemSimilarity(
+      'Explain how singly linked lists implement pointer reversal',
+      'Describe Coffman conditions required for mutual exclusion deadlocks',
+    );
+    expect(distinct).toBeLessThan(0.25);
+  });
 
   it('decomposes blueprint configuration into discrete per-question plan targets', () => {
     const config = {
@@ -105,6 +136,35 @@ describe('generation planner and routes', () => {
     const response = await request(createApp()).get(
       `/api/v1/projects/${dummyProjectId}/questions`,
     );
+
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects unauthenticated questions patch status requests', async () => {
+    const response = await request(createApp())
+      .patch(`/api/v1/projects/${dummyProjectId}/questions/${dummyRunId}`)
+      .send({ status: 'ACCEPTED' });
+
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects unauthenticated questions bulk-status requests', async () => {
+    const response = await request(createApp())
+      .post(`/api/v1/projects/${dummyProjectId}/questions/bulk-status`)
+      .send({
+        question_ids: [dummyRunId],
+        status: 'ACCEPTED',
+      });
+
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects unauthenticated questions versions creation requests', async () => {
+    const response = await request(createApp())
+      .post(`/api/v1/projects/${dummyProjectId}/questions/${dummyRunId}/versions`)
+      .send({
+        question_text: 'What is a distributed commit protocol?',
+      });
 
     expect(response.status).toBe(401);
   });

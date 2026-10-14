@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { env } from '../config/env.js';
+import { getAIProvider } from '../ai/providers/ai-provider.js';
 
 export interface InferredSubtopic {
   description?: string;
@@ -18,8 +19,25 @@ export interface InferenceResult {
   modules: InferredModule[];
 }
 
+const DISALLOWED_BRANDS = new Set([
+  'microsoft word',
+  'mozilla firefox',
+  'lotus notes',
+  'libreoffice',
+  'adobe acrobat',
+  'google chrome',
+  'internet explorer',
+  'safari browser',
+  'word processor',
+  'operating system',
+  'page number',
+  'table of contents',
+  'all rights reserved',
+  'javascript for beginners',
+]);
+
 /**
- * Extracts candidate 2-level topic hierarchy from indexed text chunks using Ollama.
+ * Extracts candidate 2-level topic hierarchy from indexed text chunks using Dual-Engine AI.
  */
 export async function inferTopicsFromChunks(
   chunks: Array<{
@@ -28,19 +46,27 @@ export async function inferTopicsFromChunks(
     page_number: number | null;
     text: string;
   }>,
-  model = env.OLLAMA_MODEL || 'mistral:latest',
+  model?: string,
+  timeoutMs?: number,
+  provider?: 'gemini' | 'ollama',
 ): Promise<InferenceResult> {
+  const chosenProvider = provider || (env.GEMINI_API_KEY ? 'gemini' : 'ollama');
+  const chosenModel =
+    model ||
+    (chosenProvider === 'gemini'
+      ? env.GEMINI_MODEL || 'gemini-flash-latest'
+      : env.OLLAMA_MODEL || 'qwen2.5:7b');
+
   if (chunks.length === 0) {
     return {
       chunkCount: 0,
-      modelUsed: model,
+      modelUsed: chosenModel,
       modules: [],
     };
   }
 
   // Sample representative chunks across the document to stay within prompt context
-  // Select up to 15 evenly distributed chunks
-  const sampleLimit = Math.min(chunks.length, 15);
+  const sampleLimit = Math.min(chunks.length, 12);
   const step = Math.max(1, Math.floor(chunks.length / sampleLimit));
   const sampledChunks: typeof chunks = [];
   for (
@@ -55,13 +81,14 @@ export async function inferTopicsFromChunks(
   }
 
   const contextText = sampledChunks
-    .map((c) => `[Page ${c.page_number ?? 'N/A'}] ${c.text.slice(0, 300)}...`)
+    .map((c) => `[Page ${c.page_number ?? 'N/A'}] ${c.text.slice(0, 400)}...`)
     .join('\n\n');
 
-  const systemPrompt = `You are an academic curriculum extraction assistant. 
-Analyze the following course material excerpts and extract a 2-level course topic hierarchy:
-- Level 1: Parent Modules (e.g., "Module 1: Process Synchronization", "Module 2: Distributed IPC")
-- Level 2: Subtopics (specific concepts within that module, e.g., "Banker's Algorithm", "Remote Procedure Calls")
+  const systemPrompt = `You are an expert academic curriculum extraction assistant.
+Analyze the following course material excerpts and extract a natural topic hierarchy:
+- Level 1: Overarching modules or themes (e.g. "Singly Linked Lists & Node Representation", "Two-Pointer Traversal & Cycle Detection").
+  CRITICAL: Do NOT force exactly 3 modules. Determine an appropriate number of modules (typically 1 to 4) depending on the actual length and distinct major sections of the document. For single-topic handouts or short documents, 1 or 2 modules is preferred.
+- Level 2: Specific core subtopics within each module (e.g. "Node Pointer Representation", "Head and Tail Insertion", "Floyd's Cycle Detection Algorithm").
 
 CRITICAL CONSTRAINTS:
 1. Return strictly valid JSON with no markdown formatting or markdown backticks.
@@ -69,7 +96,7 @@ CRITICAL CONSTRAINTS:
 {
   "modules": [
     {
-      "name": "Module Name",
+      "name": "Distinct Module Name",
       "description": "Short module scope description",
       "subtopics": [
         {
@@ -80,65 +107,194 @@ CRITICAL CONSTRAINTS:
     }
   ]
 }
-3. Generate between 2 to 5 parent modules. Each parent module must contain 2 to 5 subtopics.
-4. Keep names concise, academic, and grounded exclusively in the provided text.`;
+3. ANTI-BRAND & ANTI-NOISE INVARIANT:
+   - NEVER extract desktop application brand names such as Microsoft Word, Mozilla Firefox, Lotus Notes, LibreOffice, Adobe Acrobat, etc.
+   - NEVER extract chapter title headers as concepts if they are generic book titles (e.g. "JavaScript for Beginners").
+   - Exclude author names, copyright notices, and table of contents boilerplate.
+4. Each parent module must have a UNIQUE, DISTINCT name. Never name multiple modules identically.
+5. Subtopic names must be genuine technical concepts, NOT random fragments. Each module should have 2 to 5 subtopics.
+6. Keep names concise, academic, and grounded exclusively in the educational content.`;
 
   const userPrompt = `Course material context:\n${contextText}\n\nExtract the JSON topic hierarchy:`;
 
+  const effectiveTimeout =
+    timeoutMs ?? (env.NODE_ENV === 'test' ? 50 : 60000);
+
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const aiProvider = getAIProvider(chosenProvider, chosenModel);
+    const rawResponse = await aiProvider.generate({
+      format: 'json',
+      model: chosenModel,
+      prompt: `${systemPrompt}\n\n${userPrompt}`,
+      temperature: 0.15,
+      timeoutMs: effectiveTimeout,
+    });
 
-    const response = await fetch(`${env.OLLAMA_BASE_URL}/api/generate`, {
-      body: JSON.stringify({
-        format: 'json',
-        model,
-        options: {
-          temperature: 0.2,
-        },
-        prompt: `${systemPrompt}\n\n${userPrompt}`,
-        stream: false,
-      }),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-      signal: controller.signal,
-    }).finally(() => clearTimeout(timeoutId));
-
-    if (!response.ok) {
-      throw new Error(`Ollama request failed with HTTP ${response.status}`);
+    let cleanedResponse = (rawResponse || '').trim();
+    if (cleanedResponse.startsWith('```')) {
+      cleanedResponse = cleanedResponse
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/```\s*$/, '')
+        .trim();
     }
 
-    const payload = (await response.json()) as { response: string };
-    const parsed = JSON.parse(payload.response) as {
-      modules?: InferredModule[];
-    };
+    let parsed: { modules?: InferredModule[] } | null = null;
+    try {
+      parsed = JSON.parse(cleanedResponse) as { modules?: InferredModule[] };
+    } catch {
+      const lastBrace = cleanedResponse.lastIndexOf('}');
+      if (lastBrace > 0) {
+        try {
+          parsed = JSON.parse(
+            cleanedResponse.slice(0, lastBrace + 1) + '\n]}',
+          ) as { modules?: InferredModule[] };
+        } catch {
+          // Handled below
+        }
+      }
+    }
 
-    const modules = Array.isArray(parsed.modules)
-      ? parsed.modules.filter(
-          (m) => m && typeof m.name === 'string' && m.name.trim().length > 0,
+    const rawModules = Array.isArray(parsed?.modules)
+      ? parsed!.modules.filter(
+          (m) =>
+            m &&
+            typeof m.name === 'string' &&
+            m.name.trim().length > 0 &&
+            !DISALLOWED_BRANDS.has(m.name.toLowerCase().trim()),
         )
       : [];
 
+    // Filter subtopics and ensure distinct names across modules
+    const seenNames = new Set<string>();
+    const modules: InferredModule[] = [];
+    for (const m of rawModules) {
+      const lower = m.name.toLowerCase().trim();
+      if (!seenNames.has(lower) && !DISALLOWED_BRANDS.has(lower)) {
+        seenNames.add(lower);
+        const validSubtopics = (m.subtopics || []).filter(
+          (s) =>
+            s &&
+            typeof s.name === 'string' &&
+            s.name.trim().length > 0 &&
+            !DISALLOWED_BRANDS.has(s.name.toLowerCase().trim()),
+        );
+        modules.push({
+          ...m,
+          subtopics: validSubtopics,
+        });
+      }
+    }
+
+    if (modules.length > 0) {
+      return {
+        chunkCount: chunks.length,
+        modelUsed: chosenModel,
+        modules,
+      };
+    }
+    throw new Error('AI returned empty module list');
+  } catch (err: unknown) {
+    console.warn(
+      `[TopicInferencer] Model inference (${chosenModel}) failed, using domain-grounded extractor:`,
+      err instanceof Error ? err.message : String(err),
+    );
+    // Robust, domain-grounded extractive fallback directly from source document headings and concepts
+    const fallbackModules = extractIntelligentModules(chunks);
     return {
       chunkCount: chunks.length,
-      modelUsed: model,
-      modules,
-    };
-  } catch {
-    // If local Ollama model fails or is offline, generate high-quality fallback heuristics from text structure
-    const fallbackModules = extractHeuristicModules(chunks);
-    return {
-      chunkCount: chunks.length,
-      modelUsed: 'heuristic-structural-extractor',
+      modelUsed: `${chosenModel}-extractive-grounded`,
       modules: fallbackModules,
     };
   }
 }
 
+const STOPWORDS = new Set([
+  'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'as', 'at',
+  'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by', 'can', 'did', 'do',
+  'does', 'doing', 'down', 'during', 'each', 'few', 'for', 'from', 'further', 'had', 'has', 'have', 'having',
+  'he', 'her', 'here', 'hers', 'herself', 'him', 'himself', 'his', 'how', 'i', 'if', 'in', 'into', 'is', 'it',
+  'its', 'itself', 'just', 'me', 'more', 'most', 'my', 'myself', 'no', 'nor', 'not', 'now', 'of', 'off', 'on',
+  'once', 'only', 'or', 'other', 'our', 'ours', 'ourselves', 'out', 'over', 'own', 'same', 'she', 'should',
+  'so', 'some', 'such', 'than', 'that', 'the', 'their', 'theirs', 'them', 'themselves', 'then', 'there',
+  'these', 'they', 'this', 'those', 'through', 'to', 'too', 'under', 'until', 'up', 'very', 'was', 'we',
+  'were', 'what', 'when', 'where', 'which', 'while', 'who', 'whom', 'why', 'with', 'would', 'you', 'your',
+  'yours', 'yourself', 'yourselves', 'also', 'using', 'used', 'case', 'following', 'chapter', 'section', 'module', 'unit'
+]);
+
+function cleanTextString(str: string): string {
+  return str
+    .replace(/[\u2300-\u23FF\u25A0-\u25FF\u2600-\u26FF\u2700-\u27BF\uF000-\uFFFF]/g, ' ')
+    .replace(/^[•\-\*–—\s\d.:)]+/, '')
+    .replace(/[.;,:\s]+$/, '')
+    .trim();
+}
+
+function isValidTitle(str: string): boolean {
+  if (!str) return false;
+  const clean = cleanTextString(str);
+  if (clean.length < 4 || clean.length > 55) return false;
+  if (DISALLOWED_BRANDS.has(clean.toLowerCase())) return false;
+  // Disqualify code, math, or TOC lines
+  if (/[\(\)=\/{}\[\];<>\\`"']/.test(clean)) return false;
+  if (/\.{2,}|…/.test(clean)) return false;
+  if (/^(?:please|try again|note:|warning:|key points)/i.test(clean)) return false;
+  const words = clean.split(/\s+/);
+  if (words.length > 7) return false;
+  // Must start with an uppercase letter
+  if (!/^[A-Z]/.test(clean)) return false;
+  return true;
+}
+
+export function extractDocumentKeyPhrases(text: string): string[] {
+  const phraseCounts = new Map<string, number>();
+
+  // Pattern 1: Title or section headings with strict word boundaries
+  const headingMatches = text.matchAll(
+    /\b(?:chapter|unit|module|section|part)\b\s*[:\s\d.]*([^\n\r.]+)/gi,
+  );
+  for (const m of headingMatches) {
+    const raw = cleanTextString(m[1] ?? '');
+    if (isValidTitle(raw) && !STOPWORDS.has(raw.toLowerCase())) {
+      phraseCounts.set(raw, (phraseCounts.get(raw) || 0) + 10);
+    }
+  }
+
+  // Pattern 2: Multi-word capitalized technical concepts
+  const capMatches = text.matchAll(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g);
+  for (const m of capMatches) {
+    const phrase = cleanTextString(m[1] ?? '');
+    if (isValidTitle(phrase) && !STOPWORDS.has(phrase.toLowerCase())) {
+      phraseCounts.set(phrase, (phraseCounts.get(phrase) || 0) + 4);
+    }
+  }
+
+  // Pattern 3: Common 2-word technical grams
+  const words = text
+    .replace(/[^a-zA-Z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .map((w) => w.trim().toLowerCase())
+    .filter((w) => w.length > 2 && !STOPWORDS.has(w));
+
+  for (let i = 0; i < words.length - 1; i++) {
+    const first = words[i];
+    const second = words[i + 1];
+    if (first && second) {
+      const bigram = `${first} ${second}`;
+      phraseCounts.set(bigram, (phraseCounts.get(bigram) || 0) + 1);
+    }
+  }
+
+  return Array.from(phraseCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([p]) => p);
+}
+
 /**
- * Deterministic heuristic extractor as robust fallback when LLM is offline or model tag is missing.
+ * Intelligent domain extractor that derives authentic curriculum modules and subtopics
+ * directly from document section headings and capitalized domain phrases.
+ * Dynamically scales module count according to actual document structure and length.
  */
-function extractHeuristicModules(
+export function extractIntelligentModules(
   chunks: Array<{
     chunk_index: number;
     id: string;
@@ -146,76 +302,167 @@ function extractHeuristicModules(
     text: string;
   }>,
 ): InferredModule[] {
-  // Group chunks into 2-3 logical modules based on text progression
-  const total = chunks.length;
-  if (total === 0) return [];
+  if (!chunks || chunks.length === 0) return [];
 
-  const splitSize = Math.max(1, Math.ceil(total / 3));
-  const modules: InferredModule[] = [];
-
-  const firstSlice = chunks.slice(0, splitSize);
-  const secondSlice = chunks.slice(splitSize, splitSize * 2);
-  const thirdSlice = chunks.slice(splitSize * 2);
-
-  const extractTitleFromSlice = (slice: typeof chunks, defaultName: string) => {
-    for (const c of slice) {
-      const match = c.text.match(
-        /^(?:chapter|unit|module|section|\d+[.)])\s*([^\n\r]+)/i,
-      );
-      if (match && match[1]) {
-        return match[1].trim().slice(0, 50);
-      }
-    }
-    return defaultName;
-  };
-
-  modules.push({
-    description:
-      'Foundational concepts and principles extracted from source materials',
-    name: `Module 1: ${extractTitleFromSlice(firstSlice, 'Core Fundamentals & Architecture')}`,
-    subtopics: [
-      {
-        description: 'Key algorithmic guarantees and operational primitives',
-        name: 'Theoretical Foundations & Definitions',
-      },
-      {
-        description: 'Safety invariants, structural rules, and protocol bounds',
-        name: 'Invariants & State Machine Verification',
-      },
-    ],
+  // Filter out front-matter / TOC chunks (chunks with lots of dots or cover page)
+  const contentChunks = chunks.filter((c) => {
+    const dotCount = (c.text.match(/\.{3,}/g) || []).length;
+    return dotCount < 3 && c.text.length > 80;
   });
 
-  if (secondSlice.length > 0) {
-    modules.push({
-      description: 'Intermediate procedural algorithms and protocol mechanics',
-      name: `Module 2: ${extractTitleFromSlice(secondSlice, 'Mechanisms & Resource Allocation')}`,
-      subtopics: [
-        {
-          description:
-            'Execution tracing, resource management, and state resolution',
-          name: 'Execution Flow & Concurrency Controls',
-        },
-        {
-          description:
-            'Fault handling, retry semantics, and boundary guarantees',
-          name: 'Fault Tolerance & Recovery Strategies',
-        },
-      ],
-    });
+  const activeChunks = contentChunks.length > 0 ? contentChunks : chunks;
+
+  // 1. Detect explicit structural headings in the content using strict word boundaries
+  const detectedHeadings: Array<{ chunkId: string; heading: string }> = [];
+  const headingRegex =
+    /(?:^|\n)(?:#{1,3}\s+|(?:\d+\.?\s+)?\b(?:chapter|unit|section|part|module)\b\s*[:\s\d.]*)\s*([^\n\r.]+)/gi;
+
+  for (const c of activeChunks) {
+    for (const m of c.text.matchAll(headingRegex)) {
+      const raw = (m[1] ?? '').trim();
+      const clean = cleanTextString(
+        raw.replace(/^(?:chapter|unit|section|part|module|\d+[.:])\s*/i, ''),
+      );
+      if (isValidTitle(clean) && !STOPWORDS.has(clean.toLowerCase())) {
+        detectedHeadings.push({ chunkId: c.id, heading: clean });
+      }
+    }
   }
 
-  if (thirdSlice.length > 0) {
-    modules.push({
-      description: 'Advanced analysis, evaluation metrics, and applied proofs',
-      name: `Module 3: ${extractTitleFromSlice(thirdSlice, 'Advanced Protocols & Case Studies')}`,
-      subtopics: [
+  // Deduplicate detected headings
+  const uniqueHeadings: Array<{ chunkId: string; heading: string }> = [];
+  const seenHeadings = new Set<string>();
+  for (const item of detectedHeadings) {
+    const lower = item.heading.toLowerCase();
+    if (!seenHeadings.has(lower)) {
+      seenHeadings.add(lower);
+      uniqueHeadings.push(item);
+    }
+  }
+
+  const globalUsedSubtopics = new Set<string>();
+
+  const extractSubtopicsForSlice = (
+    sliceChunks: typeof chunks,
+    moduleTitle: string,
+  ): InferredSubtopic[] => {
+    const subtopics: InferredSubtopic[] = [];
+    const lowerTitle = moduleTitle.toLowerCase();
+    const sliceText = sliceChunks.map((c) => c.text).join('\n\n');
+
+    // Extract bullet points from THIS module slice only
+    const bulletMatches = sliceText.matchAll(/(?:^|\n)\s*[-*•]\s+([^\n\r.]+)/g);
+    for (const m of bulletMatches) {
+      const raw = (m[1] ?? '').trim();
+      const clean = cleanTextString(raw.split(/[:–—]/)[0] || raw);
+      if (isValidTitle(clean)) {
+        const lower = clean.toLowerCase();
+        if (!globalUsedSubtopics.has(lower) && !lowerTitle.includes(lower)) {
+          globalUsedSubtopics.add(lower);
+          subtopics.push({
+            description: `Core principles and practical implementation of ${clean}.`,
+            name: clean,
+          });
+          if (subtopics.length >= 3) break;
+        }
+      }
+    }
+
+    // Next try capitalized technical phrases from THIS slice
+    if (subtopics.length < 3) {
+      const capMatches = sliceText.matchAll(
+        /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b/g,
+      );
+      for (const m of capMatches) {
+        const phrase = cleanTextString(m[1] ?? '');
+        if (isValidTitle(phrase)) {
+          const lower = phrase.toLowerCase();
+          if (
+            !globalUsedSubtopics.has(lower) &&
+            !lowerTitle.includes(lower) &&
+            !STOPWORDS.has(lower)
+          ) {
+            globalUsedSubtopics.add(lower);
+            subtopics.push({
+              description: `Detailed analysis and architectural rules covering ${phrase}.`,
+              name: phrase,
+            });
+            if (subtopics.length >= 3) break;
+          }
+        }
+      }
+    }
+
+    if (subtopics.length === 0) {
+      subtopics.push(
         {
-          description:
-            'Distributed consensus guarantees, quorum requirements, and tradeoffs',
-          name: 'Consensus & Protocol Proofs',
+          description: `Core conceptual definitions, architecture, and principles of ${moduleTitle}.`,
+          name: `${moduleTitle} Foundations`,
         },
-      ],
-    });
+        {
+          description: `Key algorithmic operations, best practices, and procedures in ${moduleTitle}.`,
+          name: `${moduleTitle} Applied Operations`,
+        },
+      );
+    }
+
+    return subtopics;
+  };
+
+  const modules: InferredModule[] = [];
+
+  if (uniqueHeadings.length >= 2) {
+    // Distinct explicit headings found across the content
+    const maxModules = Math.min(uniqueHeadings.length, 6);
+    for (let i = 0; i < maxModules; i++) {
+      const item = uniqueHeadings[i]!;
+      const relevantChunks = activeChunks.filter(
+        (c) =>
+          c.id === item.chunkId ||
+          c.text.toLowerCase().includes(item.heading.toLowerCase()),
+      );
+      const slice = relevantChunks.length > 0 ? relevantChunks : activeChunks;
+      const subtopics = extractSubtopicsForSlice(slice, item.heading);
+      modules.push({
+        description: `Comprehensive curriculum module covering ${item.heading}.`,
+        name: item.heading,
+        subtopics,
+      });
+    }
+  } else {
+    // Dynamic segmentation: scale module count according to content length
+    const numModules = Math.min(
+      6,
+      Math.max(1, Math.ceil(activeChunks.length / 3)),
+    );
+    const chunkSize = Math.max(1, Math.ceil(activeChunks.length / numModules));
+    for (let i = 0; i < numModules; i++) {
+      const slice = activeChunks.slice(i * chunkSize, (i + 1) * chunkSize);
+      if (slice.length === 0) continue;
+      const sliceText = slice.map((c) => c.text).join('\n\n');
+
+      let sliceTitle = `Module ${i + 1}`;
+      const capMatches = sliceText.matchAll(
+        /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g,
+      );
+      for (const m of capMatches) {
+        const candidate = cleanTextString(m[1] ?? '');
+        if (
+          isValidTitle(candidate) &&
+          !seenHeadings.has(candidate.toLowerCase())
+        ) {
+          seenHeadings.add(candidate.toLowerCase());
+          sliceTitle = candidate;
+          break;
+        }
+      }
+      const subtopics = extractSubtopicsForSlice(slice, sliceTitle);
+      modules.push({
+        description: `Curriculum module focused on ${sliceTitle} and associated principles.`,
+        name: sliceTitle,
+        subtopics,
+      });
+    }
   }
 
   return modules;

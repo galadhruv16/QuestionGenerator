@@ -557,8 +557,13 @@ topicsRouter.post('/infer', async (request, response, next) => {
       });
     }
 
-    // 2. Perform Ollama Topic Inference
-    const inferenceResult = await inferTopicsFromChunks(chunks);
+    // 2. Perform Dual-Engine Topic Inference
+    const inferenceResult = await inferTopicsFromChunks(
+      chunks,
+      parsedBody.success ? parsedBody.data.model_name : undefined,
+      undefined,
+      parsedBody.success ? parsedBody.data.model_provider : undefined,
+    );
 
     // 3. Persist inferred hierarchy & mappings
     await persistInferredTopics(

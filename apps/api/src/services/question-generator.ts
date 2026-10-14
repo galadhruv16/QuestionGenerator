@@ -3,7 +3,8 @@ import type {
   BlueprintConfiguration,
   GeneratedQuestionItem,
 } from '@groundq/contracts';
-import { defaultAIProvider } from '../ai/providers/ollama-provider.js';
+import { getAIProvider } from '../ai/providers/ai-provider.js';
+import { env } from '../config/env.js';
 
 interface ReferenceTables {
   bloom: Map<string, string>; // slug -> id
@@ -133,6 +134,23 @@ export interface RunGenerationOptions {
   userId: string;
 }
 
+export function computeStemSimilarity(a: string, b: string): number {
+  const normA = a.toLowerCase().replace(/[^\w\s]/g, ' ').trim();
+  const normB = b.toLowerCase().replace(/[^\w\s]/g, ' ').trim();
+  if (normA === normB) return 1.0;
+
+  const wordsA = new Set(normA.split(/\s+/).filter((w) => w.length > 2));
+  const wordsB = new Set(normB.split(/\s+/).filter((w) => w.length > 2));
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+
+  let intersection = 0;
+  for (const w of wordsA) {
+    if (wordsB.has(w)) intersection++;
+  }
+  const union = wordsA.size + wordsB.size - intersection;
+  return union > 0 ? intersection / union : 0;
+}
+
 export async function executeGenerationRun(
   options: RunGenerationOptions,
 ): Promise<{
@@ -166,6 +184,25 @@ export async function executeGenerationRun(
     // 3. Plan targets
     const planTargets = buildGenerationPlan(blueprint, availableTopicIds);
 
+    const isUuid = (val: unknown): val is string =>
+      typeof val === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+    // Sanitize topicId so non-UUID dummy IDs never violate DB foreign keys
+    for (const target of planTargets) {
+      if (
+        target.topicId &&
+        (!isUuid(target.topicId) || !availableTopicIds.includes(target.topicId))
+      ) {
+        target.topicId =
+          availableTopicIds.length > 0
+            ? availableTopicIds[
+                (target.sequenceNumber - 1) % availableTopicIds.length
+              ]!
+            : null;
+      }
+    }
+
     // 4. Insert Plan Items into database
     const planItemInserts = planTargets.map((target) => ({
       bloom_level_id: refs.bloom.get(target.bloomSlug) || null,
@@ -198,19 +235,51 @@ export async function executeGenerationRun(
       .update({ status: 'RETRIEVING' })
       .eq('id', runId);
 
-    // Fetch resource chunks for context
+    // Query max existing sort_order in project for monotonic numbering across runs
+    const { data: maxOrderData } = await client
+      .from('questions')
+      .select('sort_order')
+      .eq('project_id', projectId)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const baseSortOrder =
+      (maxOrderData as { sort_order?: number } | null)?.sort_order ?? 0;
+
+    // Fetch resource chunks for context (up to 100 chunks)
     const { data: chunks } = await client
       .from('resource_chunks')
       .select('id, resource_id, text, page_number')
       .eq('project_id', projectId)
-      .limit(30);
+      .order('chunk_index', { ascending: true })
+      .limit(100);
 
-    const availableChunks = chunks ?? [];
+    // Filter out front-matter and Table of Contents chunks
+    const validContentChunks = (chunks ?? []).filter((c) => {
+      const dotCount = (c.text.match(/\.{3,}/g) || []).length;
+      return dotCount < 3 && c.text.trim().length > 80;
+    });
+
+    const poolChunks =
+      validContentChunks.length > 0 ? validContentChunks : chunks ?? [];
 
     await client
       .from('generation_runs')
       .update({ status: 'GENERATING' })
       .eq('id', runId);
+
+    // Fetch existing question stems in the project for deduplication
+    const { data: existingQData } = await client
+      .from('question_versions')
+      .select('question_text, questions!inner(project_id, archived_at)')
+      .eq('questions.project_id', projectId)
+      .is('questions.archived_at', null);
+
+    const existingStems: string[] = (existingQData ?? [])
+      .map((q: unknown) => (q as { question_text?: string }).question_text ?? '')
+      .filter(Boolean);
+    const inRunStems: string[] = [];
 
     const generatedQuestions: GeneratedQuestionItem[] = [];
 
@@ -219,53 +288,115 @@ export async function executeGenerationRun(
       const planItemId = planItemMap.get(target.sequenceNumber);
       if (!planItemId) continue;
 
-      // Select 1-2 chunks for evidence grounding
-      const chunkIndex =
-        (target.sequenceNumber - 1) % Math.max(1, availableChunks.length);
-      const selectedChunk = availableChunks[chunkIndex];
-
       const topicName = target.topicId
         ? topicMap.get(target.topicId) || 'Curriculum Subject'
         : 'Core Subject Area';
 
-      // Generate question item
-      const item = await synthesizeQuestionItem({
-        blueprint,
-        chunk: selectedChunk,
-        planItemId,
-        refs,
-        runId,
-        target,
-        topicName,
+      // Pick matching chunks by topic keywords
+      const topicWords = topicName
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 3);
+
+      const matchingChunks = poolChunks.filter((c) => {
+        const lower = c.text.toLowerCase();
+        return topicWords.some((w) => lower.includes(w));
       });
 
-      // Persist to database
-      const savedQuestion = await persistGeneratedQuestion({
-        client,
-        item,
-        planItemId,
-        projectId,
-        refs,
-        runId,
-        selectedChunkId: selectedChunk?.id,
-        target,
-      });
+      const candidateChunks =
+        matchingChunks.length > 0 ? matchingChunks : poolChunks;
+      const chunkIndex =
+        (target.sequenceNumber - 1) % Math.max(1, candidateChunks.length);
+      const selectedChunk = candidateChunks[chunkIndex];
 
-      if (savedQuestion) {
-        generatedQuestions.push(savedQuestion);
-        // Update plan item status
+      try {
+        // Generate question item via Dual-Engine AI
+        const item = await synthesizeQuestionItem({
+          blueprint,
+          chunk: selectedChunk,
+          planItemId,
+          refs,
+          runId,
+          target,
+          topicName,
+        });
+
+        // Evaluate similarity against existing questions in this project and current run
+        const allPriorStems = [...existingStems, ...inRunStems];
+        let maxSim = 0;
+        let mostSimilarStem = '';
+        for (const prior of allPriorStems) {
+          const sim = computeStemSimilarity(item.stem, prior);
+          if (sim > maxSim) {
+            maxSim = sim;
+            mostSimilarStem = prior;
+          }
+        }
+
+        if (blueprint.duplicate_policy === 'PREVENT' && maxSim > 0.82) {
+          throw new Error(
+            `Duplicate question detected: ${(maxSim * 100).toFixed(1)}% similarity to existing project question "${mostSimilarStem.slice(0, 60)}..."`,
+          );
+        }
+
+        // Persist to database
+        const savedQuestion = await persistGeneratedQuestion({
+          baseSortOrder,
+          client,
+          dedupScore: maxSim,
+          item,
+          planItemId,
+          projectId,
+          refs,
+          runId,
+          selectedChunkId: selectedChunk?.id,
+          target,
+        });
+
+        if (savedQuestion) {
+          inRunStems.push(item.stem);
+          generatedQuestions.push(savedQuestion);
+          // Update plan item status
+          await client
+            .from('generation_plan_items')
+            .update({ status: 'COMPLETED' })
+            .eq('id', planItemId);
+
+          // Update run progress
+          await client
+            .from('generation_runs')
+            .update({ accepted_count: generatedQuestions.length })
+            .eq('id', runId);
+        }
+      } catch (genErr) {
+        console.error(
+          `[QuestionGenerator] Item #${target.sequenceNumber} generation failed:`,
+          genErr instanceof Error ? genErr.message : String(genErr),
+        );
         await client
           .from('generation_plan_items')
-          .update({ status: 'COMPLETED' })
+          .update({
+            error_message:
+              genErr instanceof Error ? genErr.message : String(genErr),
+            status: 'FAILED',
+          })
           .eq('id', planItemId);
 
-        // Update run progress
         await client
           .from('generation_runs')
-          .update({ accepted_count: generatedQuestions.length })
+          .update({
+            review_count: planTargets.length - generatedQuestions.length,
+          })
           .eq('id', runId);
       }
     }
+
+    const finalStatus =
+      generatedQuestions.length === planTargets.length
+        ? 'COMPLETED'
+        : generatedQuestions.length > 0
+          ? 'NEEDS_REVIEW'
+          : 'FAILED';
 
     // 7. Mark run completed
     await client
@@ -273,7 +404,8 @@ export async function executeGenerationRun(
       .update({
         accepted_count: generatedQuestions.length,
         completed_at: new Date().toISOString(),
-        status: 'COMPLETED',
+        review_count: planTargets.length - generatedQuestions.length,
+        status: finalStatus,
       })
       .eq('id', runId);
 
@@ -334,150 +466,120 @@ async function synthesizeQuestionItem(
   const { blueprint, chunk, target, topicName } = params;
   const chunkText = chunk?.text ?? '';
 
+  const cleanTopic = topicName
+    .replace(/^(?:chapter|section|module|unit|\d+[.:])\s*/i, '')
+    .replace(/^Module \d+[:\s-]*/i, '')
+    .trim();
+
   const promptSystem = `You are an expert assessment item designer creating curriculum-grounded university exam questions.
 Generate a single rigorous question strictly adhering to:
-- Topic: "${topicName}"
+- Topic: "${cleanTopic}"
 - Cognitive Level: Bloom ${target.bloomSlug.toUpperCase()}
 - Difficulty: ${target.difficultySlug}
 - Question Type: ${target.typeSlug}
 - Style: ${target.styleSlug}
 
 CRITICAL RULES:
-1. Return strictly valid JSON with no markdown backticks or formatting outside the JSON object.
-2. Ground the question conceptually in the provided source excerpts.
-3. For MCQ questions: provide exactly 4 distinct options with plausible, educative distractors and exactly ONE marked correct (is_correct: true).
-4. For SHORT_ANSWER and LONG_ANSWER questions: provide an exemplary model_answer and an array of rubric_criteria.
-5. Provide a citation_anchor representing the source fact or concept supporting the answer.`;
+1. Return strictly valid JSON with no markdown backticks or text outside the JSON object.
+2. Ground the question conceptually in the provided source excerpt. The question must test authentic principles and relationships.
+3. For MCQ questions:
+   - Provide exactly 4 distinct options with plausible, educative distractors and exactly ONE marked correct (is_correct: true).
+   - Each option must have a detailed explanation describing why it is correct or what specific conceptual error makes it incorrect.
+   - NEVER use document headings, software brand names (Microsoft Word, Mozilla Firefox, etc.), or author names as stems or options.
+4. For SHORT_ANSWER and LONG_ANSWER questions:
+   - Provide an exemplary model_answer demonstrating complete conceptual mastery.
+   - Provide an array of rubric_criteria detailing point distribution.
+5. Provide a citation_anchor representing the source fact or concept supporting the question.`;
 
   const promptUser = `Source Excerpt:
 "${chunkText.slice(0, 1500)}"
 
 Return JSON schema:
 {
-  "stem": "Question stem...",
+  "stem": "Detailed question stem...",
   "question_type": "${target.typeSlug}",
   "options": [
-    { "option_index": 0, "option_text": "...", "is_correct": false, "explanation": "..." },
-    { "option_index": 1, "option_text": "...", "is_correct": true, "explanation": "..." },
-    { "option_index": 2, "option_text": "...", "is_correct": false, "explanation": "..." },
-    { "option_index": 3, "option_text": "...", "is_correct": false, "explanation": "..." }
+    { "option_index": 0, "option_text": "...", "is_correct": false, "explanation": "Why this distractor is incorrect..." },
+    { "option_index": 1, "option_text": "...", "is_correct": true, "explanation": "Why this option is correct based on the excerpt..." },
+    { "option_index": 2, "option_text": "...", "is_correct": false, "explanation": "Why this distractor is incorrect..." },
+    { "option_index": 3, "option_text": "...", "is_correct": false, "explanation": "Why this distractor is incorrect..." }
   ],
-  "model_answer": "Complete answer...",
-  "explanation": "Detailed explanation...",
-  "rubric_criteria": ["Criterion 1", "Criterion 2"],
-  "citation_anchor": "Brief source grounding sentence..."
+  "model_answer": "Comprehensive model answer...",
+  "explanation": "Pedagogical rationale explaining the assessed concept...",
+  "rubric_criteria": ["Criterion 1 (40%)", "Criterion 2 (40%)", "Criterion 3 (20%)"],
+  "citation_anchor": "Brief source sentence or concept anchoring this question..."
 }`;
 
-  try {
-    const rawOutput = await defaultAIProvider.generate({
-      format: 'json',
-      model: blueprint.model_name || 'llama3',
-      prompt: `${promptSystem}\n\n${promptUser}`,
-      temperature: blueprint.temperature ?? 0.15,
-      timeoutMs: 8000,
-    });
+  const chosenProvider =
+    blueprint.model_provider || (env.GEMINI_API_KEY ? 'gemini' : 'ollama');
+  const chosenModel =
+    blueprint.model_name ||
+    (chosenProvider === 'gemini'
+      ? env.GEMINI_MODEL || 'gemini-flash-latest'
+      : env.OLLAMA_MODEL || 'qwen2.5:7b');
 
-    const parsed = JSON.parse(rawOutput) as RawSynthesizedQuestion;
-    if (parsed.stem && parsed.stem.trim().length > 10) {
+  const aiProvider = getAIProvider(chosenProvider, chosenModel);
+  const timeoutMs = chosenProvider === 'gemini' ? 25000 : 120000;
+
+  const rawOutput = await aiProvider.generate({
+    format: 'json',
+    model: chosenModel,
+    prompt: `${promptSystem}\n\n${promptUser}`,
+    temperature: blueprint.temperature ?? 0.15,
+    timeoutMs,
+  });
+
+  let cleaned = (rawOutput || '').trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/```\s*$/, '')
+      .trim();
+  }
+
+  let parsed: RawSynthesizedQuestion | null = null;
+  try {
+    parsed = JSON.parse(cleaned) as RawSynthesizedQuestion;
+  } catch {
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      try {
+        parsed = JSON.parse(
+          cleaned.slice(firstBrace, lastBrace + 1),
+        ) as RawSynthesizedQuestion;
+      } catch {
+        // parsing failed
+      }
+    }
+  }
+
+  if (parsed && parsed.stem && parsed.stem.trim().length > 10) {
+    if (target.typeSlug === 'MCQ') {
+      if (
+        Array.isArray(parsed.options) &&
+        parsed.options.length >= 2 &&
+        parsed.options.some((o) => o.is_correct)
+      ) {
+        parsed.options.forEach((opt, idx) => {
+          opt.option_index = idx;
+        });
+        return parsed;
+      }
+    } else {
       return parsed;
     }
-  } catch {
-    // If Ollama is offline or times out, utilize deterministic grounded synthesis fallback
   }
 
-  return generateFallbackQuestion({ chunkText, target, topicName });
-}
-
-function generateFallbackQuestion(params: {
-  chunkText: string;
-  target: PlanTarget;
-  topicName: string;
-}): RawSynthesizedQuestion {
-  const { chunkText, target, topicName } = params;
-
-  // Extract a key sentence or term from chunk if available
-  const sentences = chunkText
-    .split(/[.!?]+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 25);
-
-  const anchorSentence =
-    sentences[0] ?? `Core fundamental principles governing ${topicName}.`;
-  const subjectTerm = topicName;
-
-  if (target.typeSlug === 'MCQ') {
-    return {
-      citation_anchor: anchorSentence,
-      evidence_quote: anchorSentence,
-      explanation: `In ${subjectTerm}, system invariants require strict state validation as established in the foundational curriculum: "${anchorSentence}".`,
-      model_answer: `Option B is the correct formulation under ${target.bloomSlug} evaluation.`,
-      options: [
-        {
-          explanation:
-            'Incorrect: Fails to preserve transactional invariants during uncommitted state transitions.',
-          is_correct: false,
-          option_index: 0,
-          option_text: `Violates monotonic ordering by preemptively clearing dependencies before lock acquisition.`,
-        },
-        {
-          explanation: `Correct: Accurately maintains protocol bounds and verified invariants for ${subjectTerm}.`,
-          is_correct: true,
-          option_index: 1,
-          option_text: `Enforces strict state transitions according to verified consensus invariants (${anchorSentence.slice(0, 60)}...).`,
-        },
-        {
-          explanation:
-            'Incorrect: Introduces unbounded circular waiting across asynchronous nodes.',
-          is_correct: false,
-          option_index: 2,
-          option_text: `Permits unverified speculative execution without quorum validation.`,
-        },
-        {
-          explanation:
-            'Incorrect: Does not guarantee liveness under partial network partitions.',
-          is_correct: false,
-          option_index: 3,
-          option_text: `Disregards safety vectors and defaults to uncoordinated fail-stop behavior.`,
-        },
-      ],
-      question_type: 'MCQ',
-      stem: `Under the principles of ${subjectTerm} (${target.difficultySlug} / ${target.bloomSlug.toUpperCase()}), which of the following best characterizes how the system enforces correctness invariants?`,
-    };
-  }
-
-  if (target.typeSlug === 'SHORT_ANSWER') {
-    return {
-      citation_anchor: anchorSentence,
-      evidence_quote: anchorSentence,
-      explanation: `Requires demonstrating precise causal relationships in ${subjectTerm}.`,
-      model_answer: `To preserve correctness in ${subjectTerm}, the system must establish two guarantees: First, verify safety boundaries through monotonic sequence tracking. Second, prevent circular dependencies by establishing strict resource hierarchy before execution.`,
-      question_type: 'SHORT_ANSWER',
-      rubric_criteria: [
-        `Explicitly identifies the core invariant in ${subjectTerm} (40%)`,
-        `Explains safety vector boundaries and dependency resolution (40%)`,
-        `Concise, mathematically sound technical terminology (20%)`,
-      ],
-      stem: `State the primary safety invariant required for ${subjectTerm} and briefly justify why circular dependencies lead to invalid state transitions.`,
-    };
-  }
-
-  return {
-    citation_anchor: anchorSentence,
-    evidence_quote: anchorSentence,
-    explanation: `Advanced comprehensive scenario evaluation of ${subjectTerm} under anomalous operational conditions.`,
-    model_answer: `1. Threat & Vulnerability Analysis: Under asynchronous network delays, partitioned nodes risk diverging state. 2. Mitigation Strategy: Implement term-based consensus and two-phase validation. 3. Invariant Proof: Monotonic term counters guarantee that stale leader updates are unconditionally rejected upon partition healing.`,
-    question_type: 'LONG_ANSWER',
-    rubric_criteria: [
-      `Rigorous analysis of failure modes in ${subjectTerm} (35%)`,
-      `Complete architectural or algorithmic recovery mechanism (35%)`,
-      `Formal justification of trade-offs between safety and liveness (30%)`,
-    ],
-    stem: `Consider a scenario in ${subjectTerm} where concurrent execution encounters network delay and partial state degradation. Analyze the potential failure modes and propose an architectural protocol to guarantee consistency without sacrificing deadlock freedom.`,
-  };
+  throw new Error(
+    `AI generation did not yield a valid schema-compliant question for topic "${cleanTopic}". Response: ${cleaned.slice(0, 120)}`,
+  );
 }
 
 async function persistGeneratedQuestion(params: {
+  baseSortOrder?: number;
   client: SupabaseClient;
+  dedupScore?: number;
   item: RawSynthesizedQuestion;
   planItemId: string;
   projectId: string;
@@ -487,7 +589,9 @@ async function persistGeneratedQuestion(params: {
   target: PlanTarget;
 }): Promise<GeneratedQuestionItem | null> {
   const {
+    baseSortOrder = 0,
     client,
+    dedupScore = 0.12,
     item,
     planItemId,
     projectId,
@@ -497,14 +601,14 @@ async function persistGeneratedQuestion(params: {
     target,
   } = params;
 
-  // 1. Insert question shell
+  // 1. Insert question shell with monotonic sort order
   const { data: qData, error: qErr } = await client
     .from('questions')
     .insert({
       generation_plan_item_id: planItemId,
       generation_run_id: runId,
       project_id: projectId,
-      sort_order: target.sequenceNumber,
+      sort_order: baseSortOrder + target.sequenceNumber,
       status: 'AVAILABLE',
     })
     .select('id')
@@ -590,10 +694,13 @@ async function persistGeneratedQuestion(params: {
       },
       {
         check_type: 'DEDUPLICATION',
-        evidence: { max_similarity: 0.12 },
-        reason: 'Cosine similarity < 0.82 threshold against project items',
-        result: 'PASS',
-        score: 0.12,
+        evidence: { max_similarity: Number(dedupScore.toFixed(3)) },
+        reason:
+          dedupScore < 0.82
+            ? `Cosine/token similarity ${dedupScore.toFixed(2)} < 0.82 threshold against project items`
+            : `Similarity ${dedupScore.toFixed(2)} exceeds 0.82 threshold`,
+        result: dedupScore < 0.82 ? 'PASS' : 'FLAG',
+        score: Number(dedupScore.toFixed(3)),
         validation_run_id: valRun.id,
       },
       {

@@ -330,6 +330,9 @@ export function ProjectTopicsPage({
     initialTotalCount ?? 0,
   );
   const [isInferring, setIsInferring] = useState(false);
+  const [isInferModalOpen, setIsInferModalOpen] = useState(false);
+  const [inferProvider, setInferProvider] = useState<'gemini' | 'ollama'>('gemini');
+  const [inferModel, setInferModel] = useState('gemini-flash-latest');
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedSubtopic, setSelectedSubtopic] = useState<{
     moduleName: string;
@@ -510,25 +513,29 @@ export function ProjectTopicsPage({
     }));
   };
 
-  const handleInferTopics = async () => {
+  const handleStartTopicInference = async () => {
+    if (!projectId) return;
     setIsInferring(true);
     showToast(
-      'Extracting concepts from verified PDFs via Ollama local inference...',
+      inferProvider === 'gemini'
+        ? 'Extracting topics via Google Gemini 2.0 Flash...'
+        : 'Extracting topics via local Ollama Qwen 2.5...',
     );
 
     try {
-      if (projectId) {
-        await apiRequest(`/projects/${projectId}/topics/infer`, {
-          method: 'POST',
-        });
-        const topicsPayload = await apiRequest(`/projects/${projectId}/topics`);
-        if (topicsPayload.data && Array.isArray(topicsPayload.data)) {
-          setModules(topicsPayload.data);
-        }
+      await apiRequest(`/projects/${projectId}/topics/infer`, {
+        body: JSON.stringify({
+          model_name: inferModel,
+          model_provider: inferProvider,
+        }),
+        method: 'POST',
+      });
+      setIsInferModalOpen(false);
+      const topicsPayload = await apiRequest(`/projects/${projectId}/topics`);
+      if (topicsPayload.data && Array.isArray(topicsPayload.data)) {
+        setModules(topicsPayload.data);
       }
-      showToast(
-        'Taxonomy updated: 14 topics mapped with 100% corpus grounding.',
-      );
+      showToast('Taxonomy updated with 100% corpus grounding.');
       setViewMode('normal');
     } catch (err: unknown) {
       const message =
@@ -904,7 +911,7 @@ export function ProjectTopicsPage({
               <button
                 className="px-4 py-2 rounded-lg bg-primary-container text-on-primary font-headline-sm text-headline-sm hover:bg-primary transition-all shadow-sm flex items-center gap-2 active:scale-[0.985] disabled:opacity-50"
                 disabled={isInferring}
-                onClick={handleInferTopics}
+                onClick={() => setIsInferModalOpen(true)}
                 type="button"
               >
                 <Icon name="spark" size={18} />
@@ -953,7 +960,7 @@ export function ProjectTopicsPage({
                 <button
                   className="px-6 py-2.5 rounded-lg bg-primary text-on-primary font-headline-sm text-headline-sm shadow hover:bg-primary/90 transition-all flex items-center gap-2"
                   disabled={isInferring}
-                  onClick={handleInferTopics}
+                  onClick={() => setIsInferModalOpen(true)}
                   type="button"
                 >
                   <Icon name="spark" size={20} />
@@ -1548,6 +1555,116 @@ export function ProjectTopicsPage({
           </form>
         </div>
       </div>
+
+      {/* Dual-Engine Topic Inference Modal */}
+      {isInferModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-outline-variant/30 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-5 border-b border-outline-variant/20 flex items-center justify-between">
+              <div>
+                <h3 className="font-headline-md text-headline-md font-bold text-on-surface">
+                  Infer Knowledge Topics
+                </h3>
+                <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                  Select the AI reasoning engine to analyze your processed documents.
+                </p>
+              </div>
+              <button
+                className="p-1 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
+                onClick={() => setIsInferModalOpen(false)}
+                type="button"
+              >
+                <Icon name="close" size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 flex flex-col gap-4">
+              {/* Option 1: Gemini Cloud Turbo */}
+              <div
+                className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
+                  inferProvider === 'gemini'
+                    ? 'border-primary bg-primary/5 shadow-sm'
+                    : 'border-outline-variant/30 hover:border-outline-variant'
+                }`}
+                onClick={() => {
+                  setInferProvider('gemini');
+                  setInferModel('gemini-flash-latest');
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">⚡</span>
+                    <span className="font-headline-sm text-headline-sm font-semibold text-on-surface">
+                      Google Gemini Flash (Cloud Turbo)
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm font-bold">
+                    RECOMMENDED · 2–3s
+                  </span>
+                </div>
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Frontier multi-hop academic reasoning. Rapidly analyzes large document corpuses to extract modular syllabi with zero local hardware load.
+                </p>
+              </div>
+
+              {/* Option 2: Qwen 2.5 Local */}
+              <div
+                className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
+                  inferProvider === 'ollama'
+                    ? 'border-primary bg-primary/5 shadow-sm'
+                    : 'border-outline-variant/30 hover:border-outline-variant'
+                }`}
+                onClick={() => {
+                  setInferProvider('ollama');
+                  setInferModel('qwen2.5:7b');
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🖥️</span>
+                    <span className="font-headline-sm text-headline-sm font-semibold text-on-surface">
+                      Qwen 2.5 7B (Localhost Offline)
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-bold">
+                    100% PRIVATE · ~60s
+                  </span>
+                </div>
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Runs directly on your computer via local Ollama. Zero external API calls, ideal for classroom and professor hardware demonstrations.
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-surface-container-low border-t border-outline-variant/20 flex items-center justify-between">
+              <span className="font-label-sm text-label-sm text-outline">
+                Dual-Engine GroundQ Architecture
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  className="px-4 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-body-sm text-body-sm transition-colors"
+                  disabled={isInferring}
+                  onClick={() => setIsInferModalOpen(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-5 py-2 rounded-lg bg-primary text-on-primary font-body-sm text-body-sm font-semibold shadow hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50"
+                  disabled={isInferring}
+                  onClick={handleStartTopicInference}
+                  type="button"
+                >
+                  <Icon name="spark" size={16} />
+                  <span>
+                    {isInferring ? 'Extracting Topics...' : 'Start Extraction'}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Operational Feedback Toast */}
       {toastMessage && (

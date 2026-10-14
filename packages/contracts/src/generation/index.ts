@@ -18,8 +18,9 @@ export const blueprintConfigurationSchema = z.object({
     medium: 50,
   }),
   duplicate_policy: duplicatePolicySchema.default('PREVENT'),
-  model_name: z.string().trim().min(1).default('llama3'),
-  question_count: z.number().int().min(1).max(50).default(10),
+  model_name: z.string().trim().min(1).default('gemini-2.0-flash'),
+  model_provider: z.enum(['gemini', 'ollama']).default('gemini'),
+  question_count: z.number().int().min(1).max(100).default(10),
   styles: z.record(z.string(), z.number().min(0).max(100)).default({
     analytical: 40,
     conceptual: 20,
@@ -108,6 +109,7 @@ export const startGenerationRunSchema = z.object({
   blueprint_id: z.string().uuid().optional(),
   configuration: blueprintConfigurationSchema.optional(),
   model_name: z.string().trim().optional(),
+  model_provider: z.enum(['gemini', 'ollama']).optional(),
   request_id: z.string().optional(),
 });
 export type StartGenerationRunRequest = z.infer<
@@ -165,3 +167,49 @@ export const generationRunSchema = z.object({
   updated_at: z.string().datetime(),
 });
 export type GenerationRun = z.infer<typeof generationRunSchema>;
+
+export const questionStatusValues = [
+  'AVAILABLE',
+  'ACCEPTED',
+  'REJECTED',
+  'FLAGGED',
+] as const;
+export const questionStatusSchema = z.enum(questionStatusValues);
+export type QuestionStatus = z.infer<typeof questionStatusSchema>;
+
+export const updateQuestionStatusSchema = z.object({
+  archived_at: z.string().datetime().nullable().optional(),
+  status: questionStatusSchema.optional(),
+});
+export type UpdateQuestionStatusRequest = z.infer<
+  typeof updateQuestionStatusSchema
+>;
+
+export const bulkUpdateQuestionsStatusSchema = z.object({
+  question_ids: z.array(z.string().uuid()).min(1),
+  status: questionStatusSchema,
+});
+export type BulkUpdateQuestionsStatusRequest = z.infer<
+  typeof bulkUpdateQuestionsStatusSchema
+>;
+
+export const createQuestionVersionSchema = z.object({
+  explanation: z.string().trim().optional(),
+  model_answer: z.string().trim().optional(),
+  options: z
+    .array(
+      z.object({
+        explanation: z.string().trim().optional(),
+        is_correct: z.boolean(),
+        option_index: z.number().int().optional(),
+        option_text: z.string().trim().min(1),
+      }),
+    )
+    .optional(),
+  question_text: z.string().trim().min(3),
+  rubric_criteria: z.array(z.string()).optional(),
+});
+export type CreateQuestionVersionRequest = z.infer<
+  typeof createQuestionVersionSchema
+>;
+

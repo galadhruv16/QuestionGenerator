@@ -10,6 +10,7 @@ import { LandingPage } from './pages/LandingPage';
 import { ProjectResourcesPage } from './pages/ProjectResourcesPage';
 import { ProjectTopicsPage } from './pages/ProjectTopicsPage';
 import { ProjectGenerationPage } from './pages/ProjectGenerationPage';
+import { ProjectQuestionsPage } from './pages/ProjectQuestionsPage';
 import { WorkspacePage } from './pages/WorkspacePage';
 
 export function App() {
@@ -73,6 +74,14 @@ export function App() {
             </ProtectedRoute>
           }
           path="/app/projects/:projectId/generation"
+        />
+        <Route
+          element={
+            <ProtectedRoute>
+              <ProjectQuestionsPage />
+            </ProtectedRoute>
+          }
+          path="/app/projects/:projectId/questions"
         />
       </Routes>
     </BrowserRouter>

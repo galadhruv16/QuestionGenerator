@@ -57,7 +57,7 @@ async function main() {
       const hasGenerationTab = html.includes('Generation');
       const hasBlueprint = html.includes('Blueprint') || html.includes('blueprint');
       const hasBloom = html.includes('Bloom') || html.includes('bloom');
-      console.log(`HTML size: ${html.length}, hasBlueprint: ${hasBlueprint}, hasBloom: ${hasBloom}`);
+      console.log(`HTML size: ${html.length}, hasGenerationTab: ${hasGenerationTab}, hasBlueprint: ${hasBlueprint}, hasBloom: ${hasBloom}`);
       
       const saveFile = `scratch/screen_${inst.id}.html`;
       fs.writeFileSync(path.resolve(saveFile), html);

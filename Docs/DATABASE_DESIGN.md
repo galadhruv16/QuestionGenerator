@@ -1,16 +1,16 @@
 # Syllabus-Grounded Controllable Question Generation
 
-## Database Design Specification — V1
+## Database Design Specification — V1.1
 
-**Document status:** Frozen for V1 implementation  
+**Document status:** Authoritative Database Specification  
 **Audience:** Developers, AI coding agents, database designers, reviewers, project team  
 **Purpose:** Authoritative persistence/data-model specification for V1  
 **Database:** PostgreSQL via Supabase Cloud  
 **Vector storage:** pgvector  
 **Authentication:** Supabase Auth + Google OAuth  
 **File storage:** Supabase Storage  
-**Application execution:** Localhost  
-**LLM execution:** Local Ollama  
+**Application execution:** Localhost (Node.js/Express + Vite/React)  
+**AI execution:** Dual-Engine AI Inference (Google Gemini Cloud Turbo + Localhost Ollama Qwen 2.5)  
 
 ---
 
@@ -717,7 +717,7 @@ Persistent job representing one user generation request.
 | accepted_count | integer | NO | Current accepted count |
 | review_count | integer | NO | Items requiring review |
 | duplicate_policy | text | NO | Snapshot of duplicate setting |
-| model_provider | text | NO | `ollama` for V1 |
+| model_provider | text | NO | `gemini` (Cloud Turbo) or `ollama` (Localhost) |
 | model_name | text | NO | Actual selected model |
 | model_version | text | YES | Runtime/model version if available |
 | embedding_model | text | YES | Embedding model used for retrieval |

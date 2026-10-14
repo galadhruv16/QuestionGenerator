@@ -3,11 +3,11 @@
 ## Syllabus-Grounded Controllable Question Generation Platform
 
 **Document Type:** Product Requirements Document / Project README  
-**Version:** 1.0  
+**Version:** 1.1 (Dual-Engine Architecture Update)  
 **Scope:** V1  
-**Status:** Feature scope frozen for development planning  
-**Primary AI Approach:** Retrieval-Augmented Generation (RAG) + lightweight local LLM  
-**Deployment Philosophy:** Free/local-first; no paid API required for V1
+**Status:** Authoritative Specification  
+**Primary AI Approach:** Retrieval-Augmented Generation (RAG) + Dual-Engine AI Inference (Google Gemini Cloud Turbo + Ollama Qwen 2.5 Localhost Offline)  
+**Deployment Philosophy:** Localhost modular monolith; dual-mode AI inference supporting lightning-fast cloud synthesis (Gemini API) and 100% on-device offline execution (Ollama Qwen 2.5) without mandatory paid infrastructure.
 
 ---
 
@@ -15,13 +15,13 @@
 
 This project is a role-neutral, authenticated question-generation platform that creates high-quality educational questions from study resources supplied by the user.
 
-The platform is intentionally scoped as a **question generator**, not as a grading system, adaptive learning platform, tutoring chatbot, or student-performance analytics system.
+The platform is intentionally scoped as a **controllable question generator**, not as a grading system, adaptive learning platform, tutoring chatbot, or student-performance analytics system.
 
 The central product objective is:
 
-> Generate diverse, high-order, configurable questions from user-provided study material using a lightweight local LLM, while validating that the generated questions satisfy the user's requested cognitive, difficulty, stylistic, grounding, and diversity constraints.
+> Generate diverse, high-order, configurable questions from user-provided study material using a Dual-Engine AI architecture (Google Gemini API for rapid, frontier academic synthesis, and Ollama Qwen 2.5 for 100% offline localhost execution), while validating that generated questions strictly satisfy the user's requested cognitive, difficulty, stylistic, grounding, and diversity constraints.
 
-The system must remain practical on ordinary consumer hardware without requiring a dedicated GPU or paid LLM API.
+The system empowers educators and students to create side-by-side projects evaluating cloud vs. local inference capabilities, while eliminating all synthetic template mock fallbacks.
 
 ---
 
@@ -36,27 +36,27 @@ The intended pipeline is:
 ```text
 User Resources
       ↓
-Document Processing
+Document Chunking & Local Vector Embeddings (nomic-embed-text)
       ↓
-Topic / Knowledge Structure Extraction
+Curriculum Knowledge Extraction (Gemini 2.0 Flash / Qwen 2.5 Local)
       ↓
-Generation Blueprint
+Interactive Topic Map Editing & Refinement
       ↓
-Topic-Aware Retrieval (RAG)
+Multidimensional Generation Blueprint (1–100 Qs, Bloom, Format, Difficulty)
       ↓
-Question Planning
+Topic-Aware RAG Retrieval & Front-Matter Filtering
       ↓
-Lightweight Local LLM
+Discrete Question Planning
       ↓
-Candidate Questions
+Dual-Engine AI Synthesis (Gemini API or Ollama Qwen 2.5)
       ↓
-Validation
+Candidate Questions (Strict Native JSON Schema)
       ↓
-Duplicate / Diversity Checks
+Automated Multi-Constraint Validation (Grounding, Deduplication, Schema)
       ↓
-Regeneration or Manual Review
+Regeneration or Manual Review (Zero Fake Slot-Filling)
       ↓
-Question Bank
+Monotonic Question Bank (#01..#N with Version Revisions)
 ```
 
 ---
@@ -71,8 +71,9 @@ Any authenticated user may:
 
 - create projects,
 - upload study material,
-- configure question-generation requirements,
-- generate questions,
+- choose between Cloud Turbo (Gemini) and Local Offline (Qwen 2.5) engines,
+- configure question-generation requirements (from 1 to 100 questions),
+- generate questions with full pedagogical transparency,
 - inspect validation results,
 - manage the project question bank,
 - regenerate or review failed questions.
@@ -90,55 +91,59 @@ The software does not assume either use case as the only intended workflow.
 ## 4.1 In Scope
 
 ### Project Management
-- User authentication
-- Project creation
-- Multiple projects per user
+- User authentication via Supabase Auth & Google OAuth
+- Project creation and multi-project tenancy
 - Project-specific resources
 - Project-specific topic map
-- Project-specific question bank
-- Project-specific generation history
+- Project-specific question bank with monotonic numbering
+- Project-specific generation history and batch filtering
 
 ### Resource Management
-- PDF upload
-- DOCX upload
-- PPT/PPTX upload
+- PDF upload and text parsing
+- DOCX upload and text parsing
+- PPT/PPTX upload and text parsing
 - Multiple resources within one project
-- Text extraction
-- Chunking
+- Page-aware and byte-span chunking
 - Metadata preservation
-- Local embeddings
-- Project-specific vector knowledge base
+- Local vector embeddings (`nomic-embed-text`)
+- Project-specific vector knowledge base in Supabase pgvector
 
 ### Topic / Knowledge Structure
-- Automatic extraction of topic hierarchy from supplied resources
-- User editing of the extracted topic map
-- Add topic
-- Remove topic
-- Rename topic
-- Merge/reorganize topics
-- Use topic map for generation constraints and retrieval
+- Dual-Engine extraction of curriculum hierarchy from supplied resources:
+  - Google Gemini 2.0/1.5 Flash (Cloud Turbo)
+  - Ollama Qwen 2.5 (Local Offline)
+- Strict anti-brand and anti-noise filtering (rejects desktop software and brand names like Microsoft Word, Mozilla Firefox)
+- Interactive hierarchy editor:
+  - Add module / subtopic
+  - Remove module / subtopic
+  - Rename module / subtopic
+  - Inspect mapped resource chunks
+- Topic-scoped constraints for question planning and RAG retrieval
 
 ### Controlled Question Generation
-- User-selected number of questions
-- Question-format selection
-- Bloom's Taxonomy selection
-- Difficulty selection
-- Question-style selection
-- Topic selection
-- Distribution/weight configuration
-- Generation presets
-- RAG-grounded context retrieval
-- Structured LLM output
+- User-selected target question volume (1 to 100 questions) via slider, numerical input, and quick pills
+- Dual-Engine AI synthesis selector:
+  - Google Gemini API (`gemini-2.0-flash`, `gemini-1.5-flash`)
+  - Localhost Ollama (`qwen2.5:7b`, `qwen2.5:3b`)
+- Question format distributions (MCQ, Short Answer, Long Scenario Analysis)
+- Bloom's Taxonomy cognitive span distributions (L1 Remember through L6 Synthesize)
+- Difficulty calibration distributions (Easy, Medium, Hard)
+- Question style constraints (Analytical, Conceptual, Scenario-based)
+- Topic target allocation sliders
+- Generation presets (Balanced Exam Prep, High-Order Analytical, Foundational Recall, Custom)
+- Topic-aware RAG context retrieval with front-matter / TOC filtering
+- Strict structured JSON output with native schema enforcement
+- **Zero fake slot-filler fallback policy**: No static template questions or fake answers are ever permitted. Failed calls undergo JSON auto-repair or yield explicit failure diagnostics.
 
 ### Question Validation
-- Source grounding validation
+- Source grounding validation (cosine similarity and evidence quote byte-span check)
 - Topic alignment validation
 - Bloom-level alignment validation
 - Difficulty alignment validation
 - Question-style alignment validation
-- Structural validation
-- MCQ-specific validation
-- Semantic duplicate detection
+- Structural schema validation
+- MCQ-specific validation (exactly 4 distinct options, 1 verified correct answer, 3 plausible conceptual distractors with specific error rationales)
+- Semantic duplicate detection (intra-project cosine threshold < 0.82)
 - Batch diversity checks
 - Constraint satisfaction checks
 
@@ -147,18 +152,17 @@ The software does not assume either use case as the only intended workflow.
 - Maximum retry limit
 - Preservation of user constraints
 - Manual-review state when constraints cannot be satisfied
-- Visible validation status and validation explanation
+- Visible validation status, score breakdown, and validation explanations
 
-### Question Bank
-- Persist generated questions
-- Search/filter questions
-- View question metadata
-- View source evidence
-- Approve/reject questions
-- Regenerate individual questions
-- Delete questions
-- Edit question metadata/content where supported
-- Track question generation history
+### Question Bank & Review Studio
+- Persist generated questions in Supabase PostgreSQL
+- Monotonic sequential numbering (`#01..#15`, `#16..#30`) across runs
+- Generation Batch filtering (All Batches, Batch #1, Batch #2, etc.)
+- Multi-vector filtering (Status, Topic, Bloom, Difficulty, Format, Verified Citations)
+- Inspect question stem, answer keys, distractor rationale ledger, evidence quotes, and validation check logs
+- Bulk status updates (Accept, Flag, Reject)
+- Immutable version history with instructor edit revision drawer (`v1`, `v2`, etc.)
+- Archive-first question lifecycle (soft-delete via `archived_at`)
 
 ### Optional PYQ Support
 - PYQs may be uploaded as additional resources
@@ -257,6 +261,20 @@ A question becomes acceptable only after it passes the configured validation cri
 If the system cannot generate the requested number of valid questions within the configured retry policy, it must not quietly lower difficulty, alter Bloom levels, accept duplicates, or otherwise weaken constraints just to satisfy the requested count.
 
 The failed items must instead be identified for manual review.
+
+## 5.7 Zero Synthetic Slot-Filling Fallbacks
+
+The system strictly prohibits fake fill-in-the-blank template questions, synthetic mock distractors, or dummy answers (such as slotting raw document lines or table-of-contents headings into rigid question stems) when an LLM call fails, times out, or produces unparsable output. 
+
+Failed generations must undergo automated structural JSON self-healing/retry loops or yield an explicit failure diagnostic with granular telemetry (`validation_status: 'failed'`). Slow generation is acceptable; fake or nonsensical educational output is strictly forbidden.
+
+## 5.8 Dual-Engine Execution Parity
+
+The platform supports two parallel, first-class AI synthesis engines:
+1. **Google Gemini API** (`gemini-2.0-flash` / `gemini-1.5-flash`): Cloud Turbo engine offering high-velocity (1–3s per question), frontier reasoning, and flawless schema adherence.
+2. **Local Ollama** (`qwen2.5:7b` / `qwen2.5:3b`): 100% offline, private, localhost on-device execution for offline academic environments and hardware demonstrations.
+
+Both engines adhere to the exact same typed Zod contracts, validation gauntlets, and provenance standards. The user can select the engine per project (e.g. before topic inference) or per run (in the Generation Studio), enabling side-by-side benchmarking.
 
 ---
 
@@ -365,6 +383,19 @@ Comparative 20%
 ```
 
 The generation planner should convert these requirements into a concrete question blueprint before generation.
+
+## 6.8 AI Inference Engine & Model Configuration
+
+The user selects which AI inference engine and specific model powers both topic inference and question generation:
+
+1. **Google Gemini API (Cloud Turbo - Default)**:
+   - `gemini-2.0-flash` (recommended, sub-3s response, state-of-the-art multi-turn reasoning and schema fidelity)
+   - `gemini-1.5-flash` (stable high-throughput fallback)
+2. **Localhost Ollama (Offline / Demonstration)**:
+   - `qwen2.5:7b` (recommended local model for deep reasoning, instruction compliance, and academic synthesis)
+   - `qwen2.5:3b` (lightweight local option for memory-constrained environments)
+
+The selected engine is stored in `generation_runs.model_provider` (`'gemini' | 'ollama'`) and `generation_runs.model_name` for complete pedagogical auditability.
 
 ---
 

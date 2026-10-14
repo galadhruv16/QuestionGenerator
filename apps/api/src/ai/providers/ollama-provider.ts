@@ -14,8 +14,9 @@ export class OllamaProvider implements AIProvider {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         body: JSON.stringify({
           format: options.format,
-          model: options.model || env.OLLAMA_MODEL || 'llama3',
+          model: options.model || env.OLLAMA_MODEL || 'phi3:latest',
           options: {
+            num_predict: 300,
             seed: options.seed ?? 42,
             temperature: options.temperature ?? 0.2,
           },

@@ -10,6 +10,7 @@ import {
   type AuthenticatedRequest,
 } from '../middleware/require-auth.js';
 import { executeGenerationRun } from '../services/question-generator.js';
+import { env } from '../config/env.js';
 
 const uuidSchema = z.string().uuid();
 
@@ -94,7 +95,11 @@ generationRunsRouter.post('/', async (request, response, next) => {
           medium: 50,
         },
         duplicate_policy: 'PREVENT',
-        model_name: parsedBody.data.model_name || 'llama3',
+        model_name:
+          parsedBody.data.model_name ||
+          (env.GEMINI_API_KEY ? env.GEMINI_MODEL || 'gemini-flash-latest' : env.OLLAMA_MODEL || 'qwen2.5:7b'),
+        model_provider:
+          parsedBody.data.model_provider || (env.GEMINI_API_KEY ? 'gemini' : 'ollama'),
         question_count: 10,
         styles: {
           analytical: 40,
@@ -111,6 +116,23 @@ generationRunsRouter.post('/', async (request, response, next) => {
       };
     }
 
+    const effectiveProvider =
+      parsedBody.data.model_provider ||
+      config.model_provider ||
+      (env.GEMINI_API_KEY ? 'gemini' : 'ollama');
+
+    const effectiveModel =
+      (parsedBody.data.model_name && parsedBody.data.model_name !== 'llama3'
+        ? parsedBody.data.model_name
+        : config.model_name && config.model_name !== 'llama3'
+          ? config.model_name
+          : effectiveProvider === 'gemini'
+            ? env.GEMINI_MODEL || 'gemini-flash-latest'
+            : env.OLLAMA_MODEL || 'qwen2.5:7b');
+
+    config.model_provider = effectiveProvider;
+    config.model_name = effectiveModel;
+
     const requestedCount = config.question_count || 10;
 
     // Create the generation run
@@ -121,8 +143,8 @@ generationRunsRouter.post('/', async (request, response, next) => {
         blueprint_snapshot: config,
         created_by: authReq.authUser.id,
         duplicate_policy: config.duplicate_policy || 'PREVENT',
-        model_name: config.model_name || 'llama3',
-        model_provider: 'ollama',
+        model_name: effectiveModel,
+        model_provider: effectiveProvider,
         project_id: parsedProjectId.data,
         requested_count: requestedCount,
         status: 'QUEUED',

@@ -1,14 +1,14 @@
 # Syllabus-Grounded Controllable Question Generation
-## API Specification — V1
+## API Specification — V1.1
 
-**Document status:** Frozen for V1 implementation  
+**Document status:** Authoritative HTTP API Specification  
 **Audience:** Developers, AI coding agents, reviewers, and project team  
 **API style:** REST + JSON  
 **Base path:** `/api/v1`  
-**Application execution:** Localhost  
-**Managed services:** Supabase Cloud  
+**Application execution:** Localhost (Node.js/Express + Vite/React)  
+**Managed services:** Supabase Cloud (PostgreSQL, pgvector, Auth, Storage)  
 **Authentication:** Supabase Auth + Google OAuth  
-**LLM:** Local Ollama  
+**AI Inference Runtime:** Dual-Engine (Google Gemini Cloud Turbo + Localhost Ollama Qwen 2.5)  
 **Database:** PostgreSQL + pgvector via Supabase  
 
 ---
@@ -589,6 +589,49 @@ POST /api/v1/projects/:projectId/topics/reorder
 }
 ```
 
+## Infer topics from resources
+
+Synthesizes a 2-level topic tree (Modules and Subtopics) from ready resource chunks using the chosen AI engine. Employs anti-brand and anti-noise constraints.
+
+```http
+POST /api/v1/projects/:projectId/topics/infer
+```
+
+Request:
+
+```json
+{
+  "resource_ids": ["optional-resource-uuid-1", "optional-resource-uuid-2"],
+  "model_provider": "gemini", // "gemini" (Cloud Turbo - default) | "ollama" (Local Offline)
+  "model_name": "gemini-2.0-flash" // e.g. "gemini-2.0-flash" or "qwen2.5:7b"
+}
+```
+
+Response:
+
+```json
+{
+  "data": {
+    "topics": [
+      {
+        "id": "module-1-uuid",
+        "name": "Process Management",
+        "parent_id": null,
+        "sort_order": 1,
+        "subtopics": [
+          {
+            "id": "subtopic-1-uuid",
+            "name": "Process States & Lifecycle",
+            "parent_id": "module-1-uuid",
+            "sort_order": 1
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
 ---
 
 # 13. Preset API
@@ -741,6 +784,8 @@ Recommended request:
 ```json
 {
   "blueprint_id": "uuid",
+  "model_provider": "gemini", // "gemini" (Cloud Turbo) | "ollama" (Local Offline)
+  "model_name": "gemini-2.0-flash", // e.g. "gemini-2.0-flash" | "qwen2.5:7b"
   "request_id": "optional-client-generated-uuid"
 }
 ```
@@ -749,13 +794,22 @@ An inline configuration may be supported for unsaved custom generation:
 
 ```json
 {
-  "configuration": {}
+  "configuration": {
+    "question_count": 25,
+    "model_provider": "gemini",
+    "model_name": "gemini-2.0-flash",
+    "bloom": { "analyze": 40, "apply": 30, "evaluate": 30 },
+    "difficulty": { "easy": 20, "medium": 50, "hard": 30 },
+    "styles": { "analytical": 50, "scenario": 50 },
+    "types": { "mcq": 60, "short_answer": 40 },
+    "duplicate_policy": "PREVENT"
+  }
 }
 ```
 
 The backend creates:
 
-- generation run
+- generation run (recording `model_provider` and `model_name`)
 - immutable blueprint snapshot
 - generation plan items
 

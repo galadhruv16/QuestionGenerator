@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GroundQ — Question Review &amp; Provenance Inspection Studio</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            app: {
+              base: '#030712',
+              surface: '#0b0f17',
+              card: '#111827',
+              panel: '#0f172a',
+              border: '#1f2937',
+              'border-subtle': '#374151',
+              hover: '#1e293b',
+            },
+            brand: {
+              emerald: '#10b981',
+              'emerald-dim': 'rgba(16, 185, 129, 0.12)',
+              cyan: '#22d3ee',
+              'cyan-dim': 'rgba(34, 211, 238, 0.12)',
+              indigo: '#6366f1',
+              'indigo-dim': 'rgba(99, 102, 241, 0.12)',
+              amber: '#f59e0b',
+              'amber-dim': 'rgba(245, 158, 11, 0.12)',
+              rose: '#f43f5e',
+              'rose-dim': 'rgba(244, 63, 94, 0.12)',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'Geist', 'sans-serif'],
+            display: ['Geist', 'Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    /* Sleek custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #030712;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1f2937;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #374151;
+    }
+  </style>
+</head>
+<body class="bg-app-base text-[#f9fafb] font-sans antialiased h-screen flex flex-col overflow-hidden selection:bg-brand-emerald/30 selection:text-white select-none">
+<!-- 1. TOP GLOBAL NAVIGATION HEADER (54px) -->
+<header class="h-[54px] border-b border-app-border bg-app-surface/95 backdrop-blur px-4 flex items-center justify-between shrink-0 z-30">
+<!-- Left: Logo & Breadcrumbs -->
+<div class="flex items-center space-x-3.5">
+<!-- GroundQ Minimalist Geometric Academic Icon with glowing green dot -->
+<div class="flex items-center space-x-2.5 group cursor-pointer">
+<div class="w-7 h-7 rounded-lg bg-gradient-to-br from-gray-900 to-[#111827] border border-app-border-subtle flex items-center justify-center relative shadow-inner">
+<svg class="w-4 h-4 text-brand-emerald" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24">
+<path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+</svg>
+<span class="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-emerald opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-brand-emerald shadow-[0_0_8px_#10b981]"></span>
+</span>
+</div>
+<span class="font-bold text-base tracking-tight text-[#f9fafb] font-display">GroundQ</span>
+</div>
+<div class="h-4 w-px bg-app-border"></div>
+<!-- Breadcrumbs with arrow separators -->
+<nav class="flex items-center space-x-2 text-xs font-mono text-[#9ca3af]">
+<span class="hover:text-[#f9fafb] cursor-pointer transition-colors">Workspaces</span>
+<svg class="w-3 h-3 text-[#6b7280]" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="hover:text-[#f9fafb] cursor-pointer transition-colors text-gray-300">CS-842: Distributed Systems Core</span>
+<svg class="w-3 h-3 text-[#6b7280]" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-brand-emerald font-medium px-2 py-0.5 rounded bg-brand-emerald-dim border border-brand-emerald/30 text-[11px]">Question Review</span>
+</nav>
+</div>
+<!-- Right: Telemetry Strip Pill & Profile Avatar -->
+<div class="flex items-center space-x-3">
+<!-- System Telemetry Strip Pill container -->
+<div class="hidden md:flex items-center space-x-2 bg-app-card border border-app-border text-xs font-mono px-3 py-1 rounded-full text-[#9ca3af]">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-emerald opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-brand-emerald"></span>
+</span>
+<span class="text-[#f9fafb] font-medium">Ollama: Llama-3 (Local)</span>
+<span class="text-[#6b7280]">•</span>
+<span>15 Questions Synthesized</span>
+<span class="text-[#6b7280]">•</span>
+<span class="text-brand-emerald font-semibold">100% Grounded</span>
+</div>
+<div class="h-4 w-px bg-app-border"></div>
+<!-- Instructor Profile Avatar Circle -->
+<div class="flex items-center space-x-2 pl-0.5">
+<div class="w-7 h-7 rounded-full bg-[#1e293b] border border-app-border-subtle flex items-center justify-center text-[#f9fafb] text-xs font-mono font-semibold ring-1 ring-brand-emerald/20 hover:ring-brand-emerald/50 transition-all cursor-pointer" title="Instructor: Prof. David Garcia">
+          DG
+        </div>
+</div>
+</div>
+</header>
+<!-- 2. COURSE SUB-HEADER & 5-STEP PIPELINE TAB BAR (76px) -->
+<div class="border-b border-app-border bg-app-surface px-5 pt-3 pb-0 shrink-0 z-20">
+<!-- Course Title & Metadata row -->
+<div class="flex items-center justify-between mb-2.5">
+<div>
+<h1 class="text-lg font-bold tracking-tight text-[#f9fafb] font-display flex items-center space-x-2">
+<span>CS-842: Distributed Systems Core</span>
+<span class="text-[11px] font-mono font-normal text-[#9ca3af] bg-[#111827] border border-app-border px-2 py-0.5 rounded">v2.4 Course Bank</span>
+</h1>
+<p class="text-xs text-[#9ca3af] font-mono mt-0.5">Fall 2026 • 3 Modules • 15 Items</p>
+</div>
+<!-- Top Quick Badges / Telemetry Details -->
+<div class="flex items-center space-x-3 text-xs font-mono text-[#9ca3af]">
+<span class="flex items-center space-x-1.5 bg-[#030712] border border-app-border px-2.5 py-1 rounded">
+<span class="text-[#6b7280]">Seed:</span>
+<span class="text-[#f9fafb]">#42-det</span>
+</span>
+<span class="flex items-center space-x-1.5 bg-[#030712] border border-app-border px-2.5 py-1 rounded">
+<span class="text-[#6b7280]">Deduplication:</span>
+<span class="text-brand-emerald font-semibold">Cosine &lt; 0.82</span>
+</span>
+</div>
+</div>
+<!-- 5-Step Pipeline Tab Bar with step numbers and badge counters -->
+<div class="flex items-center space-x-1 font-mono text-xs overflow-x-auto">
+<!-- 01 Resources -->
+<a class="px-3.5 py-2 text-[#9ca3af] hover:text-[#f9fafb] hover:bg-app-card rounded-t border-b-2 border-transparent transition-colors flex items-center space-x-1.5" href="#">
+<span class="text-[#6b7280]">01</span>
+<span>Resources</span>
+<span class="text-[10px] bg-app-card border border-app-border text-[#9ca3af] px-1.5 py-0.2 rounded font-bold">2</span>
+</a>
+<!-- 02 Topic Map -->
+<a class="px-3.5 py-2 text-[#9ca3af] hover:text-[#f9fafb] hover:bg-app-card rounded-t border-b-2 border-transparent transition-colors flex items-center space-x-1.5" href="#">
+<span class="text-[#6b7280]">02</span>
+<span>Topic Map</span>
+<span class="text-[10px] bg-app-card border border-app-border text-[#9ca3af] px-1.5 py-0.2 rounded font-bold">3</span>
+</a>
+<!-- 03 Generation Studio -->
+<a class="px-3.5 py-2 text-[#9ca3af] hover:text-[#f9fafb] hover:bg-app-card rounded-t border-b-2 border-transparent transition-colors flex items-center space-x-1.5" href="#">
+<span class="text-[#6b7280]">03</span>
+<span>Generation Studio</span>
+</a>
+<!-- 04 Question Review (ACTIVE TAB with bottom emerald border & "15" badge) -->
+<a class="px-3.5 py-2 text-[#f9fafb] font-medium border-b-2 border-brand-emerald bg-app-panel/50 rounded-t flex items-center space-x-2" href="#">
+<span class="text-brand-emerald font-bold">04</span>
+<span>Question Review</span>
+<span class="bg-brand-emerald text-[#030712] text-[10px] font-bold px-1.5 py-0.2 rounded-full">15</span>
+</a>
+<!-- 05 Export & Assembly -->
+<a class="px-3.5 py-2 text-[#6b7280] hover:text-[#9ca3af] rounded-t border-b-2 border-transparent transition-colors flex items-center space-x-1.5" href="#">
+<span class="text-[#6b7280]">05</span>
+<span>Export &amp; Assembly</span>
+</a>
+</div>
+</div>
+<!-- 3. MAIN SPLIT-PANE LAYOUT (3 Columns) -->
+<main class="flex-1 flex overflow-hidden bg-app-base">
+<!-- COLUMN A: MULTI-DIMENSIONAL SLICER SIDEBAR (Width ~280px, sticky border-r border-[#1f2937]) -->
+<aside class="w-[280px] border-r border-app-border bg-app-surface flex flex-col shrink-0 overflow-y-auto">
+<!-- Search Input with Ctrl+K shortcut badge -->
+<div class="p-3 border-b border-app-border">
+<div class="relative">
+<input class="w-full bg-app-base border border-app-border rounded px-2.5 py-1.5 text-xs text-[#f9fafb] placeholder-[#6b7280] focus:outline-none focus:border-brand-emerald transition-colors font-sans pl-8" placeholder="Search stems, tags, chunks..." type="text"/>
+<svg class="w-3.5 h-3.5 text-[#6b7280] absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="absolute right-2 top-2 text-[10px] font-mono bg-app-card text-[#9ca3af] px-1.5 py-0.5 rounded border border-app-border">Ctrl+K</span>
+</div>
+</div>
+<div class="p-3.5 space-y-5 text-xs">
+<!-- Review Status Segmented Pills -->
+<div>
+<div class="text-[11px] font-mono text-[#9ca3af] uppercase tracking-wider font-semibold mb-2 flex items-center justify-between">
+<span>Review Status</span>
+<span class="text-[10px] text-[#6b7280]">15 total</span>
+</div>
+<div class="flex flex-col space-y-1 font-mono text-[11px]">
+<!-- All (15) [active] -->
+<button class="w-full px-2.5 py-1.5 rounded bg-brand-emerald-dim border border-brand-emerald/40 text-brand-emerald font-semibold flex items-center justify-between">
+<span class="flex items-center space-x-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-emerald"></span>
+<span>All Items</span>
+</span>
+<span class="bg-brand-emerald/20 px-1.5 py-0.2 rounded text-[10px]">15</span>
+</button>
+<!-- Available / In Review (12) -->
+<button class="w-full px-2.5 py-1.5 rounded bg-app-card border border-app-border text-brand-amber hover:bg-app-hover flex items-center justify-between transition-colors">
+<span class="flex items-center space-x-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-amber"></span>
+<span>Available / Review</span>
+</span>
+<span class="bg-brand-amber-dim border border-brand-amber/30 text-brand-amber px-1.5 py-0.2 rounded text-[10px]">12</span>
+</button>
+<!-- Accepted (3) -->
+<button class="w-full px-2.5 py-1.5 rounded bg-app-card border border-app-border text-[#f9fafb] hover:bg-app-hover flex items-center justify-between transition-colors">
+<span class="flex items-center space-x-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-emerald"></span>
+<span class="text-emerald-300">Accepted</span>
+</span>
+<span class="bg-brand-emerald-dim border border-brand-emerald/30 text-brand-emerald px-1.5 py-0.2 rounded text-[10px]">3</span>
+</button>
+<!-- Flagged (0) & Rejected (0) -->
+<div class="grid grid-cols-2 gap-1 pt-0.5">
+<button class="px-2 py-1 rounded bg-app-card border border-app-border text-[#9ca3af] hover:bg-app-hover flex items-center justify-between transition-colors">
+<span>Flagged</span>
+<span class="text-[#6b7280] text-[10px]">0</span>
+</button>
+<button class="px-2 py-1 rounded bg-app-card border border-app-border text-[#9ca3af] hover:bg-app-hover flex items-center justify-between transition-colors">
+<span>Rejected</span>
+<span class="text-[#6b7280] text-[10px]">0</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Filter Group 1: Curriculum Module -->
+<div class="pt-1">
+<div class="text-[11px] font-mono text-[#9ca3af] uppercase tracking-wider font-semibold mb-2 flex items-center justify-between">
+<span>Curriculum Module</span>
+<span class="text-[10px] text-brand-cyan hover:underline cursor-pointer">Reset</span>
+</div>
+<div class="space-y-1.5">
+<label class="flex items-start space-x-2 text-[#f9fafb] cursor-pointer p-1 rounded hover:bg-app-card transition-colors">
+<input checked="" class="mt-0.5 rounded border-app-border-subtle bg-[#030712] text-brand-emerald focus:ring-0" type="checkbox"/>
+<div class="flex-1 min-w-0">
+<div class="truncate text-xs font-medium">Module 1: Process Sync &amp; Deadlocks</div>
+<div class="text-[10px] font-mono text-[#6b7280]">6 items • Banker's, Mutex</div>
+</div>
+</label>
+<label class="flex items-start space-x-2 text-[#f9fafb] cursor-pointer p-1 rounded hover:bg-app-card transition-colors">
+<input checked="" class="mt-0.5 rounded border-app-border-subtle bg-[#030712] text-brand-emerald focus:ring-0" type="checkbox"/>
+<div class="flex-1 min-w-0">
+<div class="truncate text-xs font-medium">Module 2: Distributed IPC</div>
+<div class="text-[10px] font-mono text-[#6b7280]">5 items • RPC, Idempotency</div>
+</div>
+</label>
+<label class="flex items-start space-x-2 text-[#f9fafb] cursor-pointer p-1 rounded hover:bg-app-card transition-colors">
+<input checked="" class="mt-0.5 rounded border-app-border-subtle bg-[#030712] text-brand-emerald focus:ring-0" type="checkbox"/>
+<div class="flex-1 min-w-0">
+<div class="truncate text-xs font-medium">Module 3: Consensus Protocols</div>
+<div class="text-[10px] font-mono text-[#6b7280]">4 items • Raft, Paxos quorum</div>
+</div>
+</label>
+</div>
+</div>
+<!-- Filter Group 2: Cognitive Level (Bloom's Taxonomy with Color Dots) -->
+<div class="pt-1">
+<div class="text-[11px] font-mono text-[#9ca3af] uppercase tracking-wider font-semibold mb-2">
+<span>Cognitive Level (Bloom)</span>
+</div>
+<div class="space-y-1.5 font-mono text-[11px]">
+<label class="flex items-center justify-between text-[#9ca3af] hover:text-[#f9fafb] p-1 rounded hover:bg-app-card cursor-pointer">
+<span class="flex items-center space-x-2">
+<input class="rounded border-app-border-subtle bg-[#030712] text-brand-emerald focus:ring-0" type="checkbox"/>
+<span class="w-2 h-2 rounded-full bg-slate-400"></span>
+<span>Remember</span>
+</span>
+<span class="text-[10px] text-[#6b7280]">1</span>
+</label>
+<label class="flex items-center justify-between text-[#9ca3af] hover:text-[#f9fafb] p-1 rounded hover:bg-app-card cursor-pointer">
+<span class="flex items-center space-x-2">
+<input checked="" class="rounded border-app-border-subtle bg-[#030712] text-brand-emerald focus:ring-0" type="checkbox"/>
+<span class="w-2 h-2 rounded-full bg-blue-400"></span>
+<span>Understand</span>
+</span>
+<span class="text-[10px] text-[#6b7280]">2</span>
+</label>
+<label class="flex items-center justify-between text-[#9ca3af] hover:text-[#f9fafb] p-1 rounded hover:bg-app-card cursor-pointer">
+<span class="flex items-center space-x-2">
+<input checked="" class="rounded border-app-border-subtle bg-[#030712] text-brand-emerald focus:ring-0" type="checkbox"/>
+<span class="w-2 h-2 rounded-full bg-brand-cyan"></span>
+<span>Apply</span>
+</span>
+<span class="text-[10px] text-[#6b7280]">4</span>
+</label>
+<label class="flex items-center justify-between text-[#f9fafb] p-1 rounded bg-brand-indigo-dim/60 border border-brand-indigo/30 cursor-pointer">
+<span class="flex items-center space-x-2">
+<input checked="" class="rounded border-app-border-subtle bg-[#030712] text-brand-indigo focus:ring-0" type="checkbox"/>
+<span class="w-2 h-2 rounded-full bg-brand-indigo"></span>
+<span class="text-indigo-300 font-semibold">Analyze</span>
+</span>
+<span class="text-[10px] text-indigo-300 font-bold">5</span>
+</label>
+<label class="flex items-center justify-between text-[#9ca3af] hover:text-[#f9fafb] p-1 rounded hover:bg-app-card cursor-pointer">
+<span class="flex items-center space-x-2">
+<input checked="" class="rounded border-app-border-subtle bg-[#030712] text-brand-emerald focus:ring-0" type="checkbox"/>
+<span class="w-2 h-2 rounded-full bg-brand-amber"></span>
+<span>Evaluate</span>
+</span>
+<span class="text-[10px] text-[#6b7280]">3</span>
+</label>
+</div>
+</div>
+<!-- Filter Group 3: Difficulty (Pills: Easy, Medium, Hard) -->
+<div class="pt-1">
+<div class="text-[11px] font-mono text-[#9ca3af] uppercase tracking-wider font-semibold mb-2">
+<span>Difficulty Rating</span>
+</div>
+<div class="grid grid-cols-3 gap-1 font-mono text-[10px] text-center">
+<button class="py-1 rounded bg-app-card border border-app-border text-[#9ca3af] hover:text-[#f9fafb] hover:bg-app-hover">Easy (3)</button>
+<button class="py-1 rounded bg-app-card border border-app-border text-[#9ca3af] hover:text-[#f9fafb] hover:bg-app-hover">Medium (7)</button>
+<button class="py-1 rounded bg-brand-rose-dim border border-brand-rose/40 text-rose-300 font-semibold">Hard (5)</button>
+</div>
+</div>
+<!-- Filter Group 4: Question Type (Pills: MCQ, Short Answer, Long Scenario) -->
+<div class="pt-1">
+<div class="text-[11px] font-mono text-[#9ca3af] uppercase tracking-wider font-semibold mb-2">
+<span>Question Type</span>
+</div>
+<div class="flex flex-wrap gap-1 font-mono text-[10px]">
+<span class="px-2 py-1 rounded bg-brand-cyan-dim border border-brand-cyan/40 text-brand-cyan font-medium cursor-pointer">MCQ (9)</span>
+<span class="px-2 py-1 rounded bg-app-card border border-app-border text-[#9ca3af] hover:text-[#f9fafb] cursor-pointer">Short Answer (3)</span>
+<span class="px-2 py-1 rounded bg-app-card border border-app-border text-[#9ca3af] hover:text-[#f9fafb] cursor-pointer">Long Scenario (3)</span>
+</div>
+</div>
+<!-- Toggle: Show only questions with verified PDF citations -->
+<div class="pt-3 border-t border-app-border">
+<label class="flex items-start space-x-2 text-[#f9fafb] cursor-pointer">
+<input checked="" class="mt-0.5 rounded border-app-border-subtle bg-[#030712] text-brand-emerald focus:ring-0" type="checkbox"/>
+<div class="text-[11px]">
+<span class="font-medium text-brand-emerald block font-mono">Verified Citations Only</span>
+<span class="text-[#6b7280] text-[10px] leading-tight block mt-0.5">Show only questions with verified PDF citations (byte-span lock)</span>
+</div>
+</label>
+</div>
+</div>
+</aside>
+<!-- COLUMN B: QUESTION LIST FEED (Width ~520px, scrollable) -->
+<section class="w-[520px] xl:w-[540px] border-r border-app-border bg-[#070b14] flex flex-col shrink-0 overflow-hidden">
+<!-- Control Bar -->
+<div class="h-11 px-3.5 border-b border-app-border bg-app-surface flex items-center justify-between shrink-0 text-xs">
+<div class="flex items-center space-x-2.5">
+<input class="rounded border-app-border-subtle bg-[#030712] text-brand-emerald focus:ring-0" type="checkbox"/>
+<span class="font-mono text-[#f9fafb] font-semibold text-xs">15 Questions Found</span>
+</div>
+<div class="flex items-center space-x-2 font-mono text-[11px]">
+<span class="text-[#6b7280]">Sort:</span>
+<select class="bg-app-base border border-app-border rounded px-2 py-0.5 text-[11px] font-mono text-[#f9fafb] focus:outline-none focus:border-brand-emerald">
+<option>Sequence (#01 - #15)</option>
+<option>Bloom Level (High-Low)</option>
+<option>Grounding Score (% Match)</option>
+<option>Difficulty Rating</option>
+</select>
+<button class="px-2 py-1 bg-brand-emerald-dim hover:bg-brand-emerald/25 border border-brand-emerald/40 text-brand-emerald rounded font-semibold text-[10px] transition-colors flex items-center space-x-1">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span>Bulk Accept</span>
+</button>
+</div>
+</div>
+<!-- Question Cards Scrollable Feed -->
+<div class="flex-1 overflow-y-auto p-3 space-y-2.5">
+<!-- CARD #01: SELECTED / FOCUSED STATE with subtle cyan/emerald glow border -->
+<article class="p-3.5 rounded-lg bg-[#0e1626] border-2 border-brand-cyan/80 shadow-[0_0_18px_rgba(34,211,238,0.15)] relative cursor-pointer group transition-all">
+<div class="flex items-start justify-between mb-2">
+<div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+<!-- Sequence pill -->
+<span class="font-mono font-bold text-xs bg-brand-cyan-dim text-brand-cyan px-2 py-0.5 rounded border border-brand-cyan/40">#01</span>
+<!-- Type pill -->
+<span class="font-mono text-[10px] uppercase font-semibold bg-app-card text-[#9ca3af] px-1.5 py-0.5 rounded border border-app-border">MCQ</span>
+<!-- Bloom badge in purple-400 / indigo -->
+<span class="font-mono text-[10px] uppercase font-bold bg-indigo-950/90 text-indigo-300 border border-indigo-700/60 px-2 py-0.5 rounded">ANALYZE</span>
+<!-- Difficulty badge in amber-400 -->
+<span class="font-mono text-[10px] uppercase font-semibold bg-brand-rose-dim text-rose-300 px-1.5 py-0.5 rounded border border-brand-rose/40">HARD • 0.85</span>
+</div>
+<!-- Status pill (AVAILABLE in amber) -->
+<span class="font-mono text-[10px] uppercase font-semibold bg-brand-amber-dim text-brand-amber border border-brand-amber/50 px-2 py-0.5 rounded flex items-center space-x-1">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-amber animate-pulse"></span>
+<span>AVAILABLE</span>
+</span>
+</div>
+<!-- Question Stem Snippet -->
+<h4 class="text-xs font-normal text-[#f9fafb] line-clamp-2 leading-relaxed mb-2 font-sans">
+            Under the Banker's Algorithm for deadlock avoidance in an asynchronous multi-threaded kernel, assume the system state currently satisfies the safety criterion. If thread $T_3$ requests allocation of resource vector $R_k$, which invariant mathematically proves that granting $R_k$ keeps the state strictly safe?
+          </h4>
+<!-- Metadata Footer -->
+<div class="text-[10px] font-mono text-[#9ca3af] mb-2 flex items-center space-x-1.5">
+<span class="text-[#6b7280]">Topic:</span>
+<span class="text-gray-300">Module 1: Process Synchronization</span>
+</div>
+<div class="flex items-center justify-between text-[11px] font-mono pt-2 border-t border-app-border-subtle/70 text-[#9ca3af]">
+<!-- Grounding tag with book icon -->
+<div class="flex items-center space-x-1.5 truncate text-brand-emerald">
+<svg class="w-3.5 h-3.5 shrink-0 text-brand-emerald" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="truncate">lecture_04_sync.pdf (p. 14) • 99.4% Match</span>
+</div>
+<!-- Hover quick action buttons: Checkmark (Accept), Flag (Review), Cross (Reject) -->
+<div class="flex items-center space-x-1 shrink-0">
+<button class="p-1 rounded bg-brand-emerald-dim hover:bg-brand-emerald text-brand-emerald hover:text-black border border-brand-emerald/40 transition-colors" title="Accept Question">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path></svg>
+</button>
+<button class="p-1 rounded bg-brand-amber-dim hover:bg-brand-amber text-brand-amber hover:text-black border border-brand-amber/40 transition-colors" title="Flag for Review">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+<button class="p-1 rounded bg-brand-rose-dim hover:bg-brand-rose text-rose-400 hover:text-black border border-brand-rose/40 transition-colors" title="Reject Question">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</div>
+</div>
+</article>
+<!-- CARD #02: ACCEPTED ITEM -->
+<article class="p-3 rounded-lg bg-app-card border border-app-border hover:border-app-border-subtle cursor-pointer group transition-all">
+<div class="flex items-start justify-between mb-1.5">
+<div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+<span class="font-mono font-bold text-xs bg-[#1f2937] text-[#9ca3af] px-1.5 py-0.5 rounded">#02</span>
+<span class="font-mono text-[10px] uppercase font-semibold bg-[#030712] text-[#9ca3af] px-1.5 py-0.5 rounded border border-app-border">SHORT ANSWER</span>
+<span class="font-mono text-[10px] uppercase font-semibold bg-brand-cyan-dim text-brand-cyan border border-brand-cyan/30 px-1.5 py-0.5 rounded">APPLY</span>
+<span class="font-mono text-[10px] uppercase font-semibold bg-app-card text-[#9ca3af] px-1.5 py-0.5 rounded border border-app-border">MED • 0.55</span>
+</div>
+<!-- Status pill (ACCEPTED in green) -->
+<span class="font-mono text-[10px] uppercase font-semibold bg-brand-emerald-dim text-brand-emerald border border-brand-emerald/40 px-2 py-0.5 rounded flex items-center space-x-1">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-emerald"></span>
+<span>ACCEPTED</span>
+</span>
+</div>
+<h4 class="text-xs font-normal text-[#f9fafb] line-clamp-2 leading-relaxed mb-2">
+            Given a Raft consensus cluster with 5 nodes experiencing a network partition separating Nodes {1, 2} from Nodes {3, 4, 5}, trace why a client write request to Node 1 will fail to commit while writes to Node 4 succeed.
+          </h4>
+<div class="text-[10px] font-mono text-[#9ca3af] mb-2 flex items-center space-x-1.5">
+<span class="text-[#6b7280]">Topic:</span>
+<span class="text-gray-300">Module 3: Consensus Protocols</span>
+</div>
+<div class="flex items-center justify-between text-[11px] font-mono pt-1.5 border-t border-app-border text-[#9ca3af]">
+<div class="flex items-center space-x-1.5 truncate text-[#9ca3af]">
+<svg class="w-3.5 h-3.5 shrink-0 text-[#6b7280]" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="truncate">raft_protocol_paper.pdf (p. 6) • 99.8% Match</span>
+</div>
+<span class="text-[10px] text-[#6b7280] font-mono">Curated 2m ago</span>
+</div>
+</article>
+<!-- CARD #03: AVAILABLE ITEM -->
+<article class="p-3 rounded-lg bg-app-card border border-app-border hover:border-app-border-subtle cursor-pointer group transition-all">
+<div class="flex items-start justify-between mb-1.5">
+<div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+<span class="font-mono font-bold text-xs bg-[#1f2937] text-[#9ca3af] px-1.5 py-0.5 rounded">#03</span>
+<span class="font-mono text-[10px] uppercase font-semibold bg-[#030712] text-[#9ca3af] px-1.5 py-0.5 rounded border border-app-border">MCQ</span>
+<span class="font-mono text-[10px] uppercase font-semibold bg-brand-amber-dim text-brand-amber border border-brand-amber/30 px-1.5 py-0.5 rounded">EVALUATE</span>
+<span class="font-mono text-[10px] uppercase font-semibold bg-brand-rose-dim text-rose-300 px-1.5 py-0.5 rounded border border-brand-rose/40">HARD • 0.88</span>
+</div>
+<span class="font-mono text-[10px] uppercase font-semibold bg-brand-amber-dim text-brand-amber border border-brand-amber/50 px-2 py-0.5 rounded flex items-center space-x-1">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-amber"></span>
+<span>AVAILABLE</span>
+</span>
+</div>
+<h4 class="text-xs font-normal text-[#f9fafb] line-clamp-2 leading-relaxed mb-2">
+            In at-least-once RPC semantics with duplicate request filtering, evaluate the safety violation that arises if the client retry timeout is set strictly smaller than the server's idempotency lease expiration window.
+          </h4>
+<div class="text-[10px] font-mono text-[#9ca3af] mb-2 flex items-center space-x-1.5">
+<span class="text-[#6b7280]">Topic:</span>
+<span class="text-gray-300">Module 2: Distributed IPC</span>
+</div>
+<div class="flex items-center justify-between text-[11px] font-mono pt-1.5 border-t border-app-border text-[#9ca3af]">
+<div class="flex items-center space-x-1.5 truncate text-[#9ca3af]">
+<svg class="w-3.5 h-3.5 shrink-0 text-[#6b7280]" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="truncate">tanenbaum_dist_systems.pdf (p. 88) • 98.9% Match</span>
+</div>
+<span class="text-[10px] text-[#6b7280] font-mono">Chunk #chk-311</span>
+</div>
+</article>
+<!-- CARD #04: ACCEPTED ITEM -->
+<article class="p-3 rounded-lg bg-app-card border border-app-border hover:border-app-border-subtle cursor-pointer group transition-all">
+<div class="flex items-start justify-between mb-1.5">
+<div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+<span class="font-mono font-bold text-xs bg-[#1f2937] text-[#9ca3af] px-1.5 py-0.5 rounded">#04</span>
+<span class="font-mono text-[10px] uppercase font-semibold bg-[#030712] text-[#9ca3af] px-1.5 py-0.5 rounded border border-app-border">MCQ</span>
+<span class="font-mono text-[10px] uppercase font-semibold bg-[#1e293b] text-blue-300 border border-blue-800/40 px-1.5 py-0.5 rounded">UNDERSTAND</span>
+<span class="font-mono text-[10px] uppercase font-semibold bg-[#030712] text-[#9ca3af] px-1.5 py-0.5 rounded border border-app-border">EASY • 0.32</span>
+</div>
+<span class="font-mono text-[10px] uppercase font-semibold bg-brand-emerald-dim text-brand-emerald border border-brand-emerald/40 px-2 py-0.5 rounded flex items-center space-x-1">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-emerald"></span>
+<span>ACCEPTED</span>
+</span>
+</div>
+<h4 class="text-xs font-normal text-[#f9fafb] line-clamp-2 leading-relaxed mb-2">
+            Which of the following conditions is strictly necessary but insufficient on its own to precipitate circular wait deadlock in Coffman's formal taxonomy?
+          </h4>
+<div class="text-[10px] font-mono text-[#9ca3af] mb-2 flex items-center space-x-1.5">
+<span class="text-[#6b7280]">Topic:</span>
+<span class="text-gray-300">Module 1: Process Synchronization</span>
+</div>
+<div class="flex items-center justify-between text-[11px] font-mono pt-1.5 border-t border-app-border text-[#9ca3af]">
+<div class="flex items-center space-x-1.5 truncate text-[#9ca3af]">
+<svg class="w-3.5 h-3.5 shrink-0 text-[#6b7280]" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="truncate">lecture_04_sync.pdf (p. 8) • 99.1% Match</span>
+</div>
+<span class="text-[10px] text-[#6b7280] font-mono">Curated 5m ago</span>
+</div>
+</article>
+<!-- CARD #05: AVAILABLE ITEM -->
+<article class="p-3 rounded-lg bg-app-card border border-app-border hover:border-app-border-subtle cursor-pointer group transition-all">
+<div class="flex items-start justify-between mb-1.5">
+<div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+<span class="font-mono font-bold text-xs bg-[#1f2937] text-[#9ca3af] px-1.5 py-0.5 rounded">#05</span>
+<span class="font-mono text-[10px] uppercase font-semibold bg-[#030712] text-[#9ca3af] px-1.5 py-0.5 rounded border border-app-border">SCENARIO</span>
+<span class="font-mono text-[10px] uppercase font-semibold bg-brand-indigo-dim text-indigo-300 border border-brand-indigo/40 px-1.5 py-0.5 rounded">ANALYZE</span>
+<span class="font-mono text-[10px] uppercase font-semibold bg-brand-rose-dim text-rose-300 px-1.5 py-0.5 rounded border border-brand-rose/40">HARD • 0.92</span>
+</div>
+<span class="font-mono text-[10px] uppercase font-semibold bg-brand-amber-dim text-brand-amber border border-brand-amber/50 px-2 py-0.5 rounded flex items-center space-x-1">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-amber"></span>
+<span>AVAILABLE</span>
+</span>
+</div>
+<h4 class="text-xs font-normal text-[#f9fafb] line-clamp-2 leading-relaxed mb-2">
+            Design an invariant guard in TLA+ style logic that prevents Byzantine quorum confusion when three validator nodes in a Raft derivative fail concurrently without sending explicit negative acknowledgments.
+          </h4>
+<div class="text-[10px] font-mono text-[#9ca3af] mb-2 flex items-center space-x-1.5">
+<span class="text-[#6b7280]">Topic:</span>
+<span class="text-gray-300">Module 3: Consensus Protocols</span>
+</div>
+<div class="flex items-center justify-between text-[11px] font-mono pt-1.5 border-t border-app-border text-[#9ca3af]">
+<div class="flex items-center space-x-1.5 truncate text-[#9ca3af]">
+<svg class="w-3.5 h-3.5 shrink-0 text-[#6b7280]" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="truncate">raft_protocol_paper.pdf (p. 12) • 99.5% Match</span>
+</div>
+<span class="text-[10px] text-[#6b7280] font-mono">Chunk #chk-408</span>
+</div>
+</article>
+</div>
+</section>
+<!-- COLUMN C: DEEP INSPECTION & PROVENANCE PANE (Width ~550px, border-l border-[#1f2937]) -->
+<section class="flex-1 bg-app-surface flex flex-col overflow-hidden min-w-[520px]">
+<!-- Inspection Header -->
+<div class="h-12 border-b border-app-border bg-app-panel/60 px-5 flex items-center justify-between shrink-0">
+<div class="flex items-center space-x-3">
+<span class="font-mono font-bold text-sm text-[#f9fafb]">Question #01</span>
+<span class="text-[#374151]">|</span>
+<!-- Version indicator badge -->
+<span class="font-mono text-[11px] bg-app-card text-[#9ca3af] border border-app-border px-2 py-0.5 rounded">v1 (AI-Generated)</span>
+<span class="text-[#374151]">|</span>
+<span class="font-mono text-xs text-[#6b7280]">UUID: <span class="text-gray-300">qst-842-0194e</span></span>
+</div>
+<div class="flex items-center space-x-2">
+<!-- Status Badge -->
+<span class="font-mono text-xs uppercase font-semibold bg-brand-amber-dim text-brand-amber border border-brand-amber/50 px-2.5 py-1 rounded flex items-center space-x-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-amber"></span>
+<span>AVAILABLE</span>
+</span>
+<!-- Edit Version outline button -->
+<button class="px-2.5 py-1 rounded bg-transparent hover:bg-app-card border border-app-border-subtle text-[#f9fafb] font-medium text-xs flex items-center space-x-1.5 transition-colors">
+<svg class="w-3.5 h-3.5 text-[#9ca3af]" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span>Edit Version</span>
+</button>
+</div>
+</div>
+<!-- Drawer Content Scrollable Area -->
+<div class="flex-1 overflow-y-auto p-5 space-y-5">
+<!-- CARD 1: QUESTION STEM & OPTION RATIONALE -->
+<div class="p-4 rounded-lg bg-app-card border border-app-border space-y-4">
+<div class="flex items-center justify-between border-b border-app-border pb-2.5">
+<span class="text-xs font-mono uppercase tracking-wider text-brand-cyan font-semibold flex items-center space-x-1.5">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span>Question Stem &amp; Pedagogical Rationale</span>
+</span>
+<div class="text-[11px] font-mono text-[#9ca3af]">
+<span>Bloom: </span><span class="text-indigo-300 font-semibold">L4 (Analyze)</span>
+<span class="text-[#6b7280] mx-1">•</span>
+<span>Format: </span><span class="text-[#f9fafb]">4-Option MCQ</span>
+</div>
+</div>
+<!-- Question Stem Text Box -->
+<div class="p-3.5 rounded bg-app-base border border-app-border text-sm leading-relaxed text-[#f9fafb]">
+            Under the <strong class="text-white font-semibold">Banker's Algorithm</strong> for deadlock avoidance in an asynchronous multi-threaded kernel, assume the system state currently satisfies the safety criterion. If thread <code class="text-brand-cyan font-mono bg-cyan-950/60 border border-cyan-800/40 px-1 py-0.5 rounded text-xs">T₃</code> requests allocation of resource vector <code class="text-brand-cyan font-mono bg-cyan-950/60 border border-cyan-800/40 px-1 py-0.5 rounded text-xs">R_k</code>, which invariant mathematically proves that granting <code class="text-brand-cyan font-mono bg-cyan-950/60 border border-cyan-800/40 px-1 py-0.5 rounded text-xs">R_k</code> maintains a strictly safe state?
+          </div>
+<!-- Multiple Choice Option List -->
+<div class="space-y-2.5">
+<div class="text-[11px] font-mono uppercase tracking-wider text-[#9ca3af] font-semibold">
+              Assessment Options &amp; Distractor Ledger
+            </div>
+<!-- Option A (Radio circle + text + distractor rationale in muted text) -->
+<div class="p-3 rounded border border-app-border bg-app-panel/60 text-xs space-y-1.5 transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-start space-x-2.5">
+<div class="w-4 h-4 rounded-full border border-[#6b7280] mt-0.5 flex items-center justify-center shrink-0">
+<span class="text-[9px] font-mono text-[#9ca3af]">A</span>
+</div>
+<p class="text-gray-300 font-sans leading-relaxed">
+                    The requested allocation vector satisfies <code class="font-mono text-gray-200 bg-app-base px-1 py-0.5 rounded">R_k ≤ Available</code>, and the remaining system available vector satisfies <code class="font-mono text-gray-200 bg-app-base px-1 py-0.5 rounded">Available - R_k ≥ 0</code>.
+                  </p>
+</div>
+<span class="text-[10px] font-mono text-[#9ca3af] uppercase px-1.5 py-0.5 bg-app-base rounded border border-app-border shrink-0">Distractor</span>
+</div>
+<div class="pl-6 text-[11px] text-[#9ca3af] italic border-l-2 border-app-border-subtle ml-2">
+<span class="font-mono text-rose-400 not-italic font-medium">Distractor Rationale:</span> Tests superficial availability check. Confuses immediate vector positivity with long-term safe sequence existence.
+              </div>
+</div>
+<!-- Option B (Correct Answer: subtle emerald background/border, green checkmark icon, "CORRECT ANSWER" tag) -->
+<div class="p-3.5 rounded border-2 border-brand-emerald bg-brand-emerald-dim text-xs space-y-2 shadow-sm ring-1 ring-brand-emerald/30">
+<div class="flex items-start justify-between">
+<div class="flex items-start space-x-2.5">
+<div class="w-4 h-4 rounded-full bg-brand-emerald text-[#030712] mt-0.5 flex items-center justify-center shrink-0">
+<svg class="w-3 h-3 text-black" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path></svg>
+</div>
+<p class="text-emerald-100 font-medium font-sans leading-relaxed">
+                    There exists at least one permutation sequence of all currently active threads <code class="font-mono text-emerald-300 bg-emerald-950/80 px-1 py-0.5 rounded">⟨T₁, T₂, ..., Tₙ⟩</code> such that for every thread <code class="font-mono text-emerald-300 bg-emerald-950/80 px-1 py-0.5 rounded">Tᵢ</code>, its maximum remaining need <code class="font-mono text-emerald-300 bg-emerald-950/80 px-1 py-0.5 rounded">Need[i] ≤ Available + ∑ Allocation[j]</code> for all predecessors <code class="font-mono text-emerald-300">j &lt; i</code>.
+                  </p>
+</div>
+<span class="font-mono text-[10px] font-bold text-brand-emerald bg-brand-emerald/20 border border-brand-emerald/60 px-2 py-0.5 rounded flex items-center space-x-1 shrink-0">
+<svg class="w-3 h-3 text-brand-emerald" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path></svg>
+<span>CORRECT ANSWER</span>
+</span>
+</div>
+<div class="pl-6 text-[11px] text-emerald-200/90 font-sans border-l-2 border-brand-emerald ml-2">
+<span class="font-mono text-brand-emerald font-semibold">Strict Proof Explanation:</span> Verifies the formal definition of a safe sequence. Students must deduce that temporary state transition is speculative until a valid termination topological sort is confirmed.
+              </div>
+</div>
+<!-- Option C (Distractor) -->
+<div class="p-3 rounded border border-app-border bg-app-panel/60 text-xs space-y-1.5 transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-start space-x-2.5">
+<div class="w-4 h-4 rounded-full border border-[#6b7280] mt-0.5 flex items-center justify-center shrink-0">
+<span class="text-[9px] font-mono text-[#9ca3af]">C</span>
+</div>
+<p class="text-gray-300 font-sans leading-relaxed">
+                    The Resource Allocation Graph (RAG) contains no immediate directed cycles involving node <code class="font-mono text-gray-200 bg-app-base px-1 py-0.5 rounded">T₃</code> after hypothetical assignment edge insertion.
+                  </p>
+</div>
+<span class="text-[10px] font-mono text-[#9ca3af] uppercase px-1.5 py-0.5 bg-app-base rounded border border-app-border shrink-0">Distractor</span>
+</div>
+<div class="pl-6 text-[11px] text-[#9ca3af] italic border-l-2 border-app-border-subtle ml-2">
+<span class="font-mono text-rose-400 not-italic font-medium">Distractor Rationale:</span> Cycle-freedom in RAG is only sufficient when all resource types have exactly 1 instance, failing for multi-instance kernels.
+              </div>
+</div>
+<!-- Option D (Distractor) -->
+<div class="p-3 rounded border border-app-border bg-app-panel/60 text-xs space-y-1.5 transition-all">
+<div class="flex items-start justify-between">
+<div class="flex items-start space-x-2.5">
+<div class="w-4 h-4 rounded-full border border-[#6b7280] mt-0.5 flex items-center justify-center shrink-0">
+<span class="text-[9px] font-mono text-[#9ca3af]">D</span>
+</div>
+<p class="text-gray-300 font-sans leading-relaxed">
+                    Thread <code class="font-mono text-gray-200 bg-app-base px-1 py-0.5 rounded">T₃</code> releases at least one held lock instance before requesting additional units in vector <code class="font-mono text-gray-200 bg-app-base px-1 py-0.5 rounded">R_k</code>.
+                  </p>
+</div>
+<span class="text-[10px] font-mono text-[#9ca3af] uppercase px-1.5 py-0.5 bg-app-base rounded border border-app-border shrink-0">Distractor</span>
+</div>
+<div class="pl-6 text-[11px] text-[#9ca3af] italic border-l-2 border-app-border-subtle ml-2">
+<span class="font-mono text-rose-400 not-italic font-medium">Distractor Rationale:</span> Confuses dynamic avoidance (Banker's) with static prevention (hold-and-wait elimination protocol).
+              </div>
+</div>
+</div>
+<!-- Model Answer & Rubric Criteria accordion tags -->
+<div class="pt-2 border-t border-app-border flex items-center space-x-2 text-[11px] font-mono">
+<span class="px-2 py-1 rounded bg-[#030712] border border-app-border text-[#9ca3af] flex items-center space-x-1 cursor-pointer hover:border-brand-emerald">
+<span>Model Rubric Criteria</span>
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</span>
+<span class="px-2 py-1 rounded bg-[#030712] border border-app-border text-[#9ca3af] flex items-center space-x-1 cursor-pointer hover:border-brand-emerald">
+<span>Standard Alignment (ABET CAC 1)</span>
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</span>
+</div>
+</div>
+<!-- CARD 2: GROUNDING EVIDENCE & PDF CITATION DRAWER -->
+<div class="p-4 rounded-lg bg-app-card border border-app-border space-y-3">
+<div class="flex items-center justify-between">
+<span class="text-xs font-mono uppercase tracking-wider text-brand-emerald font-semibold flex items-center space-x-1.5">
+<svg class="w-3.5 h-3.5 text-brand-emerald" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span>Grounding Evidence &amp; PDF Citation</span>
+</span>
+<span class="text-[10px] text-brand-emerald bg-brand-emerald-dim px-2 py-0.5 rounded border border-brand-emerald/40 font-mono">
+              SHA-256 Byte-Lock Verified
+            </span>
+</div>
+<!-- Source Reference Header -->
+<div class="text-xs font-mono text-[#9ca3af] flex items-center space-x-2 bg-app-base p-2 rounded border border-app-border">
+<span class="text-brand-emerald font-semibold">lecture_04_sync.pdf</span>
+<span class="text-[#6b7280]">•</span>
+<span class="text-[#f9fafb]">Page 14</span>
+<span class="text-[#6b7280]">•</span>
+<span>Chunk <code class="text-gray-300 bg-app-card px-1.5 py-0.2 rounded border border-app-border">#chk-092</code></span>
+</div>
+<!-- Quoted Evidence Box (dark background with left emerald accent border) -->
+<div class="p-3.5 rounded bg-app-base border-l-4 border-brand-emerald text-xs text-gray-200 leading-relaxed font-sans italic">
+            "A state is safe if the system can allocate resources to each thread in some order and still avoid a deadlock. More formally, a state is safe only if there exists a safe sequence ⟨T₁, T₂, ..., Tₙ⟩ of threads such that for each Tᵢ, the resources that Tᵢ can still request can be satisfied by the currently available resources plus the resources already held by all preceding threads Tⱼ with j &lt; i."
+          </div>
+<!-- Grounding Match Metric: 99.4% Cosine similarity bar -->
+<div class="space-y-1.5 pt-1">
+<div class="flex items-center justify-between text-xs font-mono">
+<span class="text-[#9ca3af]">Cosine Semantic Similarity</span>
+<span class="text-brand-emerald font-bold">99.4% Match</span>
+</div>
+<div class="w-full h-1.5 bg-[#030712] rounded-full overflow-hidden border border-app-border">
+<div class="h-full bg-brand-emerald rounded-full" style="width: 99.4%"></div>
+</div>
+</div>
+</div>
+<!-- CARD 3: 3-POINT VALIDATION LEDGER -->
+<div class="p-4 rounded-lg bg-app-card border border-app-border space-y-3">
+<div class="text-xs font-mono uppercase tracking-wider text-[#9ca3af] font-semibold">
+            Automated 3-Point Validation Ledger
+          </div>
+<div class="space-y-2 text-xs font-mono">
+<!-- Grounding Check -->
+<div class="p-2.5 rounded bg-app-base border border-brand-emerald/30 flex items-start justify-between">
+<div class="flex items-start space-x-2">
+<span class="w-4 h-4 rounded-full bg-brand-emerald text-black flex items-center justify-center shrink-0 mt-0.5">
+<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path></svg>
+</span>
+<div>
+<div class="font-bold text-[#f9fafb]">Grounding Verification</div>
+<div class="text-[11px] text-[#9ca3af] font-sans">Verified against source PDF byte-span (100% anchor match).</div>
+</div>
+</div>
+<span class="px-1.5 py-0.5 rounded bg-brand-emerald-dim text-brand-emerald text-[10px] font-bold border border-brand-emerald/40">PASS</span>
+</div>
+<!-- Deduplication Invariant -->
+<div class="p-2.5 rounded bg-app-base border border-brand-emerald/30 flex items-start justify-between">
+<div class="flex items-start space-x-2">
+<span class="w-4 h-4 rounded-full bg-brand-emerald text-black flex items-center justify-center shrink-0 mt-0.5">
+<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path></svg>
+</span>
+<div>
+<div class="font-bold text-[#f9fafb]">Deduplication Invariant</div>
+<div class="text-[11px] text-[#9ca3af] font-sans">Cosine similarity 0.12 &lt; 0.82 threshold against question bank.</div>
+</div>
+</div>
+<span class="px-1.5 py-0.5 rounded bg-brand-emerald-dim text-brand-emerald text-[10px] font-bold border border-brand-emerald/40">PASS</span>
+</div>
+<!-- Schema Quality -->
+<div class="p-2.5 rounded bg-app-base border border-brand-emerald/30 flex items-start justify-between">
+<div class="flex items-start space-x-2">
+<span class="w-4 h-4 rounded-full bg-brand-emerald text-black flex items-center justify-center shrink-0 mt-0.5">
+<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path></svg>
+</span>
+<div>
+<div class="font-bold text-[#f9fafb]">Schema Quality</div>
+<div class="text-[11px] text-[#9ca3af] font-sans">Valid JSON schema, 4 distinct options, single correct key.</div>
+</div>
+</div>
+<span class="px-1.5 py-0.5 rounded bg-brand-emerald-dim text-brand-emerald text-[10px] font-bold border border-brand-emerald/40">PASS</span>
+</div>
+</div>
+</div>
+</div>
+<!-- BOTTOM STICKY ACTION BAR -->
+<div class="h-14 border-t border-app-border bg-app-surface px-5 flex items-center justify-between shrink-0 text-xs">
+<div class="flex items-center space-x-2">
+<!-- Secondary action: "Reject Question" (dark button with subtle rose hover) -->
+<button class="px-3 py-1.5 rounded bg-app-card hover:bg-brand-rose-dim border border-app-border hover:border-brand-rose/50 text-[#9ca3af] hover:text-rose-300 font-medium flex items-center space-x-1.5 transition-colors">
+<svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span>Reject Question</span>
+</button>
+<!-- Secondary action: "Flag for Review" (dark button with amber text) -->
+<button class="px-3 py-1.5 rounded bg-app-card hover:bg-brand-amber-dim border border-app-border hover:border-brand-amber/50 text-brand-amber font-medium flex items-center space-x-1.5 transition-colors">
+<svg class="w-3.5 h-3.5 text-brand-amber" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span>Flag for Review</span>
+</button>
+</div>
+<!-- Primary CTA: "Accept Question to Bank" (solid emerald-600 button with white text and checkmark icon) -->
+<button class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center space-x-2 shadow-lg shadow-emerald-950/60 transition-colors">
+<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path></svg>
+<span>Accept Question to Bank</span>
+</button>
+</div>
+</section>
+</main>
+</body></html>

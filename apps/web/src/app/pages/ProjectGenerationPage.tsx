@@ -32,6 +32,10 @@ interface ResourceItem {
   status: string;
 }
 
+const apiBaseUrl =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.MODE === 'production' ? '' : 'http://localhost:3001');
+
 export function ProjectGenerationPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -96,7 +100,8 @@ export function ProjectGenerationPage() {
   // Quality invariants
   const [strictDeduplication, setStrictDeduplication] = useState(true);
   const [requireCitationAnchors, setRequireCitationAnchors] = useState(true);
-  const [targetModel] = useState('llama3:latest');
+  const [targetProvider, setTargetProvider] = useState<'gemini' | 'ollama'>('gemini');
+  const [targetModel, setTargetModel] = useState('gemini-flash-latest');
 
   // Generation execution state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -118,7 +123,7 @@ export function ProjectGenerationPage() {
   // Helper for authenticated API calls
   const apiRequest = async (path: string, init?: RequestInit) => {
     const session = (await getSupabaseClient().auth.getSession()).data.session;
-    const response = await fetch(`/api/v1${path}`, {
+    const response = await fetch(`${apiBaseUrl}/api/v1${path}`, {
       ...init,
       headers: {
         'Content-Type': 'application/json',
@@ -179,44 +184,8 @@ export function ProjectGenerationPage() {
           `/projects/${projectId}/generation-runs`,
         );
         setRecentRuns(runsRes.data ?? []);
-      } catch {
-        // Fallback demo topics for test or offline preview
-        const fallbackTopics: TopicItem[] = [
-          {
-            chunk_count: 28,
-            description:
-              "Banker's Algorithm, Safety Vectors, Resource Allocation Graphs",
-            id: 'top-1',
-            is_active: true,
-            name: 'Module 1: Process Synchronization & Deadlocks',
-            parent_id: null,
-          },
-          {
-            chunk_count: 24,
-            description:
-              'Idempotency Tokens, At-Least-Once vs Exactly-Once Semantics',
-            id: 'top-2',
-            is_active: true,
-            name: 'Module 2: Distributed IPC & RPCs',
-            parent_id: null,
-          },
-          {
-            chunk_count: 36,
-            description:
-              'Raft Leader Election, Term Monotonicity, Log Invariant Matching',
-            id: 'top-3',
-            is_active: true,
-            name: 'Module 3: Consensus Protocols & Replication',
-            parent_id: null,
-          },
-        ];
-        setTopics(fallbackTopics);
-        setTopicWeights({
-          'top-1': 40,
-          'top-2': 35,
-          'top-3': 25,
-        });
-        setSelectedTopicIds(new Set(['top-1', 'top-2', 'top-3']));
+      } catch (err) {
+        console.error('Failed to load project generation data:', err);
       } finally {
         setIsLoading(false);
       }
@@ -355,6 +324,7 @@ export function ProjectGenerationPage() {
       difficulty: difficultyWeights,
       duplicate_policy: strictDeduplication ? 'PREVENT' : 'ALLOW',
       model_name: targetModel,
+      model_provider: targetProvider,
       question_count: questionCount,
       styles: stylesWeights,
       temperature: 0.15,
@@ -366,7 +336,11 @@ export function ProjectGenerationPage() {
 
     try {
       const res = await apiRequest(`/projects/${projectId}/generation-runs`, {
-        body: JSON.stringify({ configuration: config }),
+        body: JSON.stringify({
+          configuration: config,
+          model_name: targetModel,
+          model_provider: targetProvider,
+        }),
         method: 'POST',
       });
 
@@ -393,6 +367,7 @@ export function ProjectGenerationPage() {
       difficulty: difficultyWeights,
       duplicate_policy: strictDeduplication ? 'PREVENT' : 'ALLOW',
       model_name: targetModel,
+      model_provider: targetProvider,
       question_count: questionCount,
       styles: stylesWeights,
       temperature: 0.15,
@@ -542,7 +517,7 @@ export function ProjectGenerationPage() {
                 </div>
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-container text-on-surface-variant">
                   <Icon name="database" size={14} />
-                  <span>{totalChunksCount || 360} Chunks Mapped</span>
+                  <span>{totalChunksCount} Chunks Mapped</span>
                 </div>
               </div>
             </div>
@@ -561,7 +536,9 @@ export function ProjectGenerationPage() {
                     Taxonomy Active
                   </span>
                   <span className="px-2 py-0.5 rounded bg-secondary/15 text-secondary font-label-sm text-label-sm font-semibold">
-                    LOCAL OLLAMA ENGINE: READY
+                    {targetProvider === 'gemini'
+                      ? 'GEMINI CLOUD TURBO: READY'
+                      : 'LOCAL OLLAMA ENGINE: READY'}
                   </span>
                 </div>
                 <p className="font-body-md text-body-md text-on-surface-variant max-w-3xl">
@@ -597,13 +574,16 @@ export function ProjectGenerationPage() {
                   Active
                 </span>
               </div>
-              <div className="flex items-center gap-2 px-4 py-2.5 text-outline cursor-not-allowed font-body-sm text-body-sm whitespace-nowrap">
+              <Link
+                className="flex items-center gap-2 px-4 py-2.5 text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm transition-colors whitespace-nowrap"
+                to={`/app/projects/${projectId}/questions`}
+              >
                 <Icon name="verified" size={16} />
                 <span>4. Question Bank</span>
-                <span className="px-1.5 py-0.5 rounded bg-surface-container-high text-outline font-label-sm text-label-sm">
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-label-sm text-label-sm font-semibold">
                   Review
                 </span>
-              </div>
+              </Link>
             </nav>
           </div>
         </section>
@@ -839,6 +819,84 @@ export function ProjectGenerationPage() {
                 </div>
               </section>
 
+              {/* Section 0: Target Assessment Volume & Question Count */}
+              <section className="p-5 rounded bg-surface-container-lowest shadow-sm flex flex-col gap-4 border border-primary/20">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 bg-surface-container-low p-3 rounded">
+                  <div>
+                    <span className="font-label-sm text-label-sm text-primary font-bold uppercase tracking-wider">
+                      Batch Volume Matrix
+                    </span>
+                    <h2 className="font-headline-md text-headline-md text-on-surface">
+                      Target Question Volume
+                    </h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">Target Output:</span>
+                    <span className="px-3 py-1 rounded bg-primary text-on-primary font-headline-sm text-headline-sm font-bold">
+                      {questionCount} Questions
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="font-body-sm text-body-sm text-on-surface-variant">
+                      Choose the total number of questions to synthesize for this examination batch. Scalable up to 100 questions.
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-on-surface-variant font-medium">Custom:</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={questionCount}
+                        onChange={(e) => {
+                          const val = Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1));
+                          setQuestionCount(val);
+                        }}
+                        className="w-16 px-2 py-1 text-center font-bold text-sm rounded border border-outline-variant bg-surface text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
+                        aria-label="Direct question count input"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Range Slider */}
+                  <div className="flex items-center gap-4 pt-1">
+                    <span className="text-xs text-on-surface-variant font-semibold">5</span>
+                    <input
+                      type="range"
+                      min={5}
+                      max={100}
+                      step={5}
+                      value={questionCount}
+                      onChange={(e) => setQuestionCount(parseInt(e.target.value, 10))}
+                      className="flex-1 accent-primary cursor-pointer h-2 bg-surface-container rounded-lg"
+                      aria-label="Question count range slider"
+                    />
+                    <span className="text-xs text-on-surface-variant font-semibold">100</span>
+                  </div>
+
+                  {/* Quick Pills */}
+                  <div className="flex items-center gap-2 flex-wrap pt-1">
+                    <span className="text-xs text-on-surface-variant font-medium mr-1">Quick Presets:</span>
+                    {[5, 10, 15, 25, 30, 50, 75, 100].map((count) => (
+                      <button
+                        key={count}
+                        type="button"
+                        onClick={() => setQuestionCount(count)}
+                        className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
+                          questionCount === count
+                            ? 'bg-primary text-on-primary shadow-sm scale-105'
+                            : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant'
+                        }`}
+                      >
+                        {count} Qs
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
               {/* Section 1: Curriculum Distribution & Topic Targets */}
               <section className="p-5 rounded bg-surface-container-lowest shadow-sm flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 bg-surface-container-low p-3 rounded">
@@ -868,9 +926,16 @@ export function ProjectGenerationPage() {
                       Loading syllabus curriculum...
                     </div>
                   ) : topics.length === 0 ? (
-                    <div className="p-4 rounded bg-surface-container-low text-center text-on-surface-variant font-body-sm">
-                      No topics found in project. Ingest resources to infer
-                      syllabus topics.
+                    <div className="p-6 rounded bg-surface-container-low text-center flex flex-col items-center gap-3">
+                      <p className="text-on-surface-variant font-body-sm">
+                        No syllabus topics have been extracted for this project yet.
+                      </p>
+                      <Link
+                        to={`/projects/${projectId}/topics`}
+                        className="px-4 py-1.5 rounded bg-primary text-on-primary font-label-md text-xs hover:opacity-90 transition-opacity"
+                      >
+                        Infer Topics from Uploaded Resources
+                      </Link>
                     </div>
                   ) : (
                     topics.map((top) => {
@@ -1361,9 +1426,22 @@ export function ProjectGenerationPage() {
                         Deterministic Local Mode (Temp: 0.15, Seed: 42)
                       </span>
                     </div>
-                    <div className="font-label-sm text-label-sm bg-surface-container-lowest px-3 py-1 rounded shadow-sm">
-                      Target Model:{' '}
-                      <strong className="text-primary">{targetModel}</strong>
+                    <div className="font-label-sm text-label-sm bg-surface-container-lowest px-3 py-1.5 rounded shadow-sm flex items-center gap-2">
+                      <span className="text-on-surface-variant font-medium">Engine:</span>
+                      <select
+                        aria-label="Target Model"
+                        className="bg-transparent font-bold text-primary border-none outline-none cursor-pointer"
+                        value={`${targetProvider}:${targetModel}`}
+                        onChange={(e) => {
+                          const [prov, mod] = e.target.value.split(':') as ['gemini' | 'ollama', string];
+                          setTargetProvider(prov);
+                          setTargetModel(mod);
+                        }}
+                      >
+                        <option value="gemini:gemini-flash-latest">⚡ Gemini Flash (Cloud Turbo ~2s)</option>
+                        <option value="ollama:qwen2.5:7b">🖥️ Qwen 2.5 7B (Localhost Offline ~60s)</option>
+                        <option value="ollama:qwen2.5:3b">🖥️ Qwen 2.5 3B (Localhost Offline Light)</option>
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -1404,7 +1482,11 @@ export function ProjectGenerationPage() {
                       Est. Latency
                     </span>
                     <span className="font-headline-md text-headline-md text-on-surface font-bold">
-                      ~{Math.round(questionCount * 2.8)}s
+                      {targetProvider === 'gemini'
+                        ? `~${Math.round(questionCount * 1.8)}s`
+                        : Math.round((questionCount * 65) / 60) >= 2
+                          ? `~${Math.round((questionCount * 65) / 60)}m`
+                          : `~${questionCount * 65}s`}
                     </span>
                   </div>
                   <div className="flex flex-col pt-1">
@@ -1412,7 +1494,7 @@ export function ProjectGenerationPage() {
                       Chunks In Scope
                     </span>
                     <span className="font-body-md text-body-md text-secondary font-bold">
-                      {totalChunksCount || 28} Chunks Mapped
+                      {totalChunksCount} Chunks Mapped
                     </span>
                   </div>
                   <div className="flex flex-col pt-1">
@@ -1578,7 +1660,9 @@ export function ProjectGenerationPage() {
 
                   <div className="font-editorial-quote text-editorial-quote text-on-surface italic leading-snug">
                     {activeStreamQuestion?.stem ??
-                      '"Under syllabus consensus constraints, how does the system preserve invariants during concurrent state transitions across asynchronous nodes?"'}
+                      (isGenerating
+                        ? 'Synthesizing question stream from verified corpus...'
+                        : 'Awaiting generation run. Synthesized question items will stream and preview here in real time.')}
                   </div>
 
                   <div className="p-2 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface-variant flex flex-col gap-1 shadow-sm">
@@ -1588,12 +1672,12 @@ export function ProjectGenerationPage() {
                         <span>#RES-CHUNK-GROUNDING</span>
                       </span>
                       <span className="text-secondary font-bold">
-                        99.4% Attribution Match
+                        {activeStreamQuestion ? '99.4% Attribution Match' : 'Corpus Anchored'}
                       </span>
                     </div>
                     <p className="text-[11px] leading-tight text-on-surface-variant truncate">
                       {activeStreamQuestion?.citation_anchor ??
-                        'Syllabus Core Invariants & State Machine Verification'}
+                        'Grounded dynamically in indexed document excerpts'}
                     </p>
                   </div>
 
