@@ -67,19 +67,31 @@ localhost React application (Vite on :5173)
 localhost Node/Express API (Express on :3001)
 ```
 
-## 3.2 Dual-Engine AI inference architecture
+## 3.2 Hybrid Multi-Engine AI inference architecture
 
-V1 implements a first-class **Dual-Engine AI architecture** to balance frontier speed with offline independence:
+V1 implements a first-class **Multi-Engine AI architecture** to balance frontier speed, high quota resilience, and offline independence:
 
 1. **Google Gemini API (Cloud Turbo - Default)**:
-   - Primary model: `gemini-2.0-flash` (sub-3s generation, university-grade reasoning, strict JSON adherence).
-   - Secondary model: `gemini-1.5-flash` (high throughput fallback).
-   - Used for rapid topic inference and fast batch question generation without hardware thermal throttling.
-2. **Local Ollama (Offline / Demonstration)**:
+   - Primary model: `gemini-flash-lite-latest` / `gemini-3.5-flash-lite` (500 Requests Per Day, 15 RPM, sub-2s generation, university-grade reasoning, strict JSON adherence).
+   - Dynamic fallback list: `gemini-3.1-flash-lite`, `gemini-flash-latest`, `gemini-3.8-flash`.
+   - Automatic 2.5s exponential backoff and model rotation upon HTTP 429 rate limits.
+2. **Groq Cloud (High-Capacity Cloud Alternative)**:
+   - Primary model: `llama-3.3-70b-versatile` (14,400 Requests Per Day free tier, 30 RPM, ~300 tokens/sec).
+   - Eliminates quota anxiety during high-volume testing and bulk generation runs.
+3. **Local Ollama (Offline / Demonstration)**:
    - Primary model: `qwen2.5:7b` (recommended 7B model for deep instruction-following on capable hardware).
    - Fallback model: `qwen2.5:3b` (lower resource footprint).
    - Used for 100% offline classroom demonstrations and private on-device generation.
-3. **Local Vector Embeddings**:
+4. **Batched Synthesis & Rate Pacing**:
+   - Cloud engines (`gemini`, `groq`) group generation targets into batches of 3 (`BATCH_SIZE = 3`), slashing API consumption by 67%.
+   - Automatic 1.5s inter-batch pacing keeps execution strictly within 15 RPM ceilings.
+   - Local CPU execution uses `BATCH_SIZE = 1` to prevent hardware timeouts.
+5. **Full-Syllabus Retrieval & Stratified Sampling**:
+   - The chunk query has no arbitrary `.limit(100)` cap; all chunks across documents of any length (e.g. 200+ pages) are indexed and retrieved.
+   - Stratified stride sampling ensures questions sample proportionally across beginning, middle, and end of the material.
+6. **Programmatic Option Shuffling (Anti-Predictability)**:
+   - Generated MCQs are shuffled using an LCG pseudo-random generator, establishing a uniform ~25% distribution across A, B, C, and D and eliminating Option B bias.
+7. **Local Vector Embeddings**:
    - `nomic-embed-text` hosted locally on Ollama (768 dimensions), keeping resource chunk indexing 100% local and free.
 
 ## 3.3 Cloud-managed application services
@@ -888,44 +900,43 @@ Under no circumstances may the system slot raw document lines or headings into f
 
 # 23. AI Provider Abstraction
 
-V1 implements a unified provider abstraction supporting two parallel engines:
+V1 implements a unified provider abstraction supporting three parallel engines:
 
 ```text
-                      ┌──────────────────────┐
-                      │      AIProvider      │
-                      │     (Interface)      │
-                      └──────────┬───────────┘
-                                 │
-                 ┌───────────────┴───────────────┐
-                 ▼                               ▼
-    ┌─────────────────────────┐     ┌─────────────────────────┐
-    │     GeminiProvider      │     │     OllamaProvider      │
-    ├─────────────────────────┤     ├─────────────────────────┤
-    │ gemini-2.0-flash        │     │ qwen2.5:7b              │
-    │ gemini-1.5-flash        │     │ qwen2.5:3b              │
-    │ Cloud Turbo (1–3s)      │     │ Local Offline (60–90s)  │
-    │ Native JSON schema mode │     │ Local HTTP endpoint     │
-    │ generativelanguage API  │     │ nomic-embed embeddings  │
-    └─────────────────────────┘     └─────────────────────────┘
+                               ┌──────────────────────┐
+                               │      AIProvider      │
+                               │     (Interface)      │
+                               └──────────┬───────────┘
+                                          │
+                  ┌───────────────────────┼───────────────────────┐
+                  ▼                       ▼                       ▼
+     ┌─────────────────────────┐ ┌─────────────────────────┐ ┌─────────────────────────┐
+     │     GeminiProvider      │ │      GroqProvider       │ │     OllamaProvider      │
+     ├─────────────────────────┤ ├─────────────────────────┤ ├─────────────────────────┤
+     │ gemini-flash-lite-latest│ │ llama-3.3-70b-versatile │ │ qwen2.5:7b              │
+     │ gemini-3.5-flash-lite   │ │ llama-3.1-8b-instant    │ │ qwen2.5:3b              │
+     │ Cloud Turbo (1–2s)      │ │ Ultra-Fast Cloud (1–2s) │ │ Local Offline (60–90s)  │
+     │ 500 RPD / 15 RPM        │ │ 14,400 RPD Free Tier    │ │ 100% On-Device Privacy  │
+     │ Native JSON schema mode │ │ OpenAI-compatible JSON  │ │ Local HTTP endpoint     │
+     │ generativelanguage API  │ │ groq.com API            │ │ nomic-embed embeddings  │
+     └─────────────────────────┘ └─────────────────────────┘ └─────────────────────────┘
 ```
 
 The provider abstraction exposes:
 
 ```typescript
 export interface AIProvider {
-  name: 'gemini' | 'ollama';
-  defaultModel: string;
-  generate(prompt: string, options?: GenerationOptions): Promise<string>;
-  generateStructured<T>(prompt: string, schema: z.ZodType<T>, options?: GenerationOptions): Promise<T>;
-  embed?(text: string | string[]): Promise<number[][]>;
+  readonly name: 'gemini' | 'groq' | 'ollama';
+  generate(options: GenerateOptions): Promise<string>;
 }
 ```
 
-The provider factory `getAIProvider(provider?: 'gemini' | 'ollama', model?: string)` dynamically instantiates the requested provider:
-- If `provider === 'gemini'` (default), it reads `process.env.GEMINI_API_KEY` and calls the Google Gemini API with `responseMimeType: "application/json"`.
-- If `provider === 'ollama'`, it communicates with the local Ollama daemon on `process.env.OLLAMA_BASE_URL` (default `http://localhost:11434`).
+The provider factory `getAIProvider(provider?: 'gemini' | 'groq' | 'ollama', model?: string)` dynamically instantiates the requested provider:
+- If `provider === 'gemini'` (default), it reads `env.GEMINI_API_KEY` and calls the Google Gemini API with `responseMimeType: "application/json"`.
+- If `provider === 'groq'`, it reads `env.GROQ_API_KEY` and calls the Groq Cloud API with `response_format: { type: "json_object" }`.
+- If `provider === 'ollama'`, it communicates with the local Ollama daemon on `env.OLLAMA_BASE_URL` (default `http://localhost:11434`).
 
-Business logic (topic inferencer, question generator, validation) interacts exclusively through this abstraction and never directly invokes HTTP endpoints or client libraries.
+Business logic (topic inferencer, question generator, validation) interacts exclusively through this abstraction and never directly invokes HTTP endpoints or proprietary client libraries.
 
 ---
 

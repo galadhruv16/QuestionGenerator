@@ -5,6 +5,7 @@ import type {
 } from '@groundq/contracts';
 import { getAIProvider } from '../ai/providers/ai-provider.js';
 import { env } from '../config/env.js';
+import { STOPWORDS } from './topic-inferencer.js';
 
 interface ReferenceTables {
   bloom: Map<string, string>; // slug -> id
@@ -151,6 +152,30 @@ export function computeStemSimilarity(a: string, b: string): number {
   return union > 0 ? intersection / union : 0;
 }
 
+function createPrng(seed: number) {
+  let s = (seed * 1664525 + 1013904223) >>> 0;
+  return function () {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+export function shuffleOptions<T extends { is_correct: boolean }>(
+  options: T[],
+  seed?: number,
+): T[] {
+  if (!options || options.length <= 1) return options;
+  const cloned = [...options];
+  const rng = seed !== undefined ? createPrng(seed) : Math.random;
+  for (let i = cloned.length - 1; i > 0; i--) {
+    const r = Math.floor(rng() * (i + 1));
+    const temp = cloned[i]!;
+    cloned[i] = cloned[r]!;
+    cloned[r] = temp;
+  }
+  return cloned;
+}
+
 export async function executeGenerationRun(
   options: RunGenerationOptions,
 ): Promise<{
@@ -247,13 +272,12 @@ export async function executeGenerationRun(
     const baseSortOrder =
       (maxOrderData as { sort_order?: number } | null)?.sort_order ?? 0;
 
-    // Fetch resource chunks for context (up to 100 chunks)
+    // Fetch all resource chunks for context across the full document syllabus
     const { data: chunks } = await client
       .from('resource_chunks')
-      .select('id, resource_id, text, page_number')
+      .select('id, resource_id, text, page_number, chunk_index')
       .eq('project_id', projectId)
-      .order('chunk_index', { ascending: true })
-      .limit(100);
+      .order('chunk_index', { ascending: true });
 
     // Filter out front-matter and Table of Contents chunks
     const validContentChunks = (chunks ?? []).filter((c) => {
@@ -263,6 +287,29 @@ export async function executeGenerationRun(
 
     const poolChunks =
       validContentChunks.length > 0 ? validContentChunks : chunks ?? [];
+
+    // Query chunk_topics evidence links for mapped topics
+    const { data: chunkTopicLinks } = await client
+      .from('chunk_topics')
+      .select('chunk_id, topic_id')
+      .in(
+        'topic_id',
+        availableTopicIds.length > 0
+          ? availableTopicIds
+          : ['00000000-0000-0000-0000-000000000000'],
+      );
+
+    const topicToChunkIds = new Map<string, string[]>();
+    for (const link of chunkTopicLinks ?? []) {
+      const arr = topicToChunkIds.get(link.topic_id) ?? [];
+      arr.push(link.chunk_id);
+      topicToChunkIds.set(link.topic_id, arr);
+    }
+
+    const chunkById = new Map<string, (typeof poolChunks)[0]>();
+    for (const c of poolChunks) {
+      chunkById.set(c.id, c);
+    }
 
     await client
       .from('generation_runs')
@@ -283,7 +330,24 @@ export async function executeGenerationRun(
 
     const generatedQuestions: GeneratedQuestionItem[] = [];
 
-    // 6. Generate for each plan target
+    // 6. Generate for plan targets (Batched on Cloud providers, single on local CPU)
+    const chosenProvider =
+      blueprint.model_provider ||
+      (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
+    const isCloud = chosenProvider === 'gemini' || chosenProvider === 'groq';
+    const BATCH_SIZE = isCloud ? 3 : 1;
+
+    // Partition targets with their selected chunks into batches
+    const batchList: Array<
+      Array<{
+        chunk?: (typeof poolChunks)[0];
+        planItemId: string;
+        target: (typeof planTargets)[0];
+        topicName: string;
+      }>
+    > = [];
+
+    let currentBatch: (typeof batchList)[0] = [];
     for (const target of planTargets) {
       const planItemId = planItemMap.get(target.sequenceNumber);
       if (!planItemId) continue;
@@ -292,102 +356,169 @@ export async function executeGenerationRun(
         ? topicMap.get(target.topicId) || 'Curriculum Subject'
         : 'Core Subject Area';
 
-      // Pick matching chunks by topic keywords
-      const topicWords = topicName
-        .toLowerCase()
-        .split(/\s+/)
-        .filter((w) => w.length > 3);
+      // 1. First preference: chunks explicitly linked to target.topicId via chunk_topics
+      const mappedChunkIds = target.topicId
+        ? topicToChunkIds.get(target.topicId) ?? []
+        : [];
+      const mappedChunks = mappedChunkIds
+        .map((id) => chunkById.get(id))
+        .filter((c): c is NonNullable<typeof c> => Boolean(c));
 
-      const matchingChunks = poolChunks.filter((c) => {
-        const lower = c.text.toLowerCase();
-        return topicWords.some((w) => lower.includes(w));
+      let selectedChunk: (typeof poolChunks)[0] | undefined;
+
+      if (mappedChunks.length > 0) {
+        selectedChunk =
+          mappedChunks[(target.sequenceNumber - 1) % mappedChunks.length];
+      } else {
+        // 2. Second preference: topic keyword matching across poolChunks
+        const topicWords = topicName
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((w) => w.length > 3 && !STOPWORDS.has(w));
+
+        const matchingChunks = poolChunks.filter((c) => {
+          const lower = c.text.toLowerCase();
+          return topicWords.some((w) => lower.includes(w));
+        });
+
+        if (matchingChunks.length > 0) {
+          selectedChunk =
+            matchingChunks[(target.sequenceNumber - 1) % matchingChunks.length];
+        } else {
+          // 3. Fallback: Stratified sampling across the FULL syllabus range (beginning, middle, end)
+          const stride = Math.max(
+            1,
+            Math.floor(poolChunks.length / Math.max(1, planTargets.length)),
+          );
+          const chunkIndex = Math.min(
+            poolChunks.length - 1,
+            (target.sequenceNumber - 1) * stride,
+          );
+          selectedChunk = poolChunks[chunkIndex];
+        }
+      }
+
+      currentBatch.push({
+        chunk: selectedChunk,
+        planItemId,
+        target,
+        topicName,
       });
 
-      const candidateChunks =
-        matchingChunks.length > 0 ? matchingChunks : poolChunks;
-      const chunkIndex =
-        (target.sequenceNumber - 1) % Math.max(1, candidateChunks.length);
-      const selectedChunk = candidateChunks[chunkIndex];
+      if (currentBatch.length >= BATCH_SIZE) {
+        batchList.push(currentBatch);
+        currentBatch = [];
+      }
+    }
+    if (currentBatch.length > 0) {
+      batchList.push(currentBatch);
+    }
 
-      try {
-        // Generate question item via Dual-Engine AI
-        const item = await synthesizeQuestionItem({
-          blueprint,
-          chunk: selectedChunk,
-          planItemId,
-          refs,
-          runId,
-          target,
-          topicName,
-        });
-
-        // Evaluate similarity against existing questions in this project and current run
-        const allPriorStems = [...existingStems, ...inRunStems];
-        let maxSim = 0;
-        let mostSimilarStem = '';
-        for (const prior of allPriorStems) {
-          const sim = computeStemSimilarity(item.stem, prior);
-          if (sim > maxSim) {
-            maxSim = sim;
-            mostSimilarStem = prior;
-          }
-        }
-
-        if (blueprint.duplicate_policy === 'PREVENT' && maxSim > 0.82) {
-          throw new Error(
-            `Duplicate question detected: ${(maxSim * 100).toFixed(1)}% similarity to existing project question "${mostSimilarStem.slice(0, 60)}..."`,
+    for (let bIdx = 0; bIdx < batchList.length; bIdx++) {
+      const batch = batchList[bIdx]!;
+      // Safe RPM throttle for cloud providers (15 RPM free tier on Gemini)
+      if (isCloud && bIdx > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+      let batchResults = new Map<number, RawSynthesizedQuestion>();
+      if (batch.length > 1) {
+        try {
+          batchResults = await synthesizeQuestionBatch({
+            batch,
+            blueprint,
+            refs,
+            runId,
+          });
+        } catch (batchErr) {
+          console.warn(
+            `[QuestionGenerator] Batch synthesis failed (${batchErr instanceof Error ? batchErr.message : String(batchErr)}). Falling back to individual generation...`,
           );
         }
+      }
 
-        // Persist to database
-        const savedQuestion = await persistGeneratedQuestion({
-          baseSortOrder,
-          client,
-          dedupScore: maxSim,
-          item,
-          planItemId,
-          projectId,
-          refs,
-          runId,
-          selectedChunkId: selectedChunk?.id,
-          target,
-        });
+      for (const itemParam of batch) {
+        const { chunk: selectedChunk, planItemId, target, topicName } = itemParam;
+        try {
+          let item = batchResults.get(target.sequenceNumber);
+          if (!item) {
+            item = await synthesizeQuestionItem({
+              blueprint,
+              chunk: selectedChunk,
+              planItemId,
+              refs,
+              runId,
+              target,
+              topicName,
+            });
+          }
 
-        if (savedQuestion) {
-          inRunStems.push(item.stem);
-          generatedQuestions.push(savedQuestion);
-          // Update plan item status
+          // Evaluate similarity against existing questions in this project and current run
+          const allPriorStems = [...existingStems, ...inRunStems];
+          let maxSim = 0;
+          let mostSimilarStem = '';
+          for (const prior of allPriorStems) {
+            const sim = computeStemSimilarity(item.stem, prior);
+            if (sim > maxSim) {
+              maxSim = sim;
+              mostSimilarStem = prior;
+            }
+          }
+
+          if (blueprint.duplicate_policy === 'PREVENT' && maxSim > 0.82) {
+            throw new Error(
+              `Duplicate question detected: ${(maxSim * 100).toFixed(1)}% similarity to existing project question "${mostSimilarStem.slice(0, 60)}..."`,
+            );
+          }
+
+          // Persist to database
+          const savedQuestion = await persistGeneratedQuestion({
+            baseSortOrder,
+            client,
+            dedupScore: maxSim,
+            item,
+            planItemId,
+            projectId,
+            refs,
+            runId,
+            selectedChunkId: selectedChunk?.id,
+            target,
+          });
+
+          if (savedQuestion) {
+            inRunStems.push(item.stem);
+            generatedQuestions.push(savedQuestion);
+
+            await client
+              .from('generation_plan_items')
+              .update({ status: 'COMPLETED' })
+              .eq('id', planItemId);
+
+            await client
+              .from('generation_runs')
+              .update({ accepted_count: generatedQuestions.length })
+              .eq('id', runId);
+          }
+        } catch (genErr) {
+          console.error(
+            `[QuestionGenerator] Item #${target.sequenceNumber} generation failed:`,
+            genErr instanceof Error ? genErr.message : String(genErr),
+          );
           await client
             .from('generation_plan_items')
-            .update({ status: 'COMPLETED' })
+            .update({
+              error_message:
+                genErr instanceof Error ? genErr.message : String(genErr),
+              status: 'FAILED',
+            })
             .eq('id', planItemId);
 
-          // Update run progress
           await client
             .from('generation_runs')
-            .update({ accepted_count: generatedQuestions.length })
+            .update({
+              review_count: planTargets.length - generatedQuestions.length,
+            })
             .eq('id', runId);
         }
-      } catch (genErr) {
-        console.error(
-          `[QuestionGenerator] Item #${target.sequenceNumber} generation failed:`,
-          genErr instanceof Error ? genErr.message : String(genErr),
-        );
-        await client
-          .from('generation_plan_items')
-          .update({
-            error_message:
-              genErr instanceof Error ? genErr.message : String(genErr),
-            status: 'FAILED',
-          })
-          .eq('id', planItemId);
-
-        await client
-          .from('generation_runs')
-          .update({
-            review_count: planTargets.length - generatedQuestions.length,
-          })
-          .eq('id', runId);
       }
     }
 
@@ -460,6 +591,145 @@ interface RawSynthesizedQuestion {
   stem: string;
 }
 
+async function synthesizeQuestionBatch(params: {
+  batch: Array<{
+    chunk?: {
+      id: string;
+      page_number: number | null;
+      resource_id: string;
+      text: string;
+    };
+    planItemId: string;
+    target: PlanTarget;
+    topicName: string;
+  }>;
+  blueprint: BlueprintConfiguration;
+  refs: ReferenceTables;
+  runId: string;
+}): Promise<Map<number, RawSynthesizedQuestion>> {
+  const { batch, blueprint } = params;
+  const resultMap = new Map<number, RawSynthesizedQuestion>();
+  if (batch.length === 0) return resultMap;
+
+  const chosenProvider =
+    blueprint.model_provider ||
+    (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
+  const chosenModel =
+    blueprint.model_name ||
+    (chosenProvider === 'gemini'
+      ? env.GEMINI_MODEL || 'gemini-flash-lite-latest'
+      : chosenProvider === 'groq'
+        ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+        : env.OLLAMA_MODEL || 'qwen2.5:7b');
+
+  const promptSystem = `You are an expert assessment item designer creating curriculum-grounded university exam questions.
+Generate distinct questions strictly adhering to the specified target specifications and excerpts.
+
+CRITICAL RULES:
+1. Return strictly valid JSON with no markdown backticks or markdown formatting.
+2. Return a JSON object matching this schema:
+{
+  "questions": [
+    {
+      "sequence_number": <target sequence number>,
+      "stem": "Detailed question stem...",
+      "question_type": "MCQ" | "SHORT_ANSWER" | "LONG_ANSWER",
+      "options": [
+        { "option_index": 0, "option_text": "...", "is_correct": false, "explanation": "..." },
+        { "option_index": 1, "option_text": "...", "is_correct": true, "explanation": "..." },
+        { "option_index": 2, "option_text": "...", "is_correct": false, "explanation": "..." },
+        { "option_index": 3, "option_text": "...", "is_correct": false, "explanation": "..." }
+      ],
+      "model_answer": "Comprehensive model answer...",
+      "explanation": "Pedagogical rationale explaining the assessed concept...",
+      "rubric_criteria": ["Criterion 1 (40%)", "Criterion 2 (40%)", "Criterion 3 (20%)"],
+      "citation_anchor": "Brief source sentence or concept anchoring this question..."
+    }
+  ]
+}
+3. Ground each question conceptually in its provided source excerpt. The question must test authentic principles and relationships.
+4. For MCQ questions: provide exactly 4 distinct options with plausible, educative distractors and exactly ONE marked correct (is_correct: true). CRITICAL: Naturally vary the position of the correct option (index 0, 1, 2, or 3) across questions (never always place it in the same position).
+5. For SHORT_ANSWER and LONG_ANSWER questions: provide an exemplary model_answer and rubric_criteria.
+6. NEVER use software brand names (Microsoft Word, Mozilla Firefox, etc.), generic headings, or author names.`;
+
+  const targetDescriptions = batch
+    .map((item) => {
+      const cleanTopic = item.topicName
+        .replace(/^(?:chapter|section|module|unit|\d+[.:])\s*/i, '')
+        .replace(/^Module \d+[:\s-]*/i, '')
+        .trim();
+      const excerpt = (item.chunk?.text ?? '').slice(0, 1000);
+      return `[Target #${item.target.sequenceNumber}]
+Topic: "${cleanTopic}"
+Cognitive Level: Bloom ${item.target.bloomSlug.toUpperCase()}
+Difficulty: ${item.target.difficultySlug}
+Question Type: ${item.target.typeSlug}
+Style: ${item.target.styleSlug}
+Source Excerpt:
+"${excerpt}"`;
+    })
+    .join('\n\n---\n\n');
+
+  const promptUser = `${targetDescriptions}\n\nGenerate JSON containing the array of ${batch.length} questions:`;
+
+  const aiProvider = getAIProvider(chosenProvider, chosenModel);
+  const timeoutMs =
+    chosenProvider === 'gemini' || chosenProvider === 'groq' ? 35000 : 180000;
+
+  const rawOutput = await aiProvider.generate({
+    format: 'json',
+    model: chosenModel,
+    prompt: `${promptSystem}\n\n${promptUser}`,
+    temperature: blueprint.temperature ?? 0.15,
+    timeoutMs,
+  });
+
+  let cleaned = (rawOutput || '').trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/```\s*$/, '')
+      .trim();
+  }
+
+  let parsed: { questions?: RawSynthesizedQuestion[] } | null = null;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      try {
+        parsed = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+      } catch {
+        // parsing failed
+      }
+    }
+  }
+
+  if (parsed && Array.isArray(parsed.questions)) {
+    for (let i = 0; i < parsed.questions.length; i++) {
+      const q = parsed.questions[i];
+      if (!q || !q.stem || q.stem.trim().length <= 10) continue;
+      const seq =
+        (q as { sequence_number?: number }).sequence_number ??
+        batch[i]?.target.sequenceNumber;
+      if (typeof seq === 'number') {
+        if (q.question_type === 'MCQ' && Array.isArray(q.options)) {
+          const shuffled = shuffleOptions(q.options, seq);
+          shuffled.forEach((opt, idx) => {
+            opt.option_index = idx;
+          });
+          q.options = shuffled;
+        }
+        resultMap.set(seq, q);
+      }
+    }
+  }
+
+  return resultMap;
+}
+
 async function synthesizeQuestionItem(
   params: SynthesizeParams,
 ): Promise<RawSynthesizedQuestion> {
@@ -484,6 +754,7 @@ CRITICAL RULES:
 2. Ground the question conceptually in the provided source excerpt. The question must test authentic principles and relationships.
 3. For MCQ questions:
    - Provide exactly 4 distinct options with plausible, educative distractors and exactly ONE marked correct (is_correct: true).
+   - Naturally vary the position of the correct option (index 0, 1, 2, or 3) across questions.
    - Each option must have a detailed explanation describing why it is correct or what specific conceptual error makes it incorrect.
    - NEVER use document headings, software brand names (Microsoft Word, Mozilla Firefox, etc.), or author names as stems or options.
 4. For SHORT_ANSWER and LONG_ANSWER questions:
@@ -500,26 +771,30 @@ Return JSON schema:
   "question_type": "${target.typeSlug}",
   "options": [
     { "option_index": 0, "option_text": "...", "is_correct": false, "explanation": "Why this distractor is incorrect..." },
-    { "option_index": 1, "option_text": "...", "is_correct": true, "explanation": "Why this option is correct based on the excerpt..." },
-    { "option_index": 2, "option_text": "...", "is_correct": false, "explanation": "Why this distractor is incorrect..." },
+    { "option_index": 1, "option_text": "...", "is_correct": false, "explanation": "Why this distractor is incorrect..." },
+    { "option_index": 2, "option_text": "...", "is_correct": true, "explanation": "Why this option is correct based on the excerpt..." },
     { "option_index": 3, "option_text": "...", "is_correct": false, "explanation": "Why this distractor is incorrect..." }
   ],
   "model_answer": "Comprehensive model answer...",
   "explanation": "Pedagogical rationale explaining the assessed concept...",
   "rubric_criteria": ["Criterion 1 (40%)", "Criterion 2 (40%)", "Criterion 3 (20%)"],
   "citation_anchor": "Brief source sentence or concept anchoring this question..."
-}`;
+} `;
 
   const chosenProvider =
-    blueprint.model_provider || (env.GEMINI_API_KEY ? 'gemini' : 'ollama');
+    blueprint.model_provider ||
+    (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
   const chosenModel =
     blueprint.model_name ||
     (chosenProvider === 'gemini'
-      ? env.GEMINI_MODEL || 'gemini-flash-latest'
-      : env.OLLAMA_MODEL || 'qwen2.5:7b');
+      ? env.GEMINI_MODEL || 'gemini-flash-lite-latest'
+      : chosenProvider === 'groq'
+        ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+        : env.OLLAMA_MODEL || 'qwen2.5:7b');
 
   const aiProvider = getAIProvider(chosenProvider, chosenModel);
-  const timeoutMs = chosenProvider === 'gemini' ? 25000 : 120000;
+  const timeoutMs =
+    chosenProvider === 'gemini' || chosenProvider === 'groq' ? 25000 : 120000;
 
   const rawOutput = await aiProvider.generate({
     format: 'json',
@@ -561,9 +836,11 @@ Return JSON schema:
         parsed.options.length >= 2 &&
         parsed.options.some((o) => o.is_correct)
       ) {
-        parsed.options.forEach((opt, idx) => {
+        const shuffled = shuffleOptions(parsed.options, target.sequenceNumber);
+        shuffled.forEach((opt, idx) => {
           opt.option_index = idx;
         });
+        parsed.options = shuffled;
         return parsed;
       }
     } else {
@@ -648,12 +925,13 @@ async function persistGeneratedQuestion(params: {
     .update({ current_version_id: versionId })
     .eq('id', questionId);
 
-  // 4. If MCQ, insert options
+  // 4. If MCQ, insert options (guaranteeing balanced, shuffled distribution)
   if (item.options && item.options.length > 0) {
-    const optionRows = item.options.map((opt, idx) => ({
+    const shuffled = shuffleOptions(item.options, target.sequenceNumber);
+    const optionRows = shuffled.map((opt, idx) => ({
       explanation: opt.explanation || null,
       is_correct: opt.is_correct,
-      option_index: opt.option_index ?? idx,
+      option_index: idx,
       option_text: opt.option_text,
       question_version_id: versionId,
     }));

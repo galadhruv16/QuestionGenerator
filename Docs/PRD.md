@@ -109,9 +109,10 @@ The software does not assume either use case as the only intended workflow.
 - Project-specific vector knowledge base in Supabase pgvector
 
 ### Topic / Knowledge Structure
-- Dual-Engine extraction of curriculum hierarchy from supplied resources:
-  - Google Gemini 2.0/1.5 Flash (Cloud Turbo)
-  - Ollama Qwen 2.5 (Local Offline)
+- Multi-Engine extraction of curriculum hierarchy from supplied resources:
+  - Google Gemini Cloud Turbo (`gemini-flash-lite-latest` / `gemini-3.5-flash-lite`, 500 RPD)
+  - Groq Cloud (`llama-3.3-70b-versatile`, 14,400 RPD free tier)
+  - Ollama Qwen 2.5 (`qwen2.5:7b` / `qwen2.5:3b`, Local Offline)
 - Strict anti-brand and anti-noise filtering (rejects desktop software and brand names like Microsoft Word, Mozilla Firefox)
 - Interactive hierarchy editor:
   - Add module / subtopic
@@ -122,9 +123,14 @@ The software does not assume either use case as the only intended workflow.
 
 ### Controlled Question Generation
 - User-selected target question volume (1 to 100 questions) via slider, numerical input, and quick pills
-- Dual-Engine AI synthesis selector:
-  - Google Gemini API (`gemini-2.0-flash`, `gemini-1.5-flash`)
-  - Localhost Ollama (`qwen2.5:7b`, `qwen2.5:3b`)
+- Multi-Engine AI synthesis selector:
+  - Google Gemini API (`gemini-flash-lite-latest`, `gemini-3.5-flash-lite` with 500 RPD daily quota)
+  - Groq Cloud (`llama-3.3-70b-versatile` with 14,400 RPD daily quota)
+  - Localhost Ollama (`qwen2.5:7b`, `qwen2.5:3b` for 100% offline private synthesis)
+- Batched synthesis (`BATCH_SIZE = 3` for cloud models with 1.5s rate pacing, `BATCH_SIZE = 1` for local CPU)
+- Full-syllabus retrieval: Complete removal of arbitrary chunk caps (`.limit(100)` removed), enabling uniform coverage across 200+ page documents
+- Stratified stride sampling guaranteeing proportional distribution across the entire document depth
+- Programmatic MCQ option shuffling (deterministic LCG PRNG) ensuring uniform ~25% balance across A, B, C, D (elimination of Option B bias)
 - Question format distributions (MCQ, Short Answer, Long Scenario Analysis)
 - Bloom's Taxonomy cognitive span distributions (L1 Remember through L6 Synthesize)
 - Difficulty calibration distributions (Easy, Medium, Hard)
@@ -142,7 +148,7 @@ The software does not assume either use case as the only intended workflow.
 - Difficulty alignment validation
 - Question-style alignment validation
 - Structural schema validation
-- MCQ-specific validation (exactly 4 distinct options, 1 verified correct answer, 3 plausible conceptual distractors with specific error rationales)
+- MCQ-specific validation (exactly 4 distinct options, 1 verified correct answer, 3 plausible conceptual distractors with specific error rationales, shuffled answer position)
 - Semantic duplicate detection (intra-project cosine threshold < 0.82)
 - Batch diversity checks
 - Constraint satisfaction checks

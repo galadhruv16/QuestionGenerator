@@ -1,5 +1,6 @@
 import { env } from '../../config/env.js';
 import { GeminiProvider, defaultGeminiProvider } from './gemini-provider.js';
+import { GroqProvider, defaultGroqProvider } from './groq-provider.js';
 import { OllamaProvider, defaultAIProvider } from './ollama-provider.js';
 
 export interface GenerateOptions {
@@ -13,22 +14,30 @@ export interface GenerateOptions {
 }
 
 export interface AIProvider {
-  name?: 'gemini' | 'ollama';
+  name?: 'gemini' | 'ollama' | 'groq';
   generate(options: GenerateOptions): Promise<string>;
   embed(text: string): Promise<number[] | null>;
 }
 
 export function getAIProvider(
-  provider?: 'gemini' | 'ollama',
+  provider?: 'gemini' | 'ollama' | 'groq',
   model?: string,
 ): AIProvider {
-  const chosenProvider = provider || (env.GEMINI_API_KEY ? 'gemini' : 'ollama');
+  const chosenProvider =
+    provider || (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
 
   if (chosenProvider === 'gemini') {
     if (model) {
       return new GeminiProvider(env.GEMINI_API_KEY, model);
     }
     return defaultGeminiProvider;
+  }
+
+  if (chosenProvider === 'groq') {
+    if (model) {
+      return new GroqProvider(env.GROQ_API_KEY, model);
+    }
+    return defaultGroqProvider;
   }
 
   if (model) {

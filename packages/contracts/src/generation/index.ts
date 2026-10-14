@@ -3,6 +3,22 @@ import { z } from 'zod';
 export const duplicatePolicySchema = z.enum(['PREVENT', 'ALLOW']);
 export type DuplicatePolicy = z.infer<typeof duplicatePolicySchema>;
 
+const distributionSchema = z.record(
+  z.string().min(1),
+  z.number().min(0).max(100),
+);
+
+export const generationBlueprintSchema = z.object({
+  bloom: distributionSchema,
+  difficulty: distributionSchema,
+  duplicate_policy: z.enum(['avoid', 'allow', 'PREVENT', 'ALLOW']),
+  question_count: z.number().int().min(1).max(100),
+  question_styles: z.array(z.string().min(1)).min(1).optional(),
+  question_types: z.array(z.string().min(1)).min(1).optional(),
+  topics: z.union([z.array(z.string().uuid()), z.record(z.string(), z.number())]),
+});
+export type GenerationBlueprint = z.infer<typeof generationBlueprintSchema>;
+
 export const blueprintConfigurationSchema = z.object({
   bloom: z.record(z.string(), z.number().min(0).max(100)).default({
     analyze: 30,
@@ -18,8 +34,8 @@ export const blueprintConfigurationSchema = z.object({
     medium: 50,
   }),
   duplicate_policy: duplicatePolicySchema.default('PREVENT'),
-  model_name: z.string().trim().min(1).default('gemini-2.0-flash'),
-  model_provider: z.enum(['gemini', 'ollama']).default('gemini'),
+  model_name: z.string().trim().min(1).default('gemini-flash-lite-latest'),
+  model_provider: z.enum(['gemini', 'ollama', 'groq']).default('gemini'),
   question_count: z.number().int().min(1).max(100).default(10),
   styles: z.record(z.string(), z.number().min(0).max(100)).default({
     analytical: 40,

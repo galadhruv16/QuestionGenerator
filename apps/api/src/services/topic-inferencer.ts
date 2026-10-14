@@ -48,14 +48,17 @@ export async function inferTopicsFromChunks(
   }>,
   model?: string,
   timeoutMs?: number,
-  provider?: 'gemini' | 'ollama',
+  provider?: 'gemini' | 'ollama' | 'groq',
 ): Promise<InferenceResult> {
-  const chosenProvider = provider || (env.GEMINI_API_KEY ? 'gemini' : 'ollama');
+  const chosenProvider =
+    provider || (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
   const chosenModel =
     model ||
     (chosenProvider === 'gemini'
-      ? env.GEMINI_MODEL || 'gemini-flash-latest'
-      : env.OLLAMA_MODEL || 'qwen2.5:7b');
+      ? env.GEMINI_MODEL || 'gemini-flash-lite-latest'
+      : chosenProvider === 'groq'
+        ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+        : env.OLLAMA_MODEL || 'qwen2.5:7b');
 
   if (chunks.length === 0) {
     return {
@@ -65,29 +68,36 @@ export async function inferTopicsFromChunks(
     };
   }
 
-  // Sample representative chunks across the document to stay within prompt context
-  const sampleLimit = Math.min(chunks.length, 12);
-  const step = Math.max(1, Math.floor(chunks.length / sampleLimit));
-  const sampledChunks: typeof chunks = [];
+  // Filter out front-matter and Table of Contents chunks
+  const contentChunks = chunks.filter((c) => {
+    const dotCount = (c.text.match(/\.{3,}/g) || []).length;
+    return dotCount < 3 && c.text.trim().length > 60;
+  });
+  const validChunks = contentChunks.length > 0 ? contentChunks : chunks;
+
+  // Sample representative chunks across the full depth of the document to cover 100% of the syllabus
+  const sampleLimit = Math.min(validChunks.length, 36);
+  const step = Math.max(1, Math.floor(validChunks.length / sampleLimit));
+  const sampledChunks: typeof validChunks = [];
   for (
     let i = 0;
-    i < chunks.length && sampledChunks.length < sampleLimit;
+    i < validChunks.length && sampledChunks.length < sampleLimit;
     i += step
   ) {
-    const chunk = chunks[i];
+    const chunk = validChunks[i];
     if (chunk) {
       sampledChunks.push(chunk);
     }
   }
 
   const contextText = sampledChunks
-    .map((c) => `[Page ${c.page_number ?? 'N/A'}] ${c.text.slice(0, 400)}...`)
-    .join('\n\n');
+    .map((c) => `[Page ${c.page_number ?? 'N/A'}] ${c.text.slice(0, 550)}`)
+    .join('\n\n---\n\n');
 
   const systemPrompt = `You are an expert academic curriculum extraction assistant.
-Analyze the following course material excerpts and extract a natural topic hierarchy:
+Analyze the following course material excerpts which span the entire document from start to finish, and extract a natural topic hierarchy covering the FULL syllabus:
 - Level 1: Overarching modules or themes (e.g. "Singly Linked Lists & Node Representation", "Two-Pointer Traversal & Cycle Detection").
-  CRITICAL: Do NOT force exactly 3 modules. Determine an appropriate number of modules (typically 1 to 4) depending on the actual length and distinct major sections of the document. For single-topic handouts or short documents, 1 or 2 modules is preferred.
+  CRITICAL: Do NOT force exactly 3 modules. Determine an appropriate number of modules (typically 2 to 6 for comprehensive notes) based on the distinct major divisions across the beginning, middle, and end of the document.
 - Level 2: Specific core subtopics within each module (e.g. "Node Pointer Representation", "Head and Tail Insertion", "Floyd's Cycle Detection Algorithm").
 
 CRITICAL CONSTRAINTS:
@@ -208,7 +218,7 @@ CRITICAL CONSTRAINTS:
   }
 }
 
-const STOPWORDS = new Set([
+export const STOPWORDS = new Set([
   'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'as', 'at',
   'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by', 'can', 'did', 'do',
   'does', 'doing', 'down', 'during', 'each', 'few', 'for', 'from', 'further', 'had', 'has', 'have', 'having',
@@ -521,20 +531,51 @@ export async function persistInferredTopics(
 
       if (subError || !subTopic) continue;
 
-      // 3. Link relevant chunks to this subtopic (up to 5 chunks matching keywords or by sequence)
-      const linkedChunks = chunks.filter((c) => {
-        const words = sub.name
-          .toLowerCase()
-          .split(/\s+/)
-          .filter((w) => w.length > 3);
-        const lowerText = c.text.toLowerCase();
-        return words.some((w) => lowerText.includes(w));
+      // 3. Link relevant chunks to this subtopic
+      const contentChunks = chunks.filter((c) => {
+        const dotCount = (c.text.match(/\.{3,}/g) || []).length;
+        return dotCount < 3 && c.text.trim().length > 60;
+      });
+      const validChunks = contentChunks.length > 0 ? contentChunks : chunks;
+
+      const subWords = `${sub.name} ${sub.description ?? ''}`
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 3 && !STOPWORDS.has(w));
+
+      let matched = validChunks.filter((c) => {
+        const lower = c.text.toLowerCase();
+        return subWords.some((w) => lower.includes(w));
       });
 
-      const targets = (linkedChunks.length > 0 ? linkedChunks : chunks).slice(
-        0,
-        5,
-      );
+      if (matched.length === 0) {
+        // Fall back to module title words
+        const modWords = mod.name
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((w) => w.length > 3 && !STOPWORDS.has(w));
+        matched = validChunks.filter((c) => {
+          const lower = c.text.toLowerCase();
+          return modWords.some((w) => lower.includes(w));
+        });
+      }
+
+      // If still no keyword match, assign from this module's proportional section of the document
+      let targets: typeof chunks = [];
+      if (matched.length > 0) {
+        targets = matched.slice(0, 5);
+      } else {
+        const modIdx = Math.max(0, sortOrder - 2);
+        const sliceSize = Math.max(
+          1,
+          Math.floor(validChunks.length / Math.max(1, inference.modules.length)),
+        );
+        const modSlice = validChunks.slice(
+          modIdx * sliceSize,
+          (modIdx + 1) * sliceSize,
+        );
+        targets = (modSlice.length > 0 ? modSlice : validChunks).slice(0, 5);
+      }
 
       for (const targetChunk of targets) {
         await supabase.from('chunk_topics').upsert(

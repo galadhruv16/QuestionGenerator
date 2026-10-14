@@ -97,9 +97,14 @@ generationRunsRouter.post('/', async (request, response, next) => {
         duplicate_policy: 'PREVENT',
         model_name:
           parsedBody.data.model_name ||
-          (env.GEMINI_API_KEY ? env.GEMINI_MODEL || 'gemini-flash-latest' : env.OLLAMA_MODEL || 'qwen2.5:7b'),
+          (env.GEMINI_API_KEY
+            ? env.GEMINI_MODEL || 'gemini-flash-lite-latest'
+            : env.GROQ_API_KEY
+              ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+              : env.OLLAMA_MODEL || 'qwen2.5:7b'),
         model_provider:
-          parsedBody.data.model_provider || (env.GEMINI_API_KEY ? 'gemini' : 'ollama'),
+          parsedBody.data.model_provider ||
+          (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama'),
         question_count: 10,
         styles: {
           analytical: 40,
@@ -119,16 +124,18 @@ generationRunsRouter.post('/', async (request, response, next) => {
     const effectiveProvider =
       parsedBody.data.model_provider ||
       config.model_provider ||
-      (env.GEMINI_API_KEY ? 'gemini' : 'ollama');
+      (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
 
     const effectiveModel =
-      (parsedBody.data.model_name && parsedBody.data.model_name !== 'llama3'
+      parsedBody.data.model_name && parsedBody.data.model_name !== 'llama3'
         ? parsedBody.data.model_name
         : config.model_name && config.model_name !== 'llama3'
           ? config.model_name
           : effectiveProvider === 'gemini'
-            ? env.GEMINI_MODEL || 'gemini-flash-latest'
-            : env.OLLAMA_MODEL || 'qwen2.5:7b');
+            ? env.GEMINI_MODEL || 'gemini-flash-lite-latest'
+            : effectiveProvider === 'groq'
+              ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+              : env.OLLAMA_MODEL || 'qwen2.5:7b';
 
     config.model_provider = effectiveProvider;
     config.model_name = effectiveModel;

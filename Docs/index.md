@@ -54,20 +54,31 @@ flowchart LR
 
 Every coding agent and human developer must strictly uphold these inviolable system invariants:
 
-1. **Dual-Engine Hybrid AI Architecture**:
-   - Primary Cloud Engine: **Google Gemini API** (`gemini-2.0-flash` / `gemini-1.5-flash`) for instantaneous (1–3s), university-grade pedagogical synthesis.
-   - Offline Local Engine: **Ollama** (`qwen2.5:7b` / `qwen2.5:3b`) for 100% on-device private processing and classroom demonstrations.
+1. **Hybrid Multi-Engine AI Architecture**:
+   - Primary Cloud Engine: **Google Gemini API** (`gemini-flash-lite-latest` / `gemini-3.5-flash-lite`, 500 RPD, 15 RPM) for instantaneous (1–3s), university-grade pedagogical synthesis with high daily quota.
+   - High-Capacity Cloud Alternative: **Groq Cloud** (`llama-3.3-70b-versatile`, 14,400 RPD free tier) for high-frequency testing without quota exhaustion.
+   - Offline Local Engine: **Ollama** (`qwen2.5:7b` / `qwen2.5:3b`) for 100% on-device private processing and classroom hardware demonstrations.
    - User Selection: Users can explicitly select their preferred engine in the Resources tab before topic extraction and in the Generation Studio blueprint.
-2. **Zero Fake Template Slot-Filling**:
+2. **Batched Synthesis & Rate-Paced Cloud Execution**:
+   - Cloud engines group targets into batches of 3 (`BATCH_SIZE = 3`), reducing API call volume by ~67%.
+   - An automatic 1.5-second pacing throttle between cloud batches keeps execution well within 15 RPM limits.
+   - Local CPU execution uses `BATCH_SIZE = 1` to prevent hardware timeouts.
+3. **Full-Syllabus Stratified Sampling & Zero Artificial Caps**:
+   - Resource chunk queries never impose arbitrary limits (no `.limit(100)`). All chunks across documents of any length (e.g. 200+ pages) are loaded.
+   - Question planning employs stratified stride sampling (`stride = totalChunks / targetCount`) to guarantee uniform coverage spanning pages 1 to 200+.
+4. **Balanced MCQ Option Distribution (Anti-Predictability)**:
+   - MCQ options are programmatically shuffled using a deterministic Linear Congruential Generator (LCG) PRNG, guaranteeing a ~25% balanced distribution across Options A, B, C, and D.
+   - Static schema template bias (e.g. correct answers clustering at Option B) is strictly eliminated in both prompt instructions and database insertion.
+5. **Zero Fake Template Slot-Filling**:
    - Heuristic slot-fillers that paste raw document sentences into question templates (e.g., *"Which of the following describes [Topic]?"* with answer *"JavaScript notes, maintaining structural correctness"*) are **strictly prohibited**.
    - If an AI call fails or times out, the pipeline executes automated JSON self-healing or fails explicitly with diagnostic telemetry. Slop or corrupted questions are never persisted.
-3. **Strict Project Isolation & Provenance**:
+6. **Strict Project Isolation & Provenance**:
    - Every resource, chunk, topic, blueprint, generation run, question, version, and validation check belongs to a single authenticated project. Cross-project data leakage is strictly prohibited.
-4. **Monotonic Question Numbering**:
+7. **Monotonic Question Numbering**:
    - Questions maintain monotonic, sequential `sort_order` across generation batches (`#01..#15`, `#16..#30`), preventing duplicated question badges in the assessment feed.
-5. **Archive-First Lifecycle**:
+8. **Archive-First Lifecycle**:
    - Normal product actions never hard-delete domain entities. Soft deletion via `archived_at TIMESTAMP WITH TIME ZONE` preserves immutable academic audit trails.
-6. **Localhost Modular Monolith**:
+9. **Localhost Modular Monolith**:
    - The application executes locally (React Vite + Express TypeScript). PostgreSQL, pgvector, and Auth reside on Supabase. Never introduce Kubernetes, microservices, or external ORMs (Prisma, TypeORM) without formal architectural approval.
 
 ---

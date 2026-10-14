@@ -331,8 +331,8 @@ export function ProjectTopicsPage({
   );
   const [isInferring, setIsInferring] = useState(false);
   const [isInferModalOpen, setIsInferModalOpen] = useState(false);
-  const [inferProvider, setInferProvider] = useState<'gemini' | 'ollama'>('gemini');
-  const [inferModel, setInferModel] = useState('gemini-flash-latest');
+  const [inferProvider, setInferProvider] = useState<'gemini' | 'ollama' | 'groq'>('gemini');
+  const [inferModel, setInferModel] = useState('gemini-flash-lite-latest');
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedSubtopic, setSelectedSubtopic] = useState<{
     moduleName: string;
@@ -1588,26 +1588,54 @@ export function ProjectTopicsPage({
                 }`}
                 onClick={() => {
                   setInferProvider('gemini');
-                  setInferModel('gemini-flash-latest');
+                  setInferModel('gemini-flash-lite-latest');
                 }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-xl">⚡</span>
                     <span className="font-headline-sm text-headline-sm font-semibold text-on-surface">
-                      Google Gemini Flash (Cloud Turbo)
+                      Google Gemini Flash Lite (Cloud Turbo)
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm font-bold">
-                    RECOMMENDED · 2–3s
+                    RECOMMENDED · 500 RPD · ~1s
                   </span>
                 </div>
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
-                  Frontier multi-hop academic reasoning. Rapidly analyzes large document corpuses to extract modular syllabi with zero local hardware load.
+                  High-quota multi-hop academic reasoning. Rapidly analyzes large document corpuses to extract modular syllabi with 500 requests/day.
                 </p>
               </div>
 
-              {/* Option 2: Qwen 2.5 Local */}
+              {/* Option 2: Groq High-Speed Cloud */}
+              <div
+                className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
+                  inferProvider === 'groq'
+                    ? 'border-primary bg-primary/5 shadow-sm'
+                    : 'border-outline-variant/30 hover:border-outline-variant'
+                }`}
+                onClick={() => {
+                  setInferProvider('groq');
+                  setInferModel('llama-3.3-70b-versatile');
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🚀</span>
+                    <span className="font-headline-sm text-headline-sm font-semibold text-on-surface">
+                      Groq Llama 3.3 70B (Free High-Speed Cloud)
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-secondary/15 text-secondary font-label-sm text-label-sm font-bold">
+                    14,400 RPD · ~0.5s
+                  </span>
+                </div>
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Ultra-fast cloud inference with 14,400 free requests per day. Perfect alternative when Google daily rate limits are reached.
+                </p>
+              </div>
+
+              {/* Option 3: Qwen 2.5 Local */}
               <div
                 className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
                   inferProvider === 'ollama'

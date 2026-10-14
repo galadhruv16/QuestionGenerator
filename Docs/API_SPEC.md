@@ -602,8 +602,8 @@ Request:
 ```json
 {
   "resource_ids": ["optional-resource-uuid-1", "optional-resource-uuid-2"],
-  "model_provider": "gemini", // "gemini" (Cloud Turbo - default) | "ollama" (Local Offline)
-  "model_name": "gemini-2.0-flash" // e.g. "gemini-2.0-flash" or "qwen2.5:7b"
+  "model_provider": "gemini", // "gemini" (Cloud Turbo - default) | "groq" (Groq Cloud 14.4k RPD) | "ollama" (Local Offline)
+  "model_name": "gemini-flash-lite-latest" // e.g. "gemini-flash-lite-latest", "llama-3.3-70b-versatile", or "qwen2.5:7b"
 }
 ```
 
@@ -784,8 +784,8 @@ Recommended request:
 ```json
 {
   "blueprint_id": "uuid",
-  "model_provider": "gemini", // "gemini" (Cloud Turbo) | "ollama" (Local Offline)
-  "model_name": "gemini-2.0-flash", // e.g. "gemini-2.0-flash" | "qwen2.5:7b"
+  "model_provider": "gemini", // "gemini" (Cloud Turbo) | "groq" (Groq Cloud 14.4k RPD) | "ollama" (Local Offline)
+  "model_name": "gemini-flash-lite-latest", // e.g. "gemini-flash-lite-latest" | "llama-3.3-70b-versatile" | "qwen2.5:7b"
   "request_id": "optional-client-generated-uuid"
 }
 ```
@@ -797,7 +797,7 @@ An inline configuration may be supported for unsaved custom generation:
   "configuration": {
     "question_count": 25,
     "model_provider": "gemini",
-    "model_name": "gemini-2.0-flash",
+    "model_name": "gemini-flash-lite-latest",
     "bloom": { "analyze": 40, "apply": 30, "evaluate": 30 },
     "difficulty": { "easy": 20, "medium": 50, "hard": 30 },
     "styles": { "analytical": 50, "scenario": 50 },

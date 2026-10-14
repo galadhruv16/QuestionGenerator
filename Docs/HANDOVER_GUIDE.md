@@ -56,7 +56,8 @@ QuestionGeneration/
 | **Relational Database** | Supabase PostgreSQL | Multi-tenant persistence, project scoping |
 | **Vector Database** | Supabase `pgvector` (HNSW) | 768-dimensional semantic chunk retrieval |
 | **File Storage** | Supabase Storage | Encrypted PDF/DOCX/PPTX asset storage |
-| **Cloud AI Engine** | Google Gemini API (`gemini-2.0-flash`) | Primary Turbo generation & topic inference |
+| **Cloud AI Engine** | Google Gemini API (`gemini-flash-lite-latest`) | Primary Turbo generation & topic inference (500 RPD) |
+| **High-Capacity Cloud Engine** | Groq Cloud (`llama-3.3-70b-versatile`) | High-frequency testing & bulk generation (14,400 RPD free tier) |
 | **Local AI Engine** | Ollama (`qwen2.5:7b` / `qwen2.5:3b`) | Offline localhost fallback & demonstrations |
 | **Embeddings** | Ollama `nomic-embed-text` | 100% local 768-d chunk embedding |
 
@@ -85,7 +86,11 @@ SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 
 # AI Engine Configuration
 GEMINI_API_KEY=<your-google-gemini-api-key>
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-flash-lite-latest
+
+# Optional Groq Cloud Key (14.4k RPD free tier)
+GROQ_API_KEY=<your-groq-api-key>
+GROQ_MODEL=llama-3.3-70b-versatile
 
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:7b
@@ -105,7 +110,7 @@ VITE_API_URL=http://localhost:3001/api/v1
 
 ---
 
-## 4. Dual-Engine AI Architecture
+## 4. Multi-Engine AI Architecture
 
 The system utilizes an internal provider interface [`AIProvider`](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/ai/ai-provider.ts) located in `apps/api/src/ai/`.
 
@@ -113,9 +118,15 @@ The system utilizes an internal provider interface [`AIProvider`](file:///c:/Use
 1. **`GeminiProvider`**:
    - Location: `apps/api/src/ai/providers/gemini-provider.ts`
    - Connects to Google Generative Language API via HTTPS POST.
-   - Enforces `generationConfig.responseMimeType = "application/json"`.
-   - Latency: 1–3 seconds per question.
-2. **`OllamaProvider`**:
+   - Default: `gemini-flash-lite-latest` (500 RPD quota, 15 RPM).
+   - Features automatic 2.5s backoff and candidate model rotation on HTTP 429.
+   - Latency: 1–2 seconds per batch.
+2. **`GroqProvider`**:
+   - Location: `apps/api/src/ai/providers/groq-provider.ts`
+   - Connects to Groq Cloud API.
+   - Default: `llama-3.3-70b-versatile` (14,400 RPD quota free tier).
+   - Latency: ~1–2 seconds per batch.
+3. **`OllamaProvider`**:
    - Location: `apps/api/src/ai/providers/ollama-provider.ts`
    - Connects to local Ollama HTTP endpoint (`/api/generate`, `/api/embeddings`).
    - Latency: 60–90 seconds per question on CPU (Ryzen 5 7520U).
@@ -124,10 +135,16 @@ The system utilizes an internal provider interface [`AIProvider`](file:///c:/Use
 ```typescript
 import { getAIProvider } from '../ai/ai-provider.js';
 
-// Dynamically routes based on user preference
+// Dynamically routes based on user preference: 'gemini' | 'groq' | 'ollama'
 const provider = getAIProvider(model_provider ?? 'gemini', model_name);
-const structuredOutput = await provider.generateStructured(prompt, schema);
+const rawOutput = await provider.generate({ prompt, system, format: 'json' });
 ```
+
+### Batching & Sampling Architecture:
+- **Cloud Batching**: Cloud engines synthesize targets in groups of 3 (`BATCH_SIZE = 3`), reducing API call volume by 67%.
+- **Rate Pacing**: 1.5s delay between cloud batches prevents 15 RPM throttling.
+- **Full-Syllabus Coverage**: Loads all chunks without `.limit(100)` caps, performing stratified stride sampling across pages 1 to 200+.
+- **MCQ Option Shuffling**: Programmatic LCG shuffling ensures an even ~25% balance across options A, B, C, and D, preventing Option B bias.
 
 ---
 

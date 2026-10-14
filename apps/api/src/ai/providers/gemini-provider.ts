@@ -3,12 +3,13 @@ import { env } from '../../config/env.js';
 import { defaultAIProvider } from './ollama-provider.js';
 
 const FALLBACK_MODELS = [
-  'gemini-flash-latest',
   'gemini-flash-lite-latest',
-  'gemini-3.8-flash',
-  'gemini-3.5-flash',
-  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
+  'gemini-flash-latest',
+  'gemini-3.8-flash',
+  'gemini-3.6-flash',
+  'gemini-3.7-flash',
 ];
 
 export class GeminiProvider implements AIProvider {
@@ -19,7 +20,7 @@ export class GeminiProvider implements AIProvider {
 
   constructor(
     apiKey: string | undefined = env.GEMINI_API_KEY,
-    defaultModel: string = env.GEMINI_MODEL || 'gemini-flash-latest',
+    defaultModel: string = env.GEMINI_MODEL || 'gemini-flash-lite-latest',
   ) {
     this.apiKey = apiKey ? apiKey.trim() : undefined;
     this.defaultModel = defaultModel;
@@ -82,6 +83,10 @@ export class GeminiProvider implements AIProvider {
           console.warn(
             `[GeminiProvider] Model ${model} returned HTTP ${response.status}. Trying next fallback... Details: ${errBody.slice(0, 150)}`,
           );
+          if (response.status === 429) {
+            // Respect rate-limit window before falling back to next model
+            await new Promise((resolve) => setTimeout(resolve, 2500));
+          }
           lastError = new Error(
             `Gemini model ${model} unavailable (HTTP ${response.status}): ${errBody.slice(0, 150)}`,
           );

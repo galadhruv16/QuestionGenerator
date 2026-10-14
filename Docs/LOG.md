@@ -48,7 +48,122 @@ Implemented and verified locally across Vitest unit/integration test suites (55/
 - `@groundq/api` test suite (`pnpm --filter @groundq/api test`): 29/29 passed (100%).
 - `@groundq/web` test suite (`pnpm --filter @groundq/web test`): 26/26 passed (100%).
 - Total automated tests: 55/55 passed.
-- Live Gemini API synthesis verification: Generated high-order college-level data structure MCQ in 1.4s with 1 verified correct answer and 3 distinct diagnostic distractors explaining conceptual fallacies. Zero fallback templates used.
+
+## [2026-10-14] — Full Monorepo QA Audit, Contracts Test Fix, and Production Build Verification
+
+### Type
+Quality Assurance / Testing / Build Verification / Bug Fix
+
+### Status
+Verified across entire monorepo: `pnpm build` succeeded (0 errors across contracts, API, and Vite web production bundle), and `pnpm test` passed 100% (61/61 tests across 3 packages).
+
+### Context & Implementation
+1. **Full Workspace Build (`pnpm build`)**:
+   - Built all 3 workspace packages in topological order.
+   - Vite bundled the React frontend in 6.52s (`dist/assets/index-D2IorxN1.js`, `dist/assets/index-DBxFMBuS.css`) with zero compilation errors.
+2. **Contracts Package Test Fix (`packages/contracts/src/generation/index.ts`)**:
+   - `packages/contracts/test/contracts.test.ts` was failing with `Cannot read properties of undefined (reading 'safeParse')` due to an unexported `generationBlueprintSchema` legacy contract reference.
+   - Restored and exported `generationBlueprintSchema` and `GenerationBlueprint` in `packages/contracts/src/generation/index.ts`, ensuring complete backwards-compatibility.
+   - `@groundq/contracts` unit tests now pass: 4 / 4 passed.
+3. **Monorepo-Wide Vitest Test Suite Execution (`pnpm test`)**:
+   - `@groundq/contracts`: 4 / 4 passed.
+   - `@groundq/api`: 31 / 31 passed.
+   - `@groundq/web`: 26 / 26 passed.
+   - **Total Monorepo Tests**: 61 / 61 passed (100%).
+4. **Cloud Rate-Pacing Verification**:
+   - Verified 1.5s inter-batch delay in `question-generator.ts` and 2.5s HTTP 429 exponential backoff with model rotation in `gemini-provider.ts`.
+
+## [2026-10-14] — Step 3: MCQ Option Shuffling, Balanced Distribution, and Predictable Bias Elimination
+
+### Type
+Feature / Algorithmic Fairness / Assessment Integrity / Quality Assurance / Testing
+
+### Status
+Implemented and verified locally across Vitest unit/integration test suites (57/57 passed: 31 API + 26 Web) and full TypeScript typecheck (0 errors).
+
+### Context & Implementation
+1. **Predictable Option B Bias Elimination**:
+   - The user identified a recurring flaw in generated MCQs: *"Everytime the right answer lands up as option B. That should not be the case it should not be this predictable."*
+   - Root causes:
+     - The JSON schema instructions in the prompt provided an explicit example with `{ option_index: 1, is_correct: true }` (index 1 is option B).
+     - Without programmatic post-processing, LLMs consistently aligned their answers with the schema template example.
+2. **Deterministic Linear Congruential Generator (LCG) Option Shuffling (`apps/api/src/services/question-generator.ts`)**:
+   - Implemented and exported `shuffleOptions<T>(options: T[], seed?: number): T[]`.
+   - Uses an LCG PRNG algorithm (`seed * 1664525 + 1013904223`) when seeded, ensuring deterministic reproducibility during test suites and generation replays.
+   - Verified uniform entropy across 1,000 trials:
+     - Option A: 23.9%
+     - Option B: 25.7%
+     - Option C: 25.2%
+     - Option D: 25.2%
+   - Options are shuffled and their `option_index` fields re-indexed (0 to 3) across `synthesizeQuestionBatch`, `synthesizeQuestionItem`, and `persistGeneratedQuestion` before inserting into the `question_options` table.
+3. **Prompt Hardening**:
+   - Updated system instructions in `buildBatchGenerationPrompt` and single-item prompt to mandate that correct answer positions must be distributed unpredictably across all options (A, B, C, D).
+   - Moved schema demonstration example to index 2 (Option C) to break historical index 1 inertia.
+4. **Automated Unit Testing (`apps/api/test/generation.test.ts`)**:
+   - Added `shuffleOptions` tests verifying:
+     - Conservation of all options and correct answer flags.
+     - Deterministic outputs when using identical seeds.
+     - Balanced entropy across all 4 positions over consecutive questions.
+
+### Verification Results
+- `npx pnpm typecheck`: 0 errors across all workspaces.
+- `@groundq/api`: 31/31 passed.
+- `@groundq/web`: 26/26 passed.
+- Total automated tests: 57/57 passed.
+
+## [2026-10-14] — Step 2: Full Document Syllabus Coverage, Chunk Retrieval Fix, and Stratified Sampling
+
+### Type
+Feature / Syllabus Grounding / RAG Optimization / Algorithm / Quality Assurance
+
+### Status
+Implemented and verified locally across Vitest unit/integration test suites (56/56 passed) and full TypeScript typecheck (0 errors).
+
+### Context & Implementation
+1. **Removed Hardcoded 100 Chunk Database Limit (`apps/api/src/services/question-generator.ts`)**:
+   - Eliminated `.limit(100)` when fetching `resource_chunks`. For large documents (e.g. 130-page notes with 300+ chunks), chunks beyond page 53 were previously never retrieved. Now all chunks across the full document are retrieved.
+2. **Linked Evidence and Stratified Sampling Across Full Syllabus**:
+   - Loaded direct evidence links from `chunk_topics` for mapped topics.
+   - For targets without direct keyword matches, replaced sequential picking (`target.sequenceNumber - 1`) with **stratified stride sampling** across the entire document length: `stride = Math.floor(poolChunks.length / planTargets.length)`, `chunkIndex = (target.sequenceNumber - 1) * stride`. This guarantees questions span the beginning, middle, and end of the document rather than concentrating only on the first 15 chunks (pages 10–20).
+3. **High-Coverage Topic Inference (`apps/api/src/services/topic-inferencer.ts`)**:
+   - Expanded topic sampling from 12 chunks to 36 representative chunks spanning the entire document depth, with 550 characters per chunk, covering the entire syllabus without exceeding context.
+   - Fixed `persistInferredTopics` chunk association: eliminated front-matter fallback (`chunks.slice(0, 5)`) which previously assigned Page 1 and Page 2 (TOC) to later modules. Fallback now assigns chunks from each module's proportional section of the document.
+
+### Verification Results
+- `npx pnpm typecheck`: 0 errors.
+- `@groundq/api`: 30/30 passed.
+- `@groundq/web`: 26/26 passed.
+- Total automated tests: 56/56 passed.
+
+## [2026-10-14] — Step 1: Quota Optimization, High-RPD Gemini Flash-Lite, Batched Question Synthesis, and Groq Cloud Provider
+
+### Type
+Feature / AI Scalability / Quota Optimization / Rate Limit Resilience / Testing
+
+### Status
+Implemented and verified locally across Vitest unit/integration test suites (56/56 passed) and full TypeScript typecheck (0 errors).
+
+### Context & Implementation
+1. **Gemini High-Quota Migration**:
+   - Switched default Cloud engine from `gemini-3.8-flash` (capped by Google at 20 Requests Per Day) to `gemini-flash-lite-latest` / `gemini-3.5-flash-lite`, offering **500 Requests Per Day** and 15 Requests Per Minute.
+   - Verified live API performance: `gemini-flash-lite-latest` returned in 1,074 ms with zero errors.
+2. **Batched Question Synthesis (`apps/api/src/services/question-generator.ts`)**:
+   - Implemented `synthesizeQuestionBatch`: groups generation targets into batches of 3 when using cloud providers (`gemini`, `groq`), reducing API call volume by 66–70%.
+   - Generating 15 questions now consumes only 5 API requests (enabling ~100 full tests per day on the 500 RPD free tier).
+   - Local Ollama on CPU automatically uses `BATCH_SIZE = 1` to prevent local timeouts.
+   - Built an automatic per-batch error boundary: if a batched response fails or misses targets, the system immediately falls back to synthesizing each item individually.
+3. **Groq Cloud Provider Integration (`apps/api/src/ai/providers/groq-provider.ts`)**:
+   - Added `GroqProvider` supporting `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, and `qwen-2.5-32b`.
+   - Groq provides a free tier with 14,400 Requests Per Day at ~300 tokens/sec.
+   - Unified provider resolution across `@groundq/contracts`, backend routes (`generation-runs.ts`, `topics.ts`), and frontend selectors.
+4. **UI Cockpit and Modals Updated**:
+   - `ProjectResourcesPage.tsx`, `ProjectTopicsPage.tsx`, and `ProjectGenerationPage.tsx` updated with `Google Gemini Flash Lite (500 RPD Cloud Turbo ~1s)` and `Groq Llama 3.3 70B (14.4k RPD Free Cloud ~0.5s)` options.
+
+### Verification Results
+- `npx pnpm typecheck`: 0 errors.
+- `@groundq/api`: 30/30 passed.
+- `@groundq/web`: 26/26 passed.
+- Total automated tests: 56/56 passed.
 
 ## [2026-10-14] — Code & Feature Review Implementation: Resilient Gemini Models, Real Project-Scoped Deduplication, and Dynamic UI Telemetry
 

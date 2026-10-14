@@ -100,8 +100,8 @@ export function ProjectGenerationPage() {
   // Quality invariants
   const [strictDeduplication, setStrictDeduplication] = useState(true);
   const [requireCitationAnchors, setRequireCitationAnchors] = useState(true);
-  const [targetProvider, setTargetProvider] = useState<'gemini' | 'ollama'>('gemini');
-  const [targetModel, setTargetModel] = useState('gemini-flash-latest');
+  const [targetProvider, setTargetProvider] = useState<'gemini' | 'ollama' | 'groq'>('gemini');
+  const [targetModel, setTargetModel] = useState('gemini-flash-lite-latest');
 
   // Generation execution state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -538,7 +538,9 @@ export function ProjectGenerationPage() {
                   <span className="px-2 py-0.5 rounded bg-secondary/15 text-secondary font-label-sm text-label-sm font-semibold">
                     {targetProvider === 'gemini'
                       ? 'GEMINI CLOUD TURBO: READY'
-                      : 'LOCAL OLLAMA ENGINE: READY'}
+                      : targetProvider === 'groq'
+                        ? 'GROQ CLOUD ENGINE: READY'
+                        : 'LOCAL OLLAMA ENGINE: READY'}
                   </span>
                 </div>
                 <p className="font-body-md text-body-md text-on-surface-variant max-w-3xl">
@@ -1433,12 +1435,14 @@ export function ProjectGenerationPage() {
                         className="bg-transparent font-bold text-primary border-none outline-none cursor-pointer"
                         value={`${targetProvider}:${targetModel}`}
                         onChange={(e) => {
-                          const [prov, mod] = e.target.value.split(':') as ['gemini' | 'ollama', string];
+                          const [prov, mod] = e.target.value.split(':') as ['gemini' | 'ollama' | 'groq', string];
                           setTargetProvider(prov);
                           setTargetModel(mod);
                         }}
                       >
+                        <option value="gemini:gemini-flash-lite-latest">⚡ Gemini Flash Lite (500 RPD Cloud Turbo ~1s)</option>
                         <option value="gemini:gemini-flash-latest">⚡ Gemini Flash (Cloud Turbo ~2s)</option>
+                        <option value="groq:llama-3.3-70b-versatile">🚀 Groq Llama 3.3 70B (14.4k RPD Free Cloud ~0.5s)</option>
                         <option value="ollama:qwen2.5:7b">🖥️ Qwen 2.5 7B (Localhost Offline ~60s)</option>
                         <option value="ollama:qwen2.5:3b">🖥️ Qwen 2.5 3B (Localhost Offline Light)</option>
                       </select>
@@ -1482,8 +1486,8 @@ export function ProjectGenerationPage() {
                       Est. Latency
                     </span>
                     <span className="font-headline-md text-headline-md text-on-surface font-bold">
-                      {targetProvider === 'gemini'
-                        ? `~${Math.round(questionCount * 1.8)}s`
+                      {targetProvider === 'gemini' || targetProvider === 'groq'
+                        ? `~${Math.max(2, Math.round(questionCount * 0.4))}s`
                         : Math.round((questionCount * 65) / 60) >= 2
                           ? `~${Math.round((questionCount * 65) / 60)}m`
                           : `~${questionCount * 65}s`}

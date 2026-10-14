@@ -4,6 +4,7 @@ import { createApp } from '../src/app.js';
 import {
   buildGenerationPlan,
   computeStemSimilarity,
+  shuffleOptions,
 } from '../src/services/question-generator.js';
 
 describe('generation planner and routes', () => {
@@ -38,6 +39,38 @@ describe('generation planner and routes', () => {
       'Describe Coffman conditions required for mutual exclusion deadlocks',
     );
     expect(distinct).toBeLessThan(0.25);
+  });
+
+  it('deterministically shuffles MCQ options and eliminates Option B predictability bias', () => {
+    const rawOptions = [
+      { explanation: 'Incorrect A', is_correct: false, text: 'Distractor 1' },
+      { explanation: 'Correct B', is_correct: true, text: 'Correct Answer' },
+      { explanation: 'Incorrect C', is_correct: false, text: 'Distractor 2' },
+      { explanation: 'Incorrect D', is_correct: false, text: 'Distractor 3' },
+    ];
+
+    // 1. Determinism check: same seed gives identical shuffle
+    const shuffle1 = shuffleOptions(rawOptions, 42);
+    const shuffle2 = shuffleOptions(rawOptions, 42);
+    expect(shuffle1.map((o) => o.text)).toEqual(shuffle2.map((o) => o.text));
+
+    // 2. Integrity check: preserves all items and exactly 1 correct answer
+    expect(shuffle1).toHaveLength(4);
+    expect(shuffle1.filter((o) => o.is_correct)).toHaveLength(1);
+
+    // 3. Distribution check: correct option lands across diverse indices, not stuck at index 1 (Option B)
+    const positionCounts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
+    for (let seq = 1; seq <= 40; seq++) {
+      const res = shuffleOptions(rawOptions, seq);
+      const correctIdx = res.findIndex((o) => o.is_correct);
+      positionCounts[correctIdx] = (positionCounts[correctIdx] || 0) + 1;
+    }
+
+    // Must have hits on all 4 positions (A, B, C, D)
+    expect(positionCounts[0]).toBeGreaterThan(2);
+    expect(positionCounts[1]).toBeGreaterThan(2);
+    expect(positionCounts[2]).toBeGreaterThan(2);
+    expect(positionCounts[3]).toBeGreaterThan(2);
   });
 
   it('decomposes blueprint configuration into discrete per-question plan targets', () => {
