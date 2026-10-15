@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { GuestRoute, ProtectedRoute } from './components/AuthGuards';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import {
   CreateAccountPage,
   PasswordRecoveryPage,
@@ -11,12 +12,15 @@ import { ProjectResourcesPage } from './pages/ProjectResourcesPage';
 import { ProjectTopicsPage } from './pages/ProjectTopicsPage';
 import { ProjectGenerationPage } from './pages/ProjectGenerationPage';
 import { ProjectQuestionsPage } from './pages/ProjectQuestionsPage';
+import { ProjectExportStudioPage } from './pages/ProjectExportStudioPage';
+import { ProjectPracticeStudioPage } from './pages/ProjectPracticeStudioPage';
 import { WorkspacePage } from './pages/WorkspacePage';
 
 export function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
         <Route element={<LandingPage />} path="/" />
         <Route
           element={
@@ -83,7 +87,24 @@ export function App() {
           }
           path="/app/projects/:projectId/questions"
         />
+        <Route
+          element={
+            <ProtectedRoute>
+              <ProjectExportStudioPage />
+            </ProtectedRoute>
+          }
+          path="/app/projects/:projectId/export"
+        />
+        <Route
+          element={
+            <ProtectedRoute>
+              <ProjectPracticeStudioPage />
+            </ProtectedRoute>
+          }
+          path="/app/projects/:projectId/practice"
+        />
       </Routes>
     </BrowserRouter>
-  );
+  </ErrorBoundary>
+);
 }

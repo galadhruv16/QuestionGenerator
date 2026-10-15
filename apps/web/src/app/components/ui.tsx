@@ -6,22 +6,32 @@ export type IconName =
   | 'archive'
   | 'arrow'
   | 'arrowUpRight'
+  | 'badge'
   | 'book'
+  | 'calculator'
+  | 'chart'
   | 'check'
+  | 'checkCircle'
   | 'chevron'
   | 'close'
   | 'copy'
+  | 'crossCircle'
   | 'database'
   | 'delete'
+  | 'download'
   | 'edit'
   | 'file'
+  | 'flag'
   | 'folder'
+  | 'layers'
   | 'lock'
   | 'menu'
   | 'more_horiz'
   | 'network'
   | 'pause'
   | 'pdf'
+  | 'play'
+  | 'print'
   | 'refresh'
   | 'replay'
   | 'school'
@@ -30,7 +40,10 @@ export type IconName =
   | 'sliders'
   | 'sort'
   | 'spark'
+  | 'terminal'
+  | 'timer'
   | 'tree'
+  | 'tune'
   | 'upload'
   | 'verified';
 
@@ -60,13 +73,40 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
         <path d="M8 5h11v11" />
       </>
     ),
+    badge: (
+      <>
+        <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" />
+        <path d="m9 12 2 2 4-4" />
+      </>
+    ),
     book: (
       <>
         <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z" />
         <path d="M4 5.5v16" />
       </>
     ),
+    calculator: (
+      <>
+        <rect height="20" rx="2" width="16" x="4" y="2" />
+        <line x1="8" x2="16" y1="6" y2="6" />
+        <line x1="16" x2="16" y1="14" y2="18" />
+        <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01" />
+      </>
+    ),
+    chart: (
+      <>
+        <line x1="18" x2="18" y1="20" y2="10" />
+        <line x1="12" x2="12" y1="20" y2="4" />
+        <line x1="6" x2="6" y1="20" y2="14" />
+      </>
+    ),
     check: <path d="m5 12 4 4L19 6" />,
+    checkCircle: (
+      <>
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+        <polyline points="22 4 12 14.01 9 11.01" />
+      </>
+    ),
     chevron: <path d="m6 9 6 6 6-6" />,
     close: (
       <>
@@ -80,6 +120,13 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
       </>
     ),
+    crossCircle: (
+      <>
+        <circle cx="12" cy="12" r="10" />
+        <line x1="15" x2="9" y1="9" y2="15" />
+        <line x1="9" x2="15" y1="9" y2="15" />
+      </>
+    ),
     database: (
       <>
         <ellipse cx="12" cy="5" rx="9" ry="3" />
@@ -89,6 +136,13 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     delete: (
       <>
         <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      </>
+    ),
+    download: (
+      <>
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
       </>
     ),
     edit: (
@@ -103,9 +157,22 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
         <path d="M14 3v5h5M9 13h6M9 17h6" />
       </>
     ),
+    flag: (
+      <>
+        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+        <line x1="4" x2="4" y1="22" y2="15" />
+      </>
+    ),
     folder: (
       <>
         <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+      </>
+    ),
+    layers: (
+      <>
+        <polygon points="12 2 2 7 12 12 22 7 12 2" />
+        <polyline points="2 17 12 22 22 17" />
+        <polyline points="2 12 12 17 22 12" />
       </>
     ),
     lock: (
@@ -117,6 +184,13 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     menu: (
       <>
         <path d="M4 7h16M4 12h16M4 17h16" />
+      </>
+    ),
+    more_horiz: (
+      <>
+        <circle cx="12" cy="12" r="1" />
+        <circle cx="19" cy="12" r="1" />
+        <circle cx="5" cy="12" r="1" />
       </>
     ),
     network: (
@@ -139,6 +213,16 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
         <path d="M14 2v6h6M10 12h4M10 16h4" />
       </>
     ),
+    play: (
+      <polygon points="5 3 19 12 5 21 5 3" />
+    ),
+    print: (
+      <>
+        <polyline points="6 9 6 2 18 2 18 9" />
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+        <rect height="8" width="12" x="6" y="14" />
+      </>
+    ),
     refresh: (
       <>
         <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -148,6 +232,12 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     replay: (
       <>
         <path d="m4 12 4-4m-4 4 4 4m-4-4h11a5 5 0 0 1 5 5v1" />
+      </>
+    ),
+    school: (
+      <>
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+        <path d="M6 12v5c3 3 9 3 12 0v-5" />
       </>
     ),
     search: (
@@ -180,12 +270,37 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
         <path d="m19 3 .5 2.5L22 6l-2.5.5L19 9l-.5-2.5L16 6l2.5-.5z" />
       </>
     ),
+    terminal: (
+      <>
+        <polyline points="4 17 10 11 4 5" />
+        <line x1="12" x2="20" y1="19" y2="19" />
+      </>
+    ),
+    timer: (
+      <>
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </>
+    ),
     tree: (
       <>
         <circle cx="6" cy="6" r="3" />
         <circle cx="6" cy="18" r="3" />
         <circle cx="18" cy="12" r="3" />
         <path d="M6 9v6M9 6h3a3 3 0 0 1 3 3v3" />
+      </>
+    ),
+    tune: (
+      <>
+        <line x1="4" y1="21" x2="4" y2="14" />
+        <line x1="4" y1="10" x2="4" y2="3" />
+        <line x1="12" y1="21" x2="12" y2="12" />
+        <line x1="12" y1="8" x2="12" y2="3" />
+        <line x1="20" y1="21" x2="20" y2="16" />
+        <line x1="20" y1="12" x2="20" y2="3" />
+        <line x1="1" y1="14" x2="7" y2="14" />
+        <line x1="9" y1="8" x2="15" y2="8" />
+        <line x1="17" y1="16" x2="23" y2="16" />
       </>
     ),
     upload: (
@@ -197,19 +312,6 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
       <>
         <path d="M12 3 14 5.2l3-.2.9 2.9 2.4 1.8-1.2 2.7.6 2.9-2.8 1.2-1.2 2.7-3-.6L12 21l-2.7-2.4-3 .6-1.2-2.7-2.8-1.2.6-2.9-1.2-2.7 2.4-1.8.9-2.9 3 .2z" />
         <path d="m8 12 2.5 2.5L16 9" />
-      </>
-    ),
-    more_horiz: (
-      <>
-        <circle cx="12" cy="12" r="1.5" />
-        <circle cx="19" cy="12" r="1.5" />
-        <circle cx="5" cy="12" r="1.5" />
-      </>
-    ),
-    school: (
-      <>
-        <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
-        <path d="M6 12v5c3 3 9 3 12 0v-5" />
       </>
     ),
   };

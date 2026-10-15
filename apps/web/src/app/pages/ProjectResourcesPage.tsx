@@ -9,6 +9,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { ResourceKind, ResourceStatus } from '@groundq/contracts';
 import { getSupabaseClient } from '../../lib/supabase';
 import { Icon, Logo } from '../components/ui';
+import { getCachedProject, updateProjectCache } from '../services/session-store';
 
 interface ProjectInfo {
   created_at: string;
@@ -126,11 +127,11 @@ const apiBaseUrl =
   (import.meta.env.MODE === 'production' ? '' : 'http://localhost:3001');
 
 function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
+  if (!bytes || bytes <= 0 || isNaN(bytes)) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i] || 'B'}`;
 }
 
 export function ProjectResourcesPage({
@@ -141,14 +142,31 @@ export function ProjectResourcesPage({
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
 
-  const [project, setProject] = useState<ProjectInfo | null>(null);
+  const cached = projectId ? getCachedProject(projectId) : null;
+  const rawCachedList = Array.isArray(cached?.resources) ? cached.resources : [];
+  const initialCachedResources: ResourceItem[] = (
+    initialResources ?? rawCachedList
+  ).map((r: any) => ({
+    ...r,
+    checksum_sha256: r.checksum_sha256 || r.id?.substring(0, 8) || 'pending',
+    file_size_bytes: typeof r.file_size_bytes === 'number' ? r.file_size_bytes : 0,
+    original_filename: r.original_filename || 'Document.pdf',
+    resource_kind: r.resource_kind || 'STUDY_MATERIAL',
+    status: r.status || 'READY_TO_PROCESS',
+  }));
+
+  const [project, setProject] = useState<ProjectInfo | null>(
+    (cached?.project as ProjectInfo | null) ?? null,
+  );
   const [resources, setResources] = useState<ResourceItem[]>(
-    initialResources ?? [],
+    initialCachedResources,
   );
   const [activeView, setActiveView] = useState<'table' | 'empty' | 'ocr_alert'>(
-    initialResources && initialResources.length > 0 ? 'table' : 'empty',
+    initialCachedResources.length > 0 ? 'table' : 'empty',
   );
-  const [isLoading, setIsLoading] = useState(!initialResources);
+  const [isLoading, setIsLoading] = useState(
+    !initialResources && initialCachedResources.length === 0,
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -300,6 +318,13 @@ export function ProjectResourcesPage({
 
           setResources(detailedResources);
           setActiveView('table');
+
+          if (projectId) {
+            updateProjectCache(projectId, {
+              project: projectPayload.data,
+              resources: detailedResources,
+            });
+          }
         }
       }
     } catch (err: unknown) {
@@ -361,9 +386,11 @@ export function ProjectResourcesPage({
     if (
       searchTerm &&
       !item.original_filename
+        ?.toLowerCase()
+        ?.includes(searchTerm.toLowerCase()) &&
+      !(item.checksum_sha256 || item.id || '')
         .toLowerCase()
-        .includes(searchTerm.toLowerCase()) &&
-      !item.checksum_sha256.toLowerCase().includes(searchTerm.toLowerCase())
+        .includes(searchTerm.toLowerCase())
     ) {
       return false;
     }
@@ -387,10 +414,10 @@ export function ProjectResourcesPage({
   });
 
   const totalBytes = resources.reduce(
-    (acc, r) => acc + (r.file_size_bytes || 0),
+    (acc, r) => acc + (r?.file_size_bytes || 0),
     0,
   );
-  const readyCount = resources.filter((r) => r.status === 'READY').length;
+  const readyCount = resources.filter((r) => r?.status === 'READY').length;
 
   const handleStartProcessing = async (id: string) => {
     try {
@@ -690,13 +717,13 @@ export function ProjectResourcesPage({
                 <Icon name="spark" size={16} />
                 <span>Generation</span>
               </Link>
-              <div className="flex items-center gap-2 px-4 py-2.5 text-outline cursor-not-allowed font-body-sm text-body-sm whitespace-nowrap">
+              <Link
+                className="flex items-center gap-2 px-4 py-2.5 text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm transition-colors whitespace-nowrap"
+                to={`/app/projects/${projectId ?? 'demo'}/questions`}
+              >
                 <Icon name="verified" size={16} />
                 <span>Question Bank</span>
-                <span className="px-1.5 py-0.5 rounded bg-surface-container-high text-outline font-label-sm text-label-sm">
-                  Upcoming step
-                </span>
-              </div>
+              </Link>
             </nav>
           </div>
         </header>
@@ -1052,13 +1079,13 @@ export function ProjectResourcesPage({
                                         SHA-256:
                                       </span>
                                       <code className="text-on-surface">
-                                        {res.checksum_sha256.slice(0, 8)}..
+                                        {(res.checksum_sha256 || res.id || 'pending').slice(0, 8)}..
                                       </code>
                                       <span>•</span>
                                       <span>
-                                        {new Date(
-                                          res.created_at,
-                                        ).toLocaleDateString()}
+                                        {res.created_at
+                                          ? new Date(res.created_at).toLocaleDateString()
+                                          : 'Recent'}
                                       </span>
                                     </div>
                                   </div>
@@ -1068,7 +1095,7 @@ export function ProjectResourcesPage({
                               {/* Resource Type */}
                               <td className="py-3 px-4 whitespace-nowrap">
                                 <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface font-label-sm text-label-sm">
-                                  {res.resource_kind.replace('_', ' ')}
+                                  {(res.resource_kind || 'STUDY_MATERIAL').replace('_', ' ')}
                                 </span>
                               </td>
 
@@ -1373,10 +1400,10 @@ export function ProjectResourcesPage({
                     }
                     size={13}
                   />
-                  {selectedDrawerResource.status.replace('_', ' ')}
+                  {(selectedDrawerResource.status || 'READY').replace('_', ' ')}
                 </span>
                 <span className="font-label-sm text-label-sm text-on-surface-variant">
-                  Type: {selectedDrawerResource.resource_kind.replace('_', ' ')}
+                  Type: {(selectedDrawerResource.resource_kind || 'STUDY_MATERIAL').replace('_', ' ')}
                 </span>
               </div>
             </div>
@@ -1414,8 +1441,8 @@ export function ProjectResourcesPage({
               <div className="flex justify-between items-center">
                 <span className="text-on-surface-variant">File size:</span>
                 <span className="font-label-sm text-label-sm text-on-surface">
-                  {formatBytes(selectedDrawerResource.file_size_bytes)} (
-                  {selectedDrawerResource.file_size_bytes.toLocaleString()}{' '}
+                  {formatBytes(selectedDrawerResource.file_size_bytes || 0)} (
+                  {(selectedDrawerResource.file_size_bytes || 0).toLocaleString()}{' '}
                   bytes)
                 </span>
               </div>
@@ -1425,14 +1452,14 @@ export function ProjectResourcesPage({
                 </span>
                 <div className="flex items-center gap-1">
                   <code className="font-label-sm text-label-sm text-primary bg-surface-container-lowest px-1.5 py-0.5 rounded border border-outline-variant/30">
-                    {selectedDrawerResource.checksum_sha256}
+                    {selectedDrawerResource.checksum_sha256 || selectedDrawerResource.id}
                   </code>
                   <button
                     aria-label="Copy Checksum"
                     className="text-outline hover:text-on-surface p-0.5"
                     onClick={() =>
                       navigator.clipboard.writeText(
-                        selectedDrawerResource.checksum_sha256,
+                        selectedDrawerResource.checksum_sha256 || selectedDrawerResource.id,
                       )
                     }
                     type="button"
@@ -1849,9 +1876,9 @@ export function ProjectResourcesPage({
 
       {/* Topic Inference Engine Selector Modal */}
       {isInferModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-xl rounded-2xl bg-surface-container-lowest shadow-2xl border border-outline-variant/30 overflow-hidden flex flex-col">
-            <div className="px-6 py-5 border-b border-outline-variant/20 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-xl max-h-[90vh] rounded-2xl bg-surface-container-lowest shadow-2xl border border-outline-variant/30 overflow-hidden flex flex-col">
+            <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-outline-variant/20 flex items-center justify-between shrink-0">
               <div>
                 <h3 className="font-headline-md text-headline-md text-on-surface font-semibold">
                   Select AI Topic Extraction Engine
@@ -1869,10 +1896,10 @@ export function ProjectResourcesPage({
               </button>
             </div>
 
-            <div className="p-6 flex flex-col gap-4">
+            <div className="p-4 sm:p-6 flex flex-col gap-3 sm:gap-4 overflow-y-auto flex-1">
               {/* Option 1: Gemini Cloud Turbo */}
               <div
-                className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
+                className={`p-3.5 sm:p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
                   inferProvider === 'gemini'
                     ? 'border-primary bg-primary/5 shadow-sm'
                     : 'border-outline-variant/30 hover:border-outline-variant'
@@ -1882,14 +1909,14 @@ export function ProjectResourcesPage({
                   setInferModel('gemini-flash-lite-latest');
                 }}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">⚡</span>
+                    <span className="text-xl shrink-0">⚡</span>
                     <span className="font-headline-sm text-headline-sm font-semibold text-on-surface">
                       Google Gemini Flash Lite (Cloud Turbo)
                     </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm font-bold">
+                  <span className="self-start sm:self-auto px-2 py-0.5 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm font-bold shrink-0">
                     RECOMMENDED · 500 RPD · ~1s
                   </span>
                 </div>
@@ -1900,7 +1927,7 @@ export function ProjectResourcesPage({
 
               {/* Option 2: Groq High-Speed Cloud */}
               <div
-                className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
+                className={`p-3.5 sm:p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
                   inferProvider === 'groq'
                     ? 'border-primary bg-primary/5 shadow-sm'
                     : 'border-outline-variant/30 hover:border-outline-variant'
@@ -1910,14 +1937,14 @@ export function ProjectResourcesPage({
                   setInferModel('llama-3.3-70b-versatile');
                 }}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">🚀</span>
+                    <span className="text-xl shrink-0">🚀</span>
                     <span className="font-headline-sm text-headline-sm font-semibold text-on-surface">
                       Groq Llama 3.3 70B (Free High-Speed Cloud)
                     </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-secondary/15 text-secondary font-label-sm text-label-sm font-bold">
+                  <span className="self-start sm:self-auto px-2 py-0.5 rounded-full bg-secondary/15 text-secondary font-label-sm text-label-sm font-bold shrink-0">
                     14,400 RPD · ~0.5s
                   </span>
                 </div>
@@ -1928,7 +1955,7 @@ export function ProjectResourcesPage({
 
               {/* Option 3: Qwen 2.5 Local */}
               <div
-                className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
+                className={`p-3.5 sm:p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
                   inferProvider === 'ollama'
                     ? 'border-primary bg-primary/5 shadow-sm'
                     : 'border-outline-variant/30 hover:border-outline-variant'
@@ -1938,14 +1965,14 @@ export function ProjectResourcesPage({
                   setInferModel('qwen2.5:7b');
                 }}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">🖥️</span>
+                    <span className="text-xl shrink-0">🖥️</span>
                     <span className="font-headline-sm text-headline-sm font-semibold text-on-surface">
                       Qwen 2.5 7B (Localhost Offline)
                     </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-bold">
+                  <span className="self-start sm:self-auto px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-bold shrink-0">
                     100% PRIVATE · ~60s
                   </span>
                 </div>
@@ -1955,11 +1982,11 @@ export function ProjectResourcesPage({
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-surface-container-low border-t border-outline-variant/20 flex items-center justify-between">
+            <div className="px-5 sm:px-6 py-3.5 sm:py-4 bg-surface-container-low border-t border-outline-variant/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
               <span className="font-label-sm text-label-sm text-outline">
                 Dual-Engine GroundQ Architecture
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-end sm:self-auto">
                 <button
                   className="px-4 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-body-sm text-body-sm transition-colors"
                   disabled={isInferringTopics}

@@ -68,25 +68,42 @@ describe('ProjectQuestionsPage', () => {
     expect(
       screen.getByText('Question Stem & Pedagogical Rationale'),
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Show Answer/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Show Grounding/i })).toBeInTheDocument();
+    expect(
+      screen.queryByText('Automated 3-Point Validation Ledger'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('handles Show Answer and Show Grounding toggle buttons for active question', () => {
+    renderQuestionsPage();
+
+    expect(screen.getByText('Assessment Options')).toBeInTheDocument();
+    // Correct answer hidden initially
+    expect(screen.queryByText('CORRECT ANSWER')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Grounding Evidence & PDF Citation'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cosine Semantic Similarity/i)).not.toBeInTheDocument();
+
+    // Toggle Show Answer
+    const showAnswerBtn = screen.getByRole('button', { name: /Show Answer/i });
+    fireEvent.click(showAnswerBtn);
+
+    expect(screen.getByText('CORRECT ANSWER')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Hide Answer/i })).toBeInTheDocument();
+
+    // Toggle Show Grounding
+    const showGroundingBtn = screen.getByRole('button', { name: /Show Grounding/i });
+    fireEvent.click(showGroundingBtn);
+
     expect(
       screen.getByText('Grounding Evidence & PDF Citation'),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText('Automated 3-Point Validation Ledger'),
-    ).toBeInTheDocument();
-  });
+    expect(screen.getByRole('button', { name: /Hide Grounding/i })).toBeInTheDocument();
+    expect(screen.getByText(/Page 14/i)).toBeInTheDocument();
+    expect(screen.getByText(/#chk-092/i)).toBeInTheDocument();
 
-  it('renders options distractor ledger and evidence grounding citation for active question', () => {
-    renderQuestionsPage();
-
-    expect(
-      screen.getByText('Assessment Options & Distractor Ledger'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('CORRECT ANSWER')).toBeInTheDocument();
-    expect(
-      screen.getByText('SHA-256 Byte-Lock Verified'),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/Cosine Semantic Similarity/i)).toBeInTheDocument();
     expect(screen.getByText('Accept Question to Bank')).toBeInTheDocument();
   });
 
@@ -132,4 +149,86 @@ describe('ProjectQuestionsPage', () => {
       screen.queryByText('Edit Question Stem & Distractors'),
     ).not.toBeInTheDocument();
   });
+
+  it('opens and closes the Targeted Regeneration Tweak Drawer when clicking Regenerate in Place', () => {
+    renderQuestionsPage();
+
+    // Question #01 is available by default
+    const regenBtn = screen.getByRole('button', { name: /Regenerate in Place/i });
+    expect(regenBtn).toBeInTheDocument();
+    fireEvent.click(regenBtn);
+
+    // Tweak drawer should open
+    expect(
+      screen.getByText('Targeted Regeneration'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Target Cognitive Level (Bloom)'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Difficulty Calibration')).toBeInTheDocument();
+    expect(
+      screen.getByText('AI Inference Engine & Model'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Instructor Direction (Optional Prompt Tweak)'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Deduplication Active · Cosine similarity lock/i),
+    ).toBeInTheDocument();
+
+    // Close the drawer
+    const closeBtn = screen.getByRole('button', { name: /Close drawer/i });
+    fireEvent.click(closeBtn);
+
+    expect(
+      screen.queryByText('Targeted Regeneration'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('locks accepted questions from mutation and shows locked badge instead of regenerate button', () => {
+    renderQuestionsPage();
+
+    // Question #04 in demoQuestions is ACCEPTED
+    const q4Card = screen.getByText(/Coffman's formal taxonomy/i);
+    fireEvent.click(q4Card);
+
+    // Should display Locked (Accepted) badge in bottom bar instead of active regenerate button
+    expect(screen.getByText('Locked (Accepted)')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Regenerate in Place/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows Bulk Regenerate button when questions are selected and opens the bulk modal', () => {
+    renderQuestionsPage();
+
+    // Select all questions
+    const selectAllCheckbox = screen.getByLabelText(/Select all questions/i);
+    fireEvent.click(selectAllCheckbox);
+
+    // Bulk Regenerate button appears
+    const bulkRegenBtn = screen.getByRole('button', {
+      name: /Bulk Regenerate/i,
+    });
+    expect(bulkRegenBtn).toBeInTheDocument();
+
+    fireEvent.click(bulkRegenBtn);
+
+    // Bulk modal opens
+    expect(
+      screen.getByText('Bulk Regenerate Selected Questions'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/questions will be automatically preserved without alteration/i),
+    ).toBeInTheDocument();
+
+    // Close bulk modal
+    const cancelModalBtn = screen.getByRole('button', { name: /Close modal/i });
+    fireEvent.click(cancelModalBtn);
+
+    expect(
+      screen.queryByText('Bulk Regenerate Selected Questions'),
+    ).not.toBeInTheDocument();
+  });
 });
+

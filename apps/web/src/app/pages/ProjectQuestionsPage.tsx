@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { QuestionStatus } from '@groundq/contracts';
 import { getSupabaseClient } from '../../lib/supabase';
 import { Icon, Logo } from '../components/ui';
+import { getCachedProject, updateProjectCache } from '../services/session-store';
+import { generationManager } from '../services/generation-manager';
 
 interface ProjectInfo {
   created_at: string;
@@ -588,13 +590,25 @@ export function ProjectQuestionsPage({
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
 
+  const cached = projectId ? getCachedProject(projectId) : null;
+  const initialCachedQuestions: QuestionItem[] =
+    initialQuestions ?? (Array.isArray(cached?.questions) ? (cached.questions as QuestionItem[]) : []);
+
   // Project context state
-  const [project, setProject] = useState<ProjectInfo | null>(null);
-  const [questions, setQuestions] = useState<QuestionItem[]>(
-    initialQuestions ?? [],
+  const [project, setProject] = useState<ProjectInfo | null>(
+    (cached?.project as ProjectInfo | null) ?? null,
   );
-  const [isLoading, setIsLoading] = useState(!initialQuestions);
+  const [questions, setQuestions] = useState<QuestionItem[]>(
+    initialCachedQuestions,
+  );
+  const [isLoading, setIsLoading] = useState(
+    !initialQuestions && initialCachedQuestions.length === 0,
+  );
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // User toggle states for Answer and Grounding
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [showGrounding, setShowGrounding] = useState(false);
 
   // Column A Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -613,11 +627,17 @@ export function ProjectQuestionsPage({
     'bloom' | 'difficulty' | 'grounding' | 'sequence'
   >('sequence');
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(
-    null,
+    initialQuestions?.[0]?.id ?? initialCachedQuestions?.[0]?.id ?? null,
   );
   const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(
     new Set(),
   );
+
+  // Reset answer and grounding reveals when active question changes
+  useEffect(() => {
+    setShowAnswer(false);
+    setShowGrounding(false);
+  }, [selectedQuestionId]);
 
   // Edit Version Modal State
   const [isEditingModalOpen, setIsEditingModalOpen] = useState(false);
@@ -626,6 +646,21 @@ export function ProjectQuestionsPage({
   const [editExplanation, setEditExplanation] = useState('');
   const [editOptions, setEditOptions] = useState<QuestionOption[]>([]);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Targeted Regeneration Tweak Drawer State
+  const [isTweakDrawerOpen, setIsTweakDrawerOpen] = useState(false);
+  const [tweakQuestion, setTweakQuestion] = useState<QuestionItem | null>(null);
+  const [tweakBloom, setTweakBloom] = useState('analyze');
+  const [tweakDifficulty, setTweakDifficulty] = useState('HARD');
+  const [tweakGuidance, setTweakGuidance] = useState('');
+  const [tweakEngine, setTweakEngine] = useState<'gemini' | 'ollama'>('gemini');
+  const [isRegenerating, setIsRegenerating] = useState(false);
+
+  // Bulk Regeneration Modal State
+  const [isBulkRegenModalOpen, setIsBulkRegenModalOpen] = useState(false);
+  const [bulkRegenGuidance, setBulkRegenGuidance] = useState('');
+  const [bulkRegenEngine, setBulkRegenEngine] = useState<'gemini' | 'ollama'>('gemini');
+  const [isBulkRegenerating, setIsBulkRegenerating] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -669,7 +704,9 @@ export function ProjectQuestionsPage({
 
     async function loadQuestionsData() {
       if (!projectId) return;
-      setIsLoading(true);
+      if (initialCachedQuestions.length === 0) {
+        setIsLoading(true);
+      }
       try {
         const [projRes, qRes] = await Promise.all([
           apiRequest(`/projects/${projectId}`),
@@ -678,17 +715,20 @@ export function ProjectQuestionsPage({
 
         setProject(projRes.data);
         const loaded: QuestionItem[] = qRes.data ?? [];
+        setQuestions(loaded);
         if (loaded.length > 0) {
-          setQuestions(loaded);
-          setSelectedQuestionId(loaded[0]!.id);
+          if (!selectedQuestionId) {
+            setSelectedQuestionId(loaded[0]!.id);
+          }
         } else {
-          setQuestions([]);
           setSelectedQuestionId(null);
         }
+        updateProjectCache(projectId, {
+          project: projRes.data,
+          questions: loaded,
+        });
       } catch (err) {
         console.error('Failed to load questions:', err);
-        setQuestions([]);
-        setSelectedQuestionId(null);
       } finally {
         setIsLoading(false);
       }
@@ -696,6 +736,40 @@ export function ProjectQuestionsPage({
 
     void loadQuestionsData();
   }, [projectId, initialQuestions]);
+
+  // Dynamic live sync: when background generation is actively running, stream questions in real time
+  useEffect(() => {
+    if (!projectId) return;
+
+    const interval = setInterval(async () => {
+      const activeRun = generationManager.getActiveRun(projectId);
+      if (
+        activeRun &&
+        activeRun.status !== 'COMPLETED' &&
+        activeRun.status !== 'FAILED'
+      ) {
+        try {
+          const qRes = await apiRequest(`/projects/${projectId}/questions`);
+          if (qRes.data && Array.isArray(qRes.data)) {
+            setQuestions((prev) => {
+              if (qRes.data.length !== prev.length) {
+                updateProjectCache(projectId, { questions: qRes.data });
+                if (!selectedQuestionId && qRes.data.length > 0) {
+                  setSelectedQuestionId(qRes.data[0].id);
+                }
+                return qRes.data;
+              }
+              return prev;
+            });
+          }
+        } catch {
+          // Ignore
+        }
+      }
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [projectId, selectedQuestionId]);
 
   // Keyboard shortcut Ctrl+K to focus search
   useEffect(() => {
@@ -986,6 +1060,182 @@ export function ProjectQuestionsPage({
     }
   };
 
+  // Open Tweak Drawer for targeted regeneration
+  const handleOpenTweakDrawer = (q: QuestionItem) => {
+    if (q.status === 'ACCEPTED') {
+      showToast('Accepted questions are locked to preserve assessment integrity.');
+      return;
+    }
+    setTweakQuestion(q);
+    setTweakBloom(q.current_version.bloom_levels?.slug?.toLowerCase() || 'analyze');
+    setTweakDifficulty(q.current_version.difficulty_levels?.slug?.toUpperCase() || 'HARD');
+    setTweakGuidance('');
+    setIsTweakDrawerOpen(true);
+  };
+
+  // Execute in-place targeted regeneration
+  const handleExecuteRegenerate = async () => {
+    if (!tweakQuestion) return;
+    setIsRegenerating(true);
+    try {
+      if (projectId && !tweakQuestion.id.startsWith('qst-842-')) {
+        const res = await apiRequest(
+          `/projects/${projectId}/questions/${tweakQuestion.id}/regenerate`,
+          {
+            body: JSON.stringify({
+              bloom_slug: tweakBloom,
+              difficulty_slug: tweakDifficulty,
+              instructor_guidance: tweakGuidance.trim() || undefined,
+              model_name:
+                tweakEngine === 'gemini'
+                  ? 'gemini-flash-lite-latest'
+                  : 'qwen2.5:7b',
+              model_provider: tweakEngine,
+            }),
+            method: 'POST',
+          },
+        );
+
+        if (res.data) {
+          setQuestions((prev) => {
+            const next = prev.map((q) =>
+              q.id === tweakQuestion.id ? res.data : q,
+            );
+            updateProjectCache(projectId, { questions: next });
+            return next;
+          });
+        }
+      } else {
+        // Local simulation for demo items
+        await new Promise((r) => setTimeout(r, 700));
+        setQuestions((prev) =>
+          prev.map((q) => {
+            if (q.id === tweakQuestion.id) {
+              return {
+                ...q,
+                current_version: {
+                  ...q.current_version,
+                  bloom_levels: {
+                    name:
+                      tweakBloom.charAt(0).toUpperCase() + tweakBloom.slice(1),
+                    slug: tweakBloom,
+                  },
+                  difficulty_levels: {
+                    name:
+                      tweakDifficulty.charAt(0) +
+                      tweakDifficulty.slice(1).toLowerCase(),
+                    slug: tweakDifficulty,
+                  },
+                  question_text: tweakGuidance
+                    ? `[Regenerated] ${q.current_version.question_text} (Focus: ${tweakGuidance})`
+                    : `[Regenerated in Place] ${q.current_version.question_text}`,
+                },
+                status: 'AVAILABLE',
+              };
+            }
+            return q;
+          }),
+        );
+      }
+
+      showToast(
+        `Question #${tweakQuestion.sort_order || 1} regenerated in place with uniqueness verification.`,
+      );
+      setIsTweakDrawerOpen(false);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'Regeneration failed';
+      showToast(msg);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  // Execute bulk regeneration
+  const handleExecuteBulkRegenerate = async () => {
+    const selectedList = questions.filter((q) => bulkSelectedIds.has(q.id));
+    const eligible = selectedList.filter((q) => q.status !== 'ACCEPTED');
+    const lockedCount = selectedList.length - eligible.length;
+
+    if (eligible.length === 0) {
+      showToast(
+        'All selected questions are Accepted (locked). None can be regenerated.',
+      );
+      setIsBulkRegenModalOpen(false);
+      return;
+    }
+
+    setIsBulkRegenerating(true);
+    try {
+      const realIds = eligible
+        .map((q) => q.id)
+        .filter((id) => !id.startsWith('qst-842-'));
+
+      if (realIds.length > 0 && projectId) {
+        const res = await apiRequest(
+          `/projects/${projectId}/questions/bulk-regenerate`,
+          {
+            body: JSON.stringify({
+              instructor_guidance: bulkRegenGuidance.trim() || undefined,
+              model_name:
+                bulkRegenEngine === 'gemini'
+                  ? 'gemini-flash-lite-latest'
+                  : 'qwen2.5:7b',
+              model_provider: bulkRegenEngine,
+              question_ids: realIds,
+            }),
+            method: 'POST',
+          },
+        );
+
+        if (res.data?.questions) {
+          const updatedMap = new Map(
+            res.data.questions.map((q: QuestionItem) => [q.id, q]),
+          );
+          setQuestions((prev) => {
+            const next = prev.map((q) =>
+              updatedMap.has(q.id)
+                ? (updatedMap.get(q.id) as QuestionItem)
+                : q,
+            );
+            updateProjectCache(projectId, { questions: next });
+            return next;
+          });
+        }
+      } else {
+        // Simulation for demo items
+        await new Promise((r) => setTimeout(r, 900));
+        setQuestions((prev) =>
+          prev.map((q) => {
+            if (bulkSelectedIds.has(q.id) && q.status !== 'ACCEPTED') {
+              return {
+                ...q,
+                current_version: {
+                  ...q.current_version,
+                  question_text: `[Regenerated] ${q.current_version.question_text}`,
+                },
+                status: 'AVAILABLE',
+              };
+            }
+            return q;
+          }),
+        );
+      }
+
+      setBulkSelectedIds(new Set());
+      setIsBulkRegenModalOpen(false);
+      showToast(
+        `Regenerated ${eligible.length} questions in place.${lockedCount > 0 ? ` (${lockedCount} locked items preserved)` : ''}`,
+      );
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'Bulk regeneration failed';
+      showToast(msg);
+    } finally {
+      setIsBulkRegenerating(false);
+    }
+  };
+
   // Open Edit Modal with current active question values
   const handleOpenEditModal = () => {
     if (!activeQuestion) return;
@@ -1156,16 +1406,24 @@ export function ProjectQuestionsPage({
               <span className="text-[#94a3b8]">Seed:</span>
               <span className="text-[#0f172a] font-semibold">#42-det</span>
             </span>
-            <span className="hidden sm:flex items-center space-x-1.5 bg-[#f8fafc] border border-[#e2e8f0] px-2.5 py-1 rounded">
-              <span className="text-[#94a3b8]">Deduplication:</span>
-              <span className="text-emerald-700 font-semibold">
-                Cosine &lt; 0.82
-              </span>
-            </span>
+            <Link
+              className="hidden md:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-[#e2e8f0] hover:bg-[#f8fafc] text-[#334155] font-mono text-xs font-semibold shadow-sm transition-all"
+              to={`/app/projects/${projectId}/practice`}
+            >
+              <Icon name="school" size={13} />
+              <span>Practice &amp; Mock</span>
+            </Link>
+            <Link
+              className="hidden md:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#3157d5] hover:bg-[#2544ab] text-white font-mono text-xs font-semibold shadow-sm transition-all"
+              to={`/app/projects/${projectId}/export`}
+            >
+              <Icon name="print" size={13} />
+              <span>Export Paper</span>
+            </Link>
           </div>
         </div>
 
-        {/* 5-Step Pipeline Tab Bar */}
+        {/* 6-Step Pipeline Tab Bar */}
         <div className="flex items-center space-x-1 font-mono text-xs overflow-x-auto">
           <Link
             className="px-3.5 py-2 text-[#64748b] hover:text-[#0f172a] hover:bg-[#f8fafc] rounded-t border-b-2 border-transparent transition-colors flex items-center space-x-1.5"
@@ -1195,10 +1453,20 @@ export function ProjectQuestionsPage({
               {questions.length}
             </span>
           </div>
-          <span className="px-3.5 py-2 text-[#94a3b8] rounded-t border-b-2 border-transparent flex items-center space-x-1.5 cursor-not-allowed">
-            <span className="text-[#cbd5e1]">05</span>
-            <span>Export &amp; Assembly</span>
-          </span>
+          <Link
+            className="px-3.5 py-2 text-[#64748b] hover:text-[#0f172a] hover:bg-[#f8fafc] rounded-t border-b-2 border-transparent transition-colors flex items-center space-x-1.5"
+            to={`/app/projects/${projectId}/export`}
+          >
+            <span className="text-[#94a3b8]">05</span>
+            <span>Export &amp; Paper Builder</span>
+          </Link>
+          <Link
+            className="px-3.5 py-2 text-[#64748b] hover:text-[#0f172a] hover:bg-[#f8fafc] rounded-t border-b-2 border-transparent transition-colors flex items-center space-x-1.5"
+            to={`/app/projects/${projectId}/practice`}
+          >
+            <span className="text-[#94a3b8]">06</span>
+            <span>Practice &amp; Mock Studio</span>
+          </Link>
         </div>
       </div>
 
@@ -1584,7 +1852,9 @@ export function ProjectQuestionsPage({
                 }
                 value={sortOrder}
               >
-                <option value="sequence">Sequence (#01 - #15)</option>
+                <option value="sequence">
+                  Sequence (#01 - #{String(questions.length > 0 ? questions.length : 1).padStart(2, '0')})
+                </option>
                 <option value="bloom">Bloom Level (High-Low)</option>
                 <option value="grounding">Grounding Score (% Match)</option>
                 <option value="difficulty">Difficulty Rating</option>
@@ -1597,6 +1867,17 @@ export function ProjectQuestionsPage({
                 <Icon name="verified" size={12} />
                 <span>Bulk Accept</span>
               </button>
+
+              {bulkSelectedIds.size > 0 && (
+                <button
+                  className="px-2.5 py-1 bg-[#3157d5] hover:bg-[#2544ab] text-white rounded font-semibold text-[10px] transition-colors flex items-center space-x-1 shadow-sm animate-in fade-in duration-150"
+                  onClick={() => setIsBulkRegenModalOpen(true)}
+                  type="button"
+                >
+                  <Icon name="spark" size={12} />
+                  <span>Bulk Regenerate ({bulkSelectedIds.size})</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1633,9 +1914,6 @@ export function ProjectQuestionsPage({
                   'lecture_04_sync.pdf';
                 const pageNum =
                   sourceRef?.resource_chunks?.page_number || 14;
-                const matchPct = sourceRef?.relevance_score
-                  ? Math.round(sourceRef.relevance_score * 1000) / 10
-                  : 99.4;
 
                 const bloomSlug = (
                   q.current_version.bloom_levels?.slug || 'analyze'
@@ -1703,8 +1981,11 @@ export function ProjectQuestionsPage({
 
                       {/* Status Badge */}
                       {q.status === 'ACCEPTED' ? (
-                        <span className="font-mono text-[10px] uppercase font-semibold bg-emerald-50 text-emerald-700 border border-emerald-300 px-2 py-0.5 rounded flex items-center space-x-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                        <span
+                          className="font-mono text-[10px] uppercase font-semibold bg-emerald-50 text-emerald-700 border border-emerald-300 px-2 py-0.5 rounded flex items-center space-x-1"
+                          title="Locked: Accepted questions cannot be regenerated"
+                        >
+                          <Icon name="lock" size={10} />
                           <span>ACCEPTED</span>
                         </span>
                       ) : q.status === 'REJECTED' ? (
@@ -1741,12 +2022,32 @@ export function ProjectQuestionsPage({
                       <div className="flex items-center space-x-1.5 truncate text-emerald-700 font-medium">
                         <Icon name="file" size={12} />
                         <span className="truncate">
-                          {filename} (p. {pageNum}) • {matchPct}% Match
+                          {filename} (p. {pageNum})
                         </span>
                       </div>
 
                       {/* Hover action buttons */}
                       <div className="flex items-center space-x-1 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                        {q.status !== 'ACCEPTED' ? (
+                          <button
+                            className="p-1 rounded bg-[#eef2ff] hover:bg-[#3157d5] text-[#3157d5] hover:text-white border border-[#3157d5]/30 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenTweakDrawer(q);
+                            }}
+                            title="Regenerate Question in Place"
+                            type="button"
+                          >
+                            <Icon name="spark" size={12} />
+                          </button>
+                        ) : (
+                          <span
+                            className="p-1 rounded text-slate-400 cursor-not-allowed"
+                            title="Accepted questions are locked from mutation"
+                          >
+                            <Icon name="lock" size={12} />
+                          </span>
+                        )}
                         <button
                           className="p-1 rounded bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-300 transition-colors"
                           onClick={(e) => {
@@ -1880,16 +2181,71 @@ export function ProjectQuestionsPage({
                   {activeQuestion.current_version.question_text}
                 </div>
 
+                {/* Show Answer & Show Grounding Toggle Buttons */}
+                <div className="flex items-center space-x-2.5 pt-1">
+                  <button
+                    className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center space-x-1.5 transition-all shadow-sm ${
+                      showAnswer
+                        ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/20'
+                        : 'bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] border border-[#cbd5e1]'
+                    }`}
+                    onClick={() => setShowAnswer((prev) => !prev)}
+                    type="button"
+                  >
+                    <Icon name="verified" size={13} />
+                    <span>{showAnswer ? 'Hide Answer' : 'Show Answer'}</span>
+                  </button>
+
+                  <button
+                    className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center space-x-1.5 transition-all shadow-sm ${
+                      showGrounding
+                        ? 'bg-[#3157d5] text-white hover:bg-[#2544ab] shadow-blue-500/20'
+                        : 'bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] border border-[#cbd5e1]'
+                    }`}
+                    onClick={() => setShowGrounding((prev) => !prev)}
+                    type="button"
+                  >
+                    <Icon name="search" size={13} />
+                    <span>{showGrounding ? 'Hide Grounding' : 'Show Grounding'}</span>
+                  </button>
+                </div>
+
                 {/* MCQ Options Distractor Ledger */}
                 {activeQuestion.current_version.question_options &&
                 activeQuestion.current_version.question_options.length > 0 ? (
                   <div className="space-y-2.5">
-                    <div className="text-[11px] font-mono uppercase tracking-wider text-[#64748b] font-semibold">
-                      Assessment Options &amp; Distractor Ledger
+                    <div className="text-[11px] font-mono uppercase tracking-wider text-[#64748b] font-semibold flex items-center justify-between">
+                      <span>Assessment Options</span>
+                      {!showAnswer && (
+                        <span className="text-[10px] text-[#94a3b8] normal-case font-normal italic">
+                          Click &quot;Show Answer&quot; to reveal correct key &amp; rationale
+                        </span>
+                      )}
                     </div>
                     {activeQuestion.current_version.question_options.map(
                       (opt, idx) => {
                         const letter = String.fromCharCode(65 + idx);
+
+                        if (!showAnswer) {
+                          return (
+                            <div
+                              className="p-3 rounded border border-[#e2e8f0] bg-white text-xs space-y-1.5 transition-all hover:border-[#cbd5e1]"
+                              key={idx}
+                            >
+                              <div className="flex items-start space-x-2.5">
+                                <div className="w-5 h-5 rounded-full border border-[#cbd5e1] mt-0.5 flex items-center justify-center shrink-0 bg-[#f8fafc]">
+                                  <span className="text-[10px] font-mono text-[#64748b] font-semibold">
+                                    {letter}
+                                  </span>
+                                </div>
+                                <p className="text-[#1e293b] font-sans leading-relaxed pt-0.5">
+                                  {opt.option_text}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+
                         if (opt.is_correct) {
                           return (
                             <div
@@ -1898,10 +2254,10 @@ export function ProjectQuestionsPage({
                             >
                               <div className="flex items-start justify-between">
                                 <div className="flex items-start space-x-2.5">
-                                  <div className="w-4 h-4 rounded-full bg-emerald-600 text-white mt-0.5 flex items-center justify-center shrink-0 shadow-sm">
+                                  <div className="w-5 h-5 rounded-full bg-emerald-600 text-white mt-0.5 flex items-center justify-center shrink-0 shadow-sm">
                                     <Icon name="verified" size={12} />
                                   </div>
-                                  <p className="text-emerald-950 font-medium font-sans leading-relaxed">
+                                  <p className="text-emerald-950 font-medium font-sans leading-relaxed pt-0.5">
                                     {opt.option_text}
                                   </p>
                                 </div>
@@ -1929,12 +2285,12 @@ export function ProjectQuestionsPage({
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex items-start space-x-2.5">
-                                <div className="w-4 h-4 rounded-full border border-[#94a3b8] mt-0.5 flex items-center justify-center shrink-0 bg-[#f8fafc]">
-                                  <span className="text-[9px] font-mono text-[#64748b] font-semibold">
+                                <div className="w-5 h-5 rounded-full border border-[#94a3b8] mt-0.5 flex items-center justify-center shrink-0 bg-[#f8fafc]">
+                                  <span className="text-[10px] font-mono text-[#64748b] font-semibold">
                                     {letter}
                                   </span>
                                 </div>
-                                <p className="text-[#334155] font-sans leading-relaxed">
+                                <p className="text-[#334155] font-sans leading-relaxed pt-0.5">
                                   {opt.option_text}
                                 </p>
                               </div>
@@ -1957,24 +2313,32 @@ export function ProjectQuestionsPage({
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {activeQuestion.current_version.model_answer && (
-                      <div className="p-3 rounded border border-[#e2e8f0] bg-[#f8fafc] text-xs space-y-1">
-                        <span className="font-mono text-emerald-700 font-semibold uppercase text-[10px]">
-                          Exemplary Model Answer
-                        </span>
-                        <p className="text-[#0f172a] leading-relaxed font-sans">
-                          {activeQuestion.current_version.model_answer}
-                        </p>
-                      </div>
-                    )}
-                    {activeQuestion.current_version.explanation && (
-                      <div className="p-3 rounded border border-[#e2e8f0] bg-[#f8fafc] text-xs space-y-1">
-                        <span className="font-mono text-[#3157d5] font-semibold uppercase text-[10px]">
-                          Pedagogical Rationale
-                        </span>
-                        <p className="text-[#334155] leading-relaxed font-sans">
-                          {activeQuestion.current_version.explanation}
-                        </p>
+                    {showAnswer ? (
+                      <>
+                        {activeQuestion.current_version.model_answer && (
+                          <div className="p-3 rounded border border-[#e2e8f0] bg-[#f8fafc] text-xs space-y-1">
+                            <span className="font-mono text-emerald-700 font-semibold uppercase text-[10px]">
+                              Exemplary Model Answer
+                            </span>
+                            <p className="text-[#0f172a] leading-relaxed font-sans">
+                              {activeQuestion.current_version.model_answer}
+                            </p>
+                          </div>
+                        )}
+                        {activeQuestion.current_version.explanation && (
+                          <div className="p-3 rounded border border-[#e2e8f0] bg-[#f8fafc] text-xs space-y-1">
+                            <span className="font-mono text-[#3157d5] font-semibold uppercase text-[10px]">
+                              Pedagogical Rationale
+                            </span>
+                            <p className="text-[#334155] leading-relaxed font-sans">
+                              {activeQuestion.current_version.explanation}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="p-3 rounded border border-dashed border-[#cbd5e1] bg-[#f8fafc] text-xs text-[#64748b] text-center font-mono">
+                        Click &quot;Show Answer&quot; to reveal exemplary model answer &amp; rationale.
                       </div>
                     )}
                   </div>
@@ -2003,21 +2367,19 @@ export function ProjectQuestionsPage({
                   )}
               </div>
 
-              {/* CARD 2: GROUNDING EVIDENCE & PDF CITATION DRAWER */}
-              {(() => {
+              {/* CARD 2: GROUNDING EVIDENCE & PDF CITATION DRAWER (Visible when showGrounding is toggled) */}
+              {showGrounding && (() => {
                 const sRef =
                   activeQuestion.current_version.question_source_refs?.[0];
                 const filename =
                   sRef?.resource_chunks?.resources?.original_filename ||
-                  'lecture_04_sync.pdf';
-                const pageNum = sRef?.resource_chunks?.page_number || 14;
-                const chunkId = sRef?.chunk_id || 'chk-092';
-                const score = sRef?.relevance_score
-                  ? Math.round(sRef.relevance_score * 1000) / 10
-                  : 99.4;
+                  'Source Document';
+                const pageNum = sRef?.resource_chunks?.page_number || 1;
+                const chunkId = sRef?.chunk_id || 'chk-01';
                 const quote =
                   sRef?.evidence_text ||
-                  'A state is safe if the system can allocate resources to each thread in some order and still avoid a deadlock. More formally, a state is safe only if there exists a safe sequence of threads.';
+                  activeQuestion.current_version.question_source_refs?.[0]?.evidence_text ||
+                  'No verbatim evidence excerpt available for this question.';
 
                 return (
                   <div className="p-4 rounded-lg bg-white border border-[#e2e8f0] shadow-sm space-y-3">
@@ -2029,12 +2391,12 @@ export function ProjectQuestionsPage({
                         </span>
                       </span>
                       <span className="text-[10px] text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300 font-mono font-medium">
-                        SHA-256 Byte-Lock Verified
+                        Corpus Verified
                       </span>
                     </div>
 
                     <div className="text-xs font-mono text-[#64748b] flex items-center space-x-2 bg-[#f8fafc] p-2 rounded border border-[#e2e8f0]">
-                      <span className="text-emerald-700 font-semibold">
+                      <span className="text-emerald-700 font-semibold truncate max-w-[200px]">
                         {filename}
                       </span>
                       <span className="text-[#cbd5e1]">•</span>
@@ -2051,124 +2413,58 @@ export function ProjectQuestionsPage({
                     <div className="p-3.5 rounded bg-[#f8fafc] border-l-4 border-emerald-600 border-y border-r border-[#e2e8f0] text-xs text-[#334155] leading-relaxed font-serif italic">
                       &quot;{quote}&quot;
                     </div>
-
-                    <div className="space-y-1.5 pt-1">
-                      <div className="flex items-center justify-between text-xs font-mono">
-                        <span className="text-[#64748b]">
-                          Cosine Semantic Similarity
-                        </span>
-                        <span className="text-emerald-700 font-bold">
-                          {score}% Match
-                        </span>
-                      </div>
-                      <div className="w-full h-1.5 bg-[#e2e8f0] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-600 rounded-full"
-                          style={{ width: `${Math.min(100, score)}%` }}
-                        />
-                      </div>
-                    </div>
                   </div>
                 );
               })()}
-
-              {/* CARD 3: 3-POINT VALIDATION LEDGER */}
-              <div className="p-4 rounded-lg bg-white border border-[#e2e8f0] shadow-sm space-y-3">
-                <div className="text-xs font-mono uppercase tracking-wider text-[#64748b] font-semibold">
-                  Automated 3-Point Validation Ledger
-                </div>
-                <div className="space-y-2 text-xs font-mono">
-                  <div className="p-2.5 rounded bg-[#f8fafc] border border-emerald-300 flex items-start justify-between">
-                    <div className="flex items-start space-x-2">
-                      <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5">
-                        <Icon name="verified" size={12} />
-                      </span>
-                      <div>
-                        <div className="font-bold text-[#0f172a]">
-                          Grounding Verification
-                        </div>
-                        <div className="text-[11px] text-[#64748b] font-sans">
-                          Verified against source PDF byte-span (100% anchor
-                          match).
-                        </div>
-                      </div>
-                    </div>
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300">
-                      PASS
-                    </span>
-                  </div>
-
-                  <div className="p-2.5 rounded bg-[#f8fafc] border border-emerald-300 flex items-start justify-between">
-                    <div className="flex items-start space-x-2">
-                      <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5">
-                        <Icon name="verified" size={12} />
-                      </span>
-                      <div>
-                        <div className="font-bold text-[#0f172a]">
-                          Deduplication Invariant
-                        </div>
-                        <div className="text-[11px] text-[#64748b] font-sans">
-                          Cosine similarity 0.12 &lt; 0.82 threshold against
-                          question bank.
-                        </div>
-                      </div>
-                    </div>
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300">
-                      PASS
-                    </span>
-                  </div>
-
-                  <div className="p-2.5 rounded bg-[#f8fafc] border border-emerald-300 flex items-start justify-between">
-                    <div className="flex items-start space-x-2">
-                      <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5">
-                        <Icon name="verified" size={12} />
-                      </span>
-                      <div>
-                        <div className="font-bold text-[#0f172a]">
-                          Schema Quality
-                        </div>
-                        <div className="text-[11px] text-[#64748b] font-sans">
-                          Valid JSON schema, 4 distinct options, single correct
-                          key.
-                        </div>
-                      </div>
-                    </div>
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300">
-                      PASS
-                    </span>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* BOTTOM STICKY ACTION BAR */}
             <div className="h-14 border-t border-[#e2e8f0] bg-white px-5 flex items-center justify-between shrink-0 text-xs shadow-[0_-1px_3px_rgba(0,0,0,0.03)]">
               <div className="flex items-center space-x-2">
                 <button
-                  className="px-3 py-1.5 rounded bg-white hover:bg-rose-50 border border-[#cbd5e1] hover:border-rose-300 text-[#64748b] hover:text-rose-700 font-medium flex items-center space-x-1.5 transition-colors shadow-sm"
+                  className="px-2.5 py-1.5 rounded bg-white hover:bg-rose-50 border border-[#cbd5e1] hover:border-rose-300 text-[#64748b] hover:text-rose-700 font-medium flex items-center space-x-1.5 transition-colors shadow-sm"
                   onClick={() =>
                     void handleUpdateStatus(activeQuestion.id, 'REJECTED')
                   }
                   type="button"
                 >
                   <Icon name="delete" size={14} />
-                  <span>Reject Question</span>
+                  <span>Reject</span>
                 </button>
 
                 <button
-                  className="px-3 py-1.5 rounded bg-white hover:bg-amber-50 border border-[#cbd5e1] hover:border-amber-300 text-amber-700 font-medium flex items-center space-x-1.5 transition-colors shadow-sm"
+                  className="px-2.5 py-1.5 rounded bg-white hover:bg-amber-50 border border-[#cbd5e1] hover:border-amber-300 text-amber-700 font-medium flex items-center space-x-1.5 transition-colors shadow-sm"
                   onClick={() =>
                     void handleUpdateStatus(activeQuestion.id, 'FLAGGED')
                   }
                   type="button"
                 >
                   <Icon name="alert" size={14} />
-                  <span>Flag for Review</span>
+                  <span>Flag</span>
                 </button>
+
+                {activeQuestion.status === 'ACCEPTED' ? (
+                  <div
+                    className="px-3 py-1.5 rounded bg-slate-50 border border-slate-200 text-[#94a3b8] font-medium flex items-center space-x-1.5 cursor-not-allowed text-xs"
+                    title="Accepted questions are locked from mutation to preserve assessment integrity"
+                  >
+                    <Icon name="lock" size={13} />
+                    <span>Locked (Accepted)</span>
+                  </div>
+                ) : (
+                  <button
+                    className="px-3 py-1.5 rounded-lg bg-[#3157d5] hover:bg-[#2544ab] text-white font-medium flex items-center space-x-1.5 transition-colors shadow-sm"
+                    onClick={() => handleOpenTweakDrawer(activeQuestion)}
+                    type="button"
+                  >
+                    <Icon name="spark" size={13} />
+                    <span>Regenerate in Place</span>
+                  </button>
+                )}
               </div>
 
               <button
-                className="px-4 py-2 rounded bg-[#3157d5] hover:bg-[#2544ab] text-white font-semibold flex items-center space-x-2 shadow-sm transition-colors"
+                className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center space-x-2 shadow-sm transition-colors"
                 onClick={() =>
                   void handleUpdateStatus(activeQuestion.id, 'ACCEPTED')
                 }
@@ -2343,6 +2639,337 @@ export function ProjectQuestionsPage({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Targeted Regeneration Tweak Drawer */}
+      {isTweakDrawerOpen && tweakQuestion && (
+        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
+            onClick={() => !isRegenerating && setIsTweakDrawerOpen(false)}
+          />
+
+          {/* Drawer Container */}
+          <div className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col z-50 border-l border-[#e2e8f0] animate-in slide-in-from-right duration-200">
+            {/* Header */}
+            <div className="h-16 px-6 border-b border-[#e2e8f0] bg-white flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#eef2ff] text-[#3157d5] flex items-center justify-center font-bold">
+                  <Icon name="spark" size={18} />
+                </div>
+                <div>
+                  <h3 className="font-serif text-base font-semibold text-[#0f172a] flex items-center space-x-2">
+                    <span>Targeted Regeneration</span>
+                    <span className="font-mono text-xs font-bold text-[#3157d5] bg-[#eef2ff] border border-[#3157d5]/30 px-2 py-0.5 rounded">
+                      #{String(tweakQuestion.sort_order || 1).padStart(2, '0')}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-[#64748b] font-mono">
+                    Replaces question in place anchored strictly to source chunk
+                  </p>
+                </div>
+              </div>
+              <button
+                aria-label="Close drawer"
+                className="text-[#64748b] hover:text-[#0f172a] p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                disabled={isRegenerating}
+                onClick={() => setIsTweakDrawerOpen(false)}
+                type="button"
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#fbf8fc]">
+              {/* Telemetry Strip: Anchored Source & Deduplication Guardrail */}
+              <div className="p-3.5 rounded-lg bg-white border border-[#e2e8f0] shadow-sm space-y-2 text-xs font-mono">
+                <div className="flex items-center space-x-2 text-[#334155]">
+                  <Icon name="file" size={14} />
+                  <span className="truncate font-semibold text-[#0f172a] max-w-[200px]">
+                    {tweakQuestion.current_version.question_source_refs?.[0]
+                      ?.resource_chunks?.resources?.original_filename ||
+                      'Source Document'}
+                  </span>
+                  <span className="text-[#cbd5e1]">•</span>
+                  <span>
+                    Page{' '}
+                    {tweakQuestion.current_version.question_source_refs?.[0]
+                      ?.resource_chunks?.page_number || 1}
+                  </span>
+                  <span className="text-[#cbd5e1]">•</span>
+                  <code className="text-[#3157d5] bg-[#eef2ff] px-1 py-0.5 rounded font-bold">
+                    #
+                    {tweakQuestion.current_version.question_source_refs?.[0]
+                      ?.chunk_id || 'chk-01'}
+                  </code>
+                </div>
+                <div className="flex items-center space-x-2 pt-1.5 border-t border-[#f1f5f9] text-[11px] text-emerald-700">
+                  <Icon name="verified" size={13} />
+                  <span>
+                    Deduplication Active · Cosine similarity lock (&lt;0.82)
+                    strictly enforced
+                  </span>
+                </div>
+              </div>
+
+              {/* Cognitive Level (Bloom's Taxonomy) */}
+              <div className="space-y-2">
+                <label className="block text-xs font-mono font-semibold uppercase tracking-wider text-[#64748b]">
+                  Target Cognitive Level (Bloom)
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 font-mono text-xs">
+                  {[
+                    { label: 'Remember', slug: 'remember' },
+                    { label: 'Understand', slug: 'understand' },
+                    { label: 'Apply', slug: 'apply' },
+                    { label: 'Analyze', slug: 'analyze' },
+                    { label: 'Evaluate', slug: 'evaluate' },
+                  ].map((b) => {
+                    const isActive = tweakBloom.toLowerCase() === b.slug;
+                    return (
+                      <button
+                        className={`py-2 px-3 rounded-lg border font-medium text-center transition-all ${
+                          isActive
+                            ? 'bg-[#3157d5] text-white border-[#3157d5] shadow-sm font-semibold'
+                            : 'bg-white text-[#475569] border-[#cbd5e1] hover:border-[#3157d5] hover:bg-[#f8fafc]'
+                        }`}
+                        key={b.slug}
+                        onClick={() => setTweakBloom(b.slug)}
+                        type="button"
+                      >
+                        {b.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Difficulty Calibration */}
+              <div className="space-y-2">
+                <label className="block text-xs font-mono font-semibold uppercase tracking-wider text-[#64748b]">
+                  Difficulty Calibration
+                </label>
+                <div className="grid grid-cols-3 gap-2 font-mono text-xs">
+                  {['EASY', 'MEDIUM', 'HARD'].map((diff) => {
+                    const isActive = tweakDifficulty.toUpperCase() === diff;
+                    return (
+                      <button
+                        className={`py-2 px-3 rounded-lg border font-medium text-center transition-all ${
+                          isActive
+                            ? diff === 'HARD'
+                              ? 'bg-rose-600 text-white border-rose-600 shadow-sm font-semibold'
+                              : diff === 'MEDIUM'
+                                ? 'bg-amber-600 text-white border-amber-600 shadow-sm font-semibold'
+                                : 'bg-emerald-600 text-white border-emerald-600 shadow-sm font-semibold'
+                            : 'bg-white text-[#475569] border-[#cbd5e1] hover:border-[#3157d5] hover:bg-[#f8fafc]'
+                        }`}
+                        key={diff}
+                        onClick={() => setTweakDifficulty(diff)}
+                        type="button"
+                      >
+                        {diff.charAt(0) + diff.slice(1).toLowerCase()}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* AI Inference Engine */}
+              <div className="space-y-2">
+                <label className="block text-xs font-mono font-semibold uppercase tracking-wider text-[#64748b]">
+                  AI Inference Engine &amp; Model
+                </label>
+                <select
+                  className="w-full bg-white border border-[#cbd5e1] rounded-lg p-2.5 text-xs text-[#0f172a] font-sans focus:border-[#3157d5] focus:outline-none shadow-sm"
+                  onChange={(e) =>
+                    setTweakEngine(e.target.value as 'gemini' | 'ollama')
+                  }
+                  value={tweakEngine}
+                >
+                  <option value="gemini">
+                    Google Gemini Cloud Turbo (sub-2s latency, high fidelity)
+                  </option>
+                  <option value="ollama">
+                    Localhost Ollama Qwen 2.5 (100% offline, on-device)
+                  </option>
+                </select>
+              </div>
+
+              {/* Instructor Direction / Prompt Tweak */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-mono font-semibold uppercase tracking-wider text-[#64748b]">
+                    Instructor Direction (Optional Prompt Tweak)
+                  </label>
+                  <span className="text-[11px] font-mono text-[#94a3b8]">
+                    Pedagogical Guardrail
+                  </span>
+                </div>
+                <textarea
+                  className="w-full bg-white border border-[#cbd5e1] rounded-lg p-3 text-xs text-[#0f172a] font-sans focus:border-[#3157d5] focus:outline-none shadow-sm placeholder:text-[#94a3b8] leading-relaxed"
+                  onChange={(e) => setTweakGuidance(e.target.value)}
+                  placeholder="e.g., Focus on race conditions instead of deadlocks, or make distractor option C more challenging."
+                  rows={4}
+                  value={tweakGuidance}
+                />
+                <p className="text-[11px] text-[#64748b] leading-tight">
+                  The AI generator will prioritize this pedagogical nuance while
+                  verifying verbatim source chunk grounding and uniqueness against
+                  the project bank.
+                </p>
+              </div>
+            </div>
+
+            {/* Sticky Action Footer */}
+            <div className="h-16 px-6 border-t border-[#e2e8f0] bg-white flex items-center justify-between shrink-0 shadow-[0_-1px_3px_rgba(0,0,0,0.03)]">
+              <button
+                className="px-4 py-2 rounded-lg text-xs font-medium text-[#64748b] hover:text-[#0f172a] hover:bg-slate-100 transition-colors"
+                disabled={isRegenerating}
+                onClick={() => setIsTweakDrawerOpen(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="px-5 py-2.5 rounded-lg bg-[#3157d5] hover:bg-[#2544ab] text-white text-xs font-semibold flex items-center space-x-2 shadow-sm transition-all disabled:opacity-60"
+                disabled={isRegenerating}
+                onClick={handleExecuteRegenerate}
+                type="button"
+              >
+                {isRegenerating ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Synthesizing &amp; Checking Uniqueness...</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="spark" size={14} />
+                    <span>
+                      Regenerate Question #
+                      {String(tweakQuestion.sort_order || 1).padStart(2, '0')}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Regeneration Modal */}
+      {isBulkRegenModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-[#e2e8f0] rounded-xl max-w-lg w-full p-6 space-y-5 shadow-2xl text-[#0f172a] animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-[#e2e8f0] pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#eef2ff] text-[#3157d5] flex items-center justify-center font-bold">
+                  <Icon name="spark" size={18} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base font-serif text-[#0f172a]">
+                    Bulk Regenerate Selected Questions
+                  </h3>
+                  <p className="text-xs text-[#64748b] font-mono">
+                    Re-synthesize {bulkSelectedIds.size} selected items in place
+                  </p>
+                </div>
+              </div>
+              <button
+                aria-label="Close modal"
+                className="text-[#64748b] hover:text-[#0f172a] p-1 rounded hover:bg-slate-100"
+                disabled={isBulkRegenerating}
+                onClick={() => setIsBulkRegenModalOpen(false)}
+                type="button"
+              >
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="p-3 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg space-y-1.5 font-mono text-[11px] text-[#475569]">
+                <div>
+                  • Selected items:{' '}
+                  <strong className="text-[#0f172a]">
+                    {bulkSelectedIds.size} questions
+                  </strong>
+                </div>
+                <div>
+                  • Guardrail: Locked{' '}
+                  <strong className="text-emerald-700">ACCEPTED</strong>{' '}
+                  questions will be automatically preserved without alteration.
+                </div>
+                <div>
+                  • Uniqueness: Each candidate will be checked against the
+                  project bank (&lt;0.82 similarity lock).
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-mono font-semibold text-[#64748b] uppercase tracking-wider text-[11px]">
+                  AI Inference Engine
+                </label>
+                <select
+                  className="w-full bg-white border border-[#cbd5e1] rounded-lg p-2.5 text-xs text-[#0f172a] font-sans focus:border-[#3157d5] focus:outline-none"
+                  onChange={(e) =>
+                    setBulkRegenEngine(e.target.value as 'gemini' | 'ollama')
+                  }
+                  value={bulkRegenEngine}
+                >
+                  <option value="gemini">
+                    Google Gemini Cloud Turbo (sub-2s latency, high fidelity)
+                  </option>
+                  <option value="ollama">
+                    Localhost Ollama Qwen 2.5 (100% offline, on-device)
+                  </option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-mono font-semibold text-[#64748b] uppercase tracking-wider text-[11px]">
+                  Instructor Direction for Batch (Optional)
+                </label>
+                <textarea
+                  className="w-full bg-white border border-[#cbd5e1] rounded-lg p-2.5 text-xs text-[#0f172a] focus:border-[#3157d5] focus:outline-none placeholder:text-[#94a3b8]"
+                  onChange={(e) => setBulkRegenGuidance(e.target.value)}
+                  placeholder="e.g., Increase conceptual rigor and eliminate superficial recall distractors."
+                  rows={3}
+                  value={bulkRegenGuidance}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2.5 pt-3 border-t border-[#e2e8f0]">
+              <button
+                className="px-4 py-2 rounded-lg text-xs font-medium text-[#64748b] hover:text-[#0f172a] hover:bg-slate-100 transition-colors"
+                disabled={isBulkRegenerating}
+                onClick={() => setIsBulkRegenModalOpen(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="px-5 py-2.5 rounded-lg bg-[#3157d5] hover:bg-[#2544ab] text-white text-xs font-semibold flex items-center space-x-2 shadow-sm transition-all disabled:opacity-60"
+                disabled={isBulkRegenerating}
+                onClick={handleExecuteBulkRegenerate}
+                type="button"
+              >
+                {isBulkRegenerating ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Regenerating Batch in Place...</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="spark" size={14} />
+                    <span>Execute Bulk Regeneration</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

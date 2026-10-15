@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { TopicWithSubtopics } from '@groundq/contracts';
 import { getSupabaseClient } from '../../lib/supabase';
 import { Icon, Logo } from '../components/ui';
+import { getCachedProject, updateProjectCache } from '../services/session-store';
 
 interface ProjectInfo {
   created_at: string;
@@ -313,21 +314,38 @@ export function ProjectTopicsPage({
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
 
+  const cached = projectId ? getCachedProject(projectId) : null;
+  const initialCachedModules: TopicWithSubtopics[] =
+    initialModules ?? (Array.isArray(cached?.topics) ? (cached.topics as TopicWithSubtopics[]) : []);
+  const cachedResourcesList = Array.isArray(cached?.resources) ? cached.resources : [];
+  const initialCachedReady =
+    initialReadyCount ??
+    cachedResourcesList.filter((r) => r?.status === 'READY').length;
+  const initialCachedTotal = initialTotalCount ?? cachedResourcesList.length;
+
   // State switcher view mode: 'normal' | 'drawer' | 'empty' | 'zero'
   const [viewMode, setViewMode] = useState<
     'drawer' | 'empty' | 'normal' | 'zero'
-  >(initialModules && initialModules.length > 0 ? 'normal' : 'zero');
+  >(
+    initialCachedModules.length > 0
+      ? 'normal'
+      : cached && initialCachedReady === 0 && initialCachedTotal === 0
+        ? 'zero'
+        : 'normal',
+  );
 
   // Real data state
-  const [project, setProject] = useState<ProjectInfo | null>(null);
+  const [project, setProject] = useState<ProjectInfo | null>(
+    (cached?.project as ProjectInfo | null) ?? null,
+  );
   const [modules, setModules] = useState<TopicWithSubtopics[]>(
-    initialModules ?? [],
+    initialCachedModules,
   );
   const [readyResourceCount, setReadyResourceCount] = useState<number>(
-    initialReadyCount ?? 0,
+    initialCachedReady,
   );
   const [totalResourceCount, setTotalResourceCount] = useState<number>(
-    initialTotalCount ?? 0,
+    initialCachedTotal,
   );
   const [isInferring, setIsInferring] = useState(false);
   const [isInferModalOpen, setIsInferModalOpen] = useState(false);
@@ -338,12 +356,18 @@ export function ProjectTopicsPage({
     moduleName: string;
     subtopic: TopicWithSubtopics['subtopics'][number];
   } | null>(
-    initialModules && initialModules[0]?.subtopics[0]
+    (initialModules && initialModules[0]?.subtopics?.[0]
       ? {
           moduleName: initialModules[0].name,
           subtopic: initialModules[0].subtopics[0],
         }
-      : null,
+      : null) ??
+    (initialCachedModules && initialCachedModules[0]?.subtopics?.[0]
+      ? {
+          moduleName: initialCachedModules[0].name,
+          subtopic: initialCachedModules[0].subtopics[0],
+        }
+      : null),
   );
 
   const [evidenceList, setEvidenceList] = useState<EvidenceChunk[]>(
@@ -451,8 +475,15 @@ export function ProjectTopicsPage({
 
         setModules(fetchedTopics);
 
+        // Update session cache
+        updateProjectCache(projectId, {
+          project: projectPayload.data,
+          resources: resPayload.data,
+          topics: fetchedTopics,
+        });
+
         // Dynamically compute view mode
-        if (currentReady === 0) {
+        if (currentTotal === 0 || currentReady === 0) {
           setViewMode('zero');
         } else if (fetchedTopics.length === 0) {
           setViewMode('empty');
@@ -842,7 +873,9 @@ export function ProjectTopicsPage({
               </Link>
               <div className="flex items-center gap-2 px-4 py-2.5 bg-surface-container-lowest text-primary font-body-sm text-body-sm font-medium border-b-2 border-primary whitespace-nowrap">
                 <Icon name="tree" size={16} />
-                <span>Topics ({totalSubtopics})</span>
+                <span>
+                  Topics ({totalSubtopics > 0 ? `${modules.length} Modules · ${totalSubtopics} Topics` : modules.length})
+                </span>
                 <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm font-semibold">
                   Active
                 </span>
@@ -854,13 +887,27 @@ export function ProjectTopicsPage({
                 <Icon name="spark" size={16} />
                 <span>Generation</span>
               </Link>
-              <div className="flex items-center gap-2 px-4 py-2.5 text-outline cursor-not-allowed font-body-sm text-body-sm whitespace-nowrap">
+              <Link
+                className="flex items-center gap-2 px-4 py-2.5 text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm transition-colors whitespace-nowrap"
+                to={`/app/projects/${projectId ?? 'demo'}/questions`}
+              >
                 <Icon name="verified" size={16} />
                 <span>Question Bank</span>
-                <span className="px-1.5 py-0.5 rounded bg-surface-container-high text-outline font-label-sm text-label-sm">
-                  Upcoming step
-                </span>
-              </div>
+              </Link>
+              <Link
+                className="flex items-center gap-2 px-4 py-2.5 text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm transition-colors whitespace-nowrap"
+                to={`/app/projects/${projectId ?? 'demo'}/export`}
+              >
+                <Icon name="print" size={16} />
+                <span>Export Studio</span>
+              </Link>
+              <Link
+                className="flex items-center gap-2 px-4 py-2.5 text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm transition-colors whitespace-nowrap"
+                to={`/app/projects/${projectId ?? 'demo'}/practice`}
+              >
+                <Icon name="school" size={16} />
+                <span>Practice Studio</span>
+              </Link>
             </nav>
           </div>
         </section>
@@ -1558,9 +1605,9 @@ export function ProjectTopicsPage({
 
       {/* Dual-Engine Topic Inference Modal */}
       {isInferModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg bg-surface-container-lowest rounded-2xl shadow-2xl border border-outline-variant/30 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-6 py-5 border-b border-outline-variant/20 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4">
+          <div className="w-full max-w-lg max-h-[90vh] bg-surface-container-lowest rounded-2xl shadow-2xl border border-outline-variant/30 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-outline-variant/20 flex items-center justify-between shrink-0">
               <div>
                 <h3 className="font-headline-md text-headline-md font-bold text-on-surface">
                   Infer Knowledge Topics
@@ -1578,10 +1625,10 @@ export function ProjectTopicsPage({
               </button>
             </div>
 
-            <div className="p-6 flex flex-col gap-4">
+            <div className="p-4 sm:p-6 flex flex-col gap-3 sm:gap-4 overflow-y-auto flex-1">
               {/* Option 1: Gemini Cloud Turbo */}
               <div
-                className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
+                className={`p-3.5 sm:p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
                   inferProvider === 'gemini'
                     ? 'border-primary bg-primary/5 shadow-sm'
                     : 'border-outline-variant/30 hover:border-outline-variant'
@@ -1591,14 +1638,14 @@ export function ProjectTopicsPage({
                   setInferModel('gemini-flash-lite-latest');
                 }}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">⚡</span>
+                    <span className="text-xl shrink-0">⚡</span>
                     <span className="font-headline-sm text-headline-sm font-semibold text-on-surface">
                       Google Gemini Flash Lite (Cloud Turbo)
                     </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm font-bold">
+                  <span className="self-start sm:self-auto px-2 py-0.5 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm font-bold shrink-0">
                     RECOMMENDED · 500 RPD · ~1s
                   </span>
                 </div>
@@ -1609,7 +1656,7 @@ export function ProjectTopicsPage({
 
               {/* Option 2: Groq High-Speed Cloud */}
               <div
-                className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
+                className={`p-3.5 sm:p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
                   inferProvider === 'groq'
                     ? 'border-primary bg-primary/5 shadow-sm'
                     : 'border-outline-variant/30 hover:border-outline-variant'
@@ -1619,14 +1666,14 @@ export function ProjectTopicsPage({
                   setInferModel('llama-3.3-70b-versatile');
                 }}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">🚀</span>
+                    <span className="text-xl shrink-0">🚀</span>
                     <span className="font-headline-sm text-headline-sm font-semibold text-on-surface">
                       Groq Llama 3.3 70B (Free High-Speed Cloud)
                     </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-secondary/15 text-secondary font-label-sm text-label-sm font-bold">
+                  <span className="self-start sm:self-auto px-2 py-0.5 rounded-full bg-secondary/15 text-secondary font-label-sm text-label-sm font-bold shrink-0">
                     14,400 RPD · ~0.5s
                   </span>
                 </div>
@@ -1637,7 +1684,7 @@ export function ProjectTopicsPage({
 
               {/* Option 3: Qwen 2.5 Local */}
               <div
-                className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
+                className={`p-3.5 sm:p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
                   inferProvider === 'ollama'
                     ? 'border-primary bg-primary/5 shadow-sm'
                     : 'border-outline-variant/30 hover:border-outline-variant'
@@ -1647,14 +1694,14 @@ export function ProjectTopicsPage({
                   setInferModel('qwen2.5:7b');
                 }}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">🖥️</span>
+                    <span className="text-xl shrink-0">🖥️</span>
                     <span className="font-headline-sm text-headline-sm font-semibold text-on-surface">
                       Qwen 2.5 7B (Localhost Offline)
                     </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-bold">
+                  <span className="self-start sm:self-auto px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-bold shrink-0">
                     100% PRIVATE · ~60s
                   </span>
                 </div>
@@ -1664,11 +1711,11 @@ export function ProjectTopicsPage({
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-surface-container-low border-t border-outline-variant/20 flex items-center justify-between">
+            <div className="px-5 sm:px-6 py-3.5 sm:py-4 bg-surface-container-low border-t border-outline-variant/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
               <span className="font-label-sm text-label-sm text-outline">
                 Dual-Engine GroundQ Architecture
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-end sm:self-auto">
                 <button
                   className="px-4 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-body-sm text-body-sm transition-colors"
                   disabled={isInferring}

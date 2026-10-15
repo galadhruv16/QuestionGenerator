@@ -90,15 +90,28 @@ export async function inferTopicsFromChunks(
     }
   }
 
+  const maxPage = Math.max(
+    ...validChunks.map((c) => c.page_number || 1),
+    1,
+  );
+  const minPage = Math.min(
+    ...validChunks.map((c) => c.page_number || 1),
+    1,
+  );
+
   const contextText = sampledChunks
-    .map((c) => `[Page ${c.page_number ?? 'N/A'}] ${c.text.slice(0, 550)}`)
+    .map(
+      (c) =>
+        `[Document Page ${c.page_number ?? 'N/A'} of ${maxPage}]\n${c.text.slice(0, 550)}`,
+    )
     .join('\n\n---\n\n');
 
   const systemPrompt = `You are an expert academic curriculum extraction assistant.
-Analyze the following course material excerpts which span the entire document from start to finish, and extract a natural topic hierarchy covering the FULL syllabus:
-- Level 1: Overarching modules or themes (e.g. "Singly Linked Lists & Node Representation", "Two-Pointer Traversal & Cycle Detection").
-  CRITICAL: Do NOT force exactly 3 modules. Determine an appropriate number of modules (typically 2 to 6 for comprehensive notes) based on the distinct major divisions across the beginning, middle, and end of the document.
-- Level 2: Specific core subtopics within each module (e.g. "Node Pointer Representation", "Head and Tail Insertion", "Floyd's Cycle Detection Algorithm").
+Analyze the following course material excerpts which span the entire document from Page ${minPage} to Page ${maxPage}, and extract a natural topic hierarchy covering the FULL syllabus:
+- Level 1: Overarching modules or subject chapters reflecting the core thematic divisions of the course material.
+  CRITICAL RULE: The number of modules must naturally reflect the distinct subject divisions present in the document. Short documents may have 2 to 4 modules; comprehensive textbooks or extensive notes should have 5 to 10+ modules as needed to cover all subjects.
+  CRITICAL: You MUST extract modules for ALL major subject areas found throughout the entire document, from early pages through to the final pages. Do NOT stop at introductory concepts (such as basic syntax or variables); ensure intermediate and later chapters are thoroughly represented.
+- Level 2: Specific core technical concepts and subtopics within each module (e.g. key mechanisms, methods, architectures, or algorithms). Each module should contain 2 to 5 subtopics.
 
 CRITICAL CONSTRAINTS:
 1. Return strictly valid JSON with no markdown formatting or markdown backticks.
@@ -106,7 +119,7 @@ CRITICAL CONSTRAINTS:
 {
   "modules": [
     {
-      "name": "Distinct Module Name",
+      "name": "Distinct Module Subject Name",
       "description": "Short module scope description",
       "subtopics": [
         {
@@ -121,8 +134,8 @@ CRITICAL CONSTRAINTS:
    - NEVER extract desktop application brand names such as Microsoft Word, Mozilla Firefox, Lotus Notes, LibreOffice, Adobe Acrobat, etc.
    - NEVER extract chapter title headers as concepts if they are generic book titles (e.g. "JavaScript for Beginners").
    - Exclude author names, copyright notices, and table of contents boilerplate.
-4. Each parent module must have a UNIQUE, DISTINCT name. Never name multiple modules identically.
-5. Subtopic names must be genuine technical concepts, NOT random fragments. Each module should have 2 to 5 subtopics.
+4. Each parent module must have a UNIQUE, DISTINCT name based on its subject matter. Never name multiple modules identically.
+5. Subtopic names must be genuine technical concepts, NOT random fragments.
 6. Keep names concise, academic, and grounded exclusively in the educational content.`;
 
   const userPrompt = `Course material context:\n${contextText}\n\nExtract the JSON topic hierarchy:`;
@@ -563,7 +576,7 @@ export async function persistInferredTopics(
       // If still no keyword match, assign from this module's proportional section of the document
       let targets: typeof chunks = [];
       if (matched.length > 0) {
-        targets = matched.slice(0, 5);
+        targets = matched.slice(0, 15);
       } else {
         const modIdx = Math.max(0, sortOrder - 2);
         const sliceSize = Math.max(
@@ -574,7 +587,7 @@ export async function persistInferredTopics(
           modIdx * sliceSize,
           (modIdx + 1) * sliceSize,
         );
-        targets = (modSlice.length > 0 ? modSlice : validChunks).slice(0, 5);
+        targets = (modSlice.length > 0 ? modSlice : validChunks).slice(0, 15);
       }
 
       for (const targetChunk of targets) {

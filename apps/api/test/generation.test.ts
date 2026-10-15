@@ -201,4 +201,27 @@ describe('generation planner and routes', () => {
 
     expect(response.status).toBe(401);
   });
+
+  it('rejects unauthenticated questions regenerate requests', async () => {
+    const response = await request(createApp())
+      .post(`/api/v1/projects/${dummyProjectId}/questions/${dummyRunId}/regenerate`)
+      .send({
+        bloom_slug: 'analyze',
+        difficulty_slug: 'HARD',
+      });
+
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects unauthenticated questions bulk-regenerate requests', async () => {
+    const response = await request(createApp())
+      .post(`/api/v1/projects/${dummyProjectId}/questions/bulk-regenerate`)
+      .send({
+        question_ids: [dummyRunId],
+        bloom_slug: 'analyze',
+      });
+
+    expect(response.status).toBe(401);
+  });
 });
+

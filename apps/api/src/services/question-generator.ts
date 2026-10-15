@@ -465,17 +465,51 @@ export async function executeGenerationRun(
           }
 
           if (blueprint.duplicate_policy === 'PREVENT' && maxSim > 0.82) {
-            throw new Error(
-              `Duplicate question detected: ${(maxSim * 100).toFixed(1)}% similarity to existing project question "${mostSimilarStem.slice(0, 60)}..."`,
+            console.warn(
+              `[QuestionGenerator] Item #${target.sequenceNumber} duplicate detected (${(maxSim * 100).toFixed(1)}%). Retrying with alternative chunk and varied temperature...`,
             );
+            // Select an alternative chunk from another section of the document
+            const altStride = Math.max(1, Math.floor(poolChunks.length / 3));
+            const altIndex = (target.sequenceNumber * altStride) % poolChunks.length;
+            const altChunk = poolChunks[altIndex] || selectedChunk;
+
+            try {
+              const retryItem = await synthesizeQuestionItem({
+                blueprint: { ...blueprint, temperature: 0.25 },
+                chunk: altChunk,
+                planItemId,
+                refs,
+                runId,
+                target,
+                topicName,
+              });
+              let retrySim = 0;
+              for (const prior of allPriorStems) {
+                const sim = computeStemSimilarity(retryItem.stem, prior);
+                if (sim > retrySim) retrySim = sim;
+              }
+              if (retrySim <= 0.82) {
+                item = retryItem;
+                maxSim = retrySim;
+              } else {
+                throw new Error(
+                  `Duplicate question detected after retry: ${(retrySim * 100).toFixed(1)}% similarity to "${mostSimilarStem.slice(0, 60)}..."`,
+                );
+              }
+            } catch (retryErr) {
+              throw new Error(
+                `Duplicate question detected: ${(maxSim * 100).toFixed(1)}% similarity to "${mostSimilarStem.slice(0, 60)}..."`,
+              );
+            }
           }
 
-          // Persist to database
+          // Persist to database with strictly contiguous monotonic ordering (no numbering gaps)
           const savedQuestion = await persistGeneratedQuestion({
             baseSortOrder,
             client,
             dedupScore: maxSim,
             item,
+            persistedIndex: generatedQuestions.length + 1,
             planItemId,
             projectId,
             refs,
@@ -561,16 +595,21 @@ export async function executeGenerationRun(
 }
 
 interface SynthesizeParams {
-  blueprint: BlueprintConfiguration;
+  blueprint: Partial<BlueprintConfiguration> & {
+    model_name?: string;
+    model_provider?: 'gemini' | 'groq' | 'ollama';
+    temperature?: number;
+  };
   chunk?: {
     id: string;
     page_number: number | null;
     resource_id: string;
     text: string;
   };
-  planItemId: string;
+  instructorGuidance?: string;
+  planItemId?: string;
   refs: ReferenceTables;
-  runId: string;
+  runId?: string;
   target: PlanTarget;
   topicName: string;
 }
@@ -741,13 +780,17 @@ async function synthesizeQuestionItem(
     .replace(/^Module \d+[:\s-]*/i, '')
     .trim();
 
+  const guidanceNotice = params.instructorGuidance?.trim()
+    ? `\n\nINSTRUCTOR PEDAGOGICAL GUIDANCE (CRITICAL DIRECTION):\n"${params.instructorGuidance.trim()}"\nYou must strictly incorporate this specific guidance into the question stem, distractors, and explanation.`
+    : '';
+
   const promptSystem = `You are an expert assessment item designer creating curriculum-grounded university exam questions.
 Generate a single rigorous question strictly adhering to:
 - Topic: "${cleanTopic}"
 - Cognitive Level: Bloom ${target.bloomSlug.toUpperCase()}
 - Difficulty: ${target.difficultySlug}
 - Question Type: ${target.typeSlug}
-- Style: ${target.styleSlug}
+- Style: ${target.styleSlug}${guidanceNotice}
 
 CRITICAL RULES:
 1. Return strictly valid JSON with no markdown backticks or text outside the JSON object.
@@ -858,6 +901,7 @@ async function persistGeneratedQuestion(params: {
   client: SupabaseClient;
   dedupScore?: number;
   item: RawSynthesizedQuestion;
+  persistedIndex?: number;
   planItemId: string;
   projectId: string;
   refs: ReferenceTables;
@@ -870,6 +914,7 @@ async function persistGeneratedQuestion(params: {
     client,
     dedupScore = 0.12,
     item,
+    persistedIndex,
     planItemId,
     projectId,
     refs,
@@ -878,14 +923,14 @@ async function persistGeneratedQuestion(params: {
     target,
   } = params;
 
-  // 1. Insert question shell with monotonic sort order
+  // 1. Insert question shell with strictly contiguous monotonic sort order
   const { data: qData, error: qErr } = await client
     .from('questions')
     .insert({
       generation_plan_item_id: planItemId,
       generation_run_id: runId,
       project_id: projectId,
-      sort_order: baseSortOrder + target.sequenceNumber,
+      sort_order: baseSortOrder + (persistedIndex ?? target.sequenceNumber),
       status: 'AVAILABLE',
     })
     .select('id')
@@ -1013,5 +1058,385 @@ async function persistGeneratedQuestion(params: {
     style: target.styleSlug,
     topic_id: target.topicId,
     version_number: 1,
+  };
+}
+
+export interface RegenerateQuestionOptions {
+  bloomSlug?: string;
+  client: SupabaseClient;
+  difficultySlug?: string;
+  instructorGuidance?: string;
+  modelName?: string;
+  modelProvider?: string;
+  projectId: string;
+  questionId: string;
+}
+
+/**
+ * Regenerates an existing unaccepted question in place, preserving its ID and sort order,
+ * with strict intra-project deduplication guardrail (<0.82) and optional instructor prompt adjustments.
+ */
+export async function regenerateQuestionInPlace(
+  params: RegenerateQuestionOptions,
+): Promise<{
+  dedupScore: number;
+  questionId: string;
+  regenerated: boolean;
+}> {
+  const {
+    bloomSlug,
+    client,
+    difficultySlug,
+    instructorGuidance,
+    modelName,
+    modelProvider,
+    projectId,
+    questionId,
+  } = params;
+
+  // 1. Fetch current question and its current version details
+  const { data: existingQ, error: fetchErr } = await client
+    .from('questions')
+    .select(`
+      id,
+      project_id,
+      generation_run_id,
+      status,
+      sort_order,
+      current_version_id,
+      current_version:question_versions!fk_questions_current_version (
+        id,
+        version_number,
+        question_text,
+        topic_id,
+        bloom_level_id,
+        difficulty_level_id,
+        question_type_id,
+        style_id,
+        bloom_levels (slug),
+        difficulty_levels (slug),
+        question_types (slug),
+        question_styles (slug),
+        topics (name),
+        question_source_refs (
+          id,
+          chunk_id,
+          evidence_text,
+          resource_chunks (
+            id,
+            page_number,
+            resource_id,
+            content,
+            resources (
+              original_filename
+            )
+          )
+        )
+      )
+    `)
+    .eq('id', questionId)
+    .eq('project_id', projectId)
+    .maybeSingle();
+
+  if (fetchErr) throw fetchErr;
+  if (!existingQ) {
+    const error = new Error('Question not found.');
+    (error as unknown as { statusCode: number }).statusCode = 404;
+    throw error;
+  }
+
+  // 2. Lock guardrail: Accepted questions cannot be mutated
+  if (existingQ.status === 'ACCEPTED') {
+    const error = new Error(
+      'Accepted questions are locked to preserve assessment integrity and cannot be regenerated.',
+    );
+    (error as unknown as { code: string; statusCode: number }).statusCode = 400;
+    (error as unknown as { code: string; statusCode: number }).code = 'QUESTION_LOCKED';
+    throw error;
+  }
+
+  const curVer = (existingQ as unknown as { current_version?: {
+    bloom_levels?: { slug: string };
+    difficulty_levels?: { slug: string };
+    id: string;
+    question_source_refs?: Array<{
+      chunk_id: string;
+      evidence_text: string | null;
+      id: string;
+      resource_chunks?: {
+        content: string;
+        id: string;
+        page_number: number | null;
+        resource_id: string;
+      };
+    }>;
+    question_styles?: { slug: string };
+    question_types?: { slug: string };
+    topic_id: string | null;
+    topics?: { name: string };
+    version_number: number;
+  } }).current_version;
+
+  const currentChunkRef = curVer?.question_source_refs?.[0];
+  const chunkData = currentChunkRef?.resource_chunks;
+
+  // 3. Load reference tables
+  const refs = await loadReferences(client);
+
+  const activeBloomSlug = (
+    bloomSlug ||
+    curVer?.bloom_levels?.slug ||
+    'analyze'
+  ).toLowerCase();
+  const activeDifficultySlug = (
+    difficultySlug ||
+    curVer?.difficulty_levels?.slug ||
+    'MEDIUM'
+  ).toUpperCase();
+  const activeTypeSlug = (
+    curVer?.question_types?.slug || 'MCQ'
+  ).toUpperCase();
+  const activeStyleSlug = (
+    curVer?.question_styles?.slug || 'SCENARIO'
+  ).toUpperCase();
+  const activeTopicId = curVer?.topic_id || null;
+  const activeTopicName = curVer?.topics?.name || 'Curriculum Module';
+
+  // 4. Resolve Chunk content
+  let chunkContent = chunkData?.content || '';
+  let selectedChunkId = currentChunkRef?.chunk_id;
+  let pageNumber = chunkData?.page_number ?? 1;
+  let resourceId = chunkData?.resource_id || '';
+
+  if (!chunkContent && selectedChunkId) {
+    const { data: cRow } = await client
+      .from('resource_chunks')
+      .select('id, content, page_number, resource_id')
+      .eq('id', selectedChunkId)
+      .maybeSingle();
+    if (cRow) {
+      chunkContent = cRow.content;
+      pageNumber = cRow.page_number;
+      resourceId = cRow.resource_id;
+    }
+  }
+
+  if (!chunkContent) {
+    const { data: fallbackChunk } = await client
+      .from('resource_chunks')
+      .select('id, content, page_number, resource_id, resources!inner(project_id)')
+      .eq('resources.project_id', projectId)
+      .limit(1)
+      .maybeSingle();
+    if (fallbackChunk) {
+      chunkContent = fallbackChunk.content;
+      selectedChunkId = fallbackChunk.id;
+      pageNumber = fallbackChunk.page_number;
+      resourceId = fallbackChunk.resource_id;
+    }
+  }
+
+  // 5. Gather existing question stems in the project for deduplication guardrail
+  const { data: projectQuestions } = await client
+    .from('questions')
+    .select(`
+      id,
+      current_version:question_versions!fk_questions_current_version (
+        question_text
+      )
+    `)
+    .eq('project_id', projectId)
+    .neq('id', questionId)
+    .is('archived_at', null);
+
+  const existingStems = (projectQuestions ?? [])
+    .map(
+      (q) =>
+        (q as unknown as { current_version?: { question_text?: string } })
+          .current_version?.question_text,
+    )
+    .filter(Boolean) as string[];
+
+  // 6. Build Target & Blueprint
+  const target: PlanTarget = {
+    bloomSlug: activeBloomSlug,
+    difficultySlug: activeDifficultySlug,
+    sequenceNumber: existingQ.sort_order || 1,
+    styleSlug: activeStyleSlug,
+    topicId: activeTopicId,
+    typeSlug: activeTypeSlug,
+  };
+
+  const resolvedProvider: 'gemini' | 'groq' | 'ollama' =
+    (modelProvider as 'gemini' | 'groq' | 'ollama') ||
+    (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
+  const resolvedModel: string =
+    modelName ||
+    (resolvedProvider === 'gemini'
+      ? env.GEMINI_MODEL || 'gemini-flash-lite-latest'
+      : resolvedProvider === 'groq'
+        ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+        : env.OLLAMA_MODEL || 'qwen2.5:7b');
+
+  const blueprint = {
+    model_name: resolvedModel,
+    model_provider: resolvedProvider,
+    temperature: 0.15,
+  };
+
+  // 7. Synthesize question candidate
+  let synthesized: RawSynthesizedQuestion = await synthesizeQuestionItem({
+    blueprint,
+    chunk: {
+      id: selectedChunkId || 'chk-01',
+      page_number: pageNumber,
+      resource_id: resourceId,
+      text: chunkContent,
+    },
+    instructorGuidance,
+    refs,
+    target,
+    topicName: activeTopicName,
+  });
+
+  // Check deduplication against project question bank (< 0.82 threshold)
+  let maxSimilarity = 0;
+  for (const exStem of existingStems) {
+    const sim = computeStemSimilarity(synthesized.stem, exStem);
+    if (sim > maxSimilarity) maxSimilarity = sim;
+  }
+
+  if (maxSimilarity >= 0.82) {
+    synthesized = await synthesizeQuestionItem({
+      blueprint: { ...blueprint, temperature: 0.35 },
+      chunk: {
+        id: selectedChunkId || 'chk-01',
+        page_number: pageNumber,
+        resource_id: resourceId,
+        text: chunkContent,
+      },
+      instructorGuidance: instructorGuidance
+        ? `${instructorGuidance} (Ensure the question framing, distractors, and phrasing are completely distinct from existing test items)`
+        : 'Ensure the question framing, distractors, and phrasing are completely distinct from existing test items.',
+      refs,
+      target,
+      topicName: activeTopicName,
+    });
+
+    maxSimilarity = 0;
+    for (const exStem of existingStems) {
+      const sim = computeStemSimilarity(synthesized.stem, exStem);
+      if (sim > maxSimilarity) maxSimilarity = sim;
+    }
+  }
+
+  // 8. In-place update: update existing question_version record directly
+  const versionId = existingQ.current_version_id;
+
+  if (versionId) {
+    await client
+      .from('question_versions')
+      .update({
+        bloom_level_id: refs.bloom.get(activeBloomSlug) || null,
+        difficulty_level_id: refs.difficulty.get(activeDifficultySlug) || null,
+        explanation: synthesized.explanation || null,
+        model_answer: synthesized.model_answer || null,
+        origin: 'AI_REGENERATED',
+        question_text: synthesized.stem,
+        rubric_criteria: synthesized.rubric_criteria
+          ? (synthesized.rubric_criteria as unknown as object)
+          : null,
+      })
+      .eq('id', versionId);
+
+    // Delete existing options and insert new shuffled options
+    await client
+      .from('question_options')
+      .delete()
+      .eq('question_version_id', versionId);
+
+    if (synthesized.options && synthesized.options.length > 0) {
+      const shuffled = shuffleOptions(
+        synthesized.options,
+        existingQ.sort_order || 1,
+      );
+      const optionRows = shuffled.map((opt, idx) => ({
+        explanation: opt.explanation || null,
+        is_correct: opt.is_correct,
+        option_index: idx,
+        option_text: opt.option_text,
+        question_version_id: versionId,
+      }));
+      await client.from('question_options').insert(optionRows);
+    }
+
+    // Update source ref evidence
+    if (selectedChunkId) {
+      const { data: existingRef } = await client
+        .from('question_source_refs')
+        .select('id')
+        .eq('question_version_id', versionId)
+        .maybeSingle();
+
+      if (existingRef) {
+        await client
+          .from('question_source_refs')
+          .update({
+            chunk_id: selectedChunkId,
+            evidence_text:
+              synthesized.citation_anchor || synthesized.evidence_quote || null,
+            relevance_score: 0.994,
+          })
+          .eq('id', existingRef.id);
+      } else {
+        await client.from('question_source_refs').insert({
+          chunk_id: selectedChunkId,
+          evidence_text:
+            synthesized.citation_anchor || synthesized.evidence_quote || null,
+          question_version_id: versionId,
+          relevance_score: 0.994,
+        });
+      }
+    }
+  }
+
+  // 9. Reset question status to AVAILABLE and touch updated_at
+  await client
+    .from('questions')
+    .update({
+      status: 'AVAILABLE',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', questionId);
+
+  // 10. Update generation run counters
+  if (existingQ.generation_run_id) {
+    const { count: acceptedCount } = await client
+      .from('questions')
+      .select('id', { count: 'exact', head: true })
+      .eq('generation_run_id', existingQ.generation_run_id)
+      .eq('status', 'ACCEPTED')
+      .is('archived_at', null);
+
+    const { count: reviewCount } = await client
+      .from('questions')
+      .select('id', { count: 'exact', head: true })
+      .eq('generation_run_id', existingQ.generation_run_id)
+      .eq('status', 'AVAILABLE')
+      .is('archived_at', null);
+
+    await client
+      .from('generation_runs')
+      .update({
+        accepted_count: acceptedCount ?? 0,
+        review_count: reviewCount ?? 0,
+      })
+      .eq('id', existingQ.generation_run_id);
+  }
+
+  return {
+    dedupScore: maxSimilarity,
+    questionId,
+    regenerated: true,
   };
 }

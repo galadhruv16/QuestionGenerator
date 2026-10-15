@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import {
+  bulkRegenerateQuestionsSchema,
   bulkUpdateQuestionsStatusSchema,
   createQuestionVersionSchema,
+  regenerateQuestionSchema,
   updateQuestionStatusSchema,
 } from '@groundq/contracts';
 import { z } from 'zod';
@@ -10,6 +12,7 @@ import {
   requireAuth,
   type AuthenticatedRequest,
 } from '../middleware/require-auth.js';
+import { regenerateQuestionInPlace } from '../services/question-generator.js';
 
 const uuidSchema = z.string().uuid();
 
@@ -234,6 +237,97 @@ questionsRouter.post('/bulk-status', async (request, response, next) => {
     return response.json({
       data: {
         updated_count: updatedQuestions?.length ?? 0,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * POST /api/v1/projects/:projectId/questions/bulk-regenerate
+ * Sequentially regenerates unaccepted questions in place with deduplication check
+ */
+questionsRouter.post('/bulk-regenerate', async (request, response, next) => {
+  const { projectId } = getParams(request);
+  const parsedProjectId = uuidSchema.safeParse(projectId);
+  if (!parsedProjectId.success) {
+    return response.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        details: {},
+        message: 'Invalid project ID format.',
+      },
+    });
+  }
+
+  const parsedBody = bulkRegenerateQuestionsSchema.safeParse(request.body);
+  if (!parsedBody.success) {
+    return response.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        details: parsedBody.error.flatten(),
+        message: 'Invalid bulk regenerate request payload.',
+      },
+    });
+  }
+
+  try {
+    const authReq = request as unknown as AuthenticatedRequest;
+    const client = createSupabaseUserClient(authReq.accessToken);
+    const {
+      bloom_slug,
+      difficulty_slug,
+      instructor_guidance,
+      model_name,
+      model_provider,
+      question_ids,
+    } = parsedBody.data;
+
+    // Check which questions are eligible (skip ACCEPTED questions per invariant)
+    const { data: questionsToRegen, error: fetchErr } = await client
+      .from('questions')
+      .select('id, status')
+      .in('id', question_ids)
+      .eq('project_id', parsedProjectId.data)
+      .is('archived_at', null);
+
+    if (fetchErr) throw fetchErr;
+
+    const eligible = (questionsToRegen ?? []).filter(
+      (q) => q.status !== 'ACCEPTED',
+    );
+    const skippedAccepted = (questionsToRegen ?? []).filter(
+      (q) => q.status === 'ACCEPTED',
+    );
+
+    const regeneratedQuestions = [];
+    for (const q of eligible) {
+      await regenerateQuestionInPlace({
+        bloomSlug: bloom_slug,
+        client,
+        difficultySlug: difficulty_slug,
+        instructorGuidance: instructor_guidance,
+        modelName: model_name,
+        modelProvider: model_provider,
+        projectId: parsedProjectId.data,
+        questionId: q.id,
+      });
+
+      const { data: fullQ } = await client
+        .from('questions')
+        .select(QUESTION_DETAIL_SELECT)
+        .eq('id', q.id)
+        .single();
+
+      if (fullQ) regeneratedQuestions.push(fullQ);
+    }
+
+    return response.json({
+      data: {
+        questions: regeneratedQuestions,
+        regenerated_count: regeneratedQuestions.length,
+        skipped_accepted_count: skippedAccepted.length,
       },
     });
   } catch (error) {
@@ -516,3 +610,80 @@ questionsRouter.post('/:questionId/versions', async (request, response, next) =>
     return next(error);
   }
 });
+
+/**
+ * POST /api/v1/projects/:projectId/questions/:questionId/regenerate
+ * Regenerates an existing unaccepted question in place, updating its content and resetting to AVAILABLE
+ */
+questionsRouter.post('/:questionId/regenerate', async (request, response, next) => {
+  const { projectId, questionId } = getParams(request);
+  const parsedProjectId = uuidSchema.safeParse(projectId);
+  const parsedQuestionId = uuidSchema.safeParse(questionId);
+  if (!parsedProjectId.success || !parsedQuestionId.success) {
+    return response.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        details: {},
+        message: 'Invalid project or question ID format.',
+      },
+    });
+  }
+
+  const parsedBody = regenerateQuestionSchema.safeParse(request.body);
+  if (!parsedBody.success) {
+    return response.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        details: parsedBody.error.flatten(),
+        message: 'Invalid regeneration payload.',
+      },
+    });
+  }
+
+  try {
+    const authReq = request as unknown as AuthenticatedRequest;
+    const client = createSupabaseUserClient(authReq.accessToken);
+    const {
+      bloom_slug,
+      difficulty_slug,
+      instructor_guidance,
+      model_name,
+      model_provider,
+    } = parsedBody.data;
+
+    await regenerateQuestionInPlace({
+      bloomSlug: bloom_slug,
+      client,
+      difficultySlug: difficulty_slug,
+      instructorGuidance: instructor_guidance,
+      modelName: model_name,
+      modelProvider: model_provider,
+      projectId: parsedProjectId.data,
+      questionId: parsedQuestionId.data,
+    });
+
+    const { data: fullQuestion, error: fetchErr } = await client
+      .from('questions')
+      .select(QUESTION_DETAIL_SELECT)
+      .eq('id', parsedQuestionId.data)
+      .single();
+
+    if (fetchErr) throw fetchErr;
+
+    return response.json({
+      data: fullQuestion,
+    });
+  } catch (error: unknown) {
+    if ((error as { code?: string })?.code === 'QUESTION_LOCKED') {
+      return response.status(400).json({
+        error: {
+          code: 'QUESTION_LOCKED',
+          details: {},
+          message: (error as Error).message,
+        },
+      });
+    }
+    return next(error);
+  }
+});
+

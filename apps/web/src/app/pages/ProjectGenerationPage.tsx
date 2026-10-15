@@ -9,6 +9,9 @@ import type {
 import { getSupabaseClient } from '../../lib/supabase';
 import { Icon, Logo } from '../components/ui';
 
+import { getCachedProject, updateProjectCache } from '../services/session-store';
+import { generationManager } from '../services/generation-manager';
+
 interface ProjectData {
   created_at: string;
   description: string | null;
@@ -40,14 +43,31 @@ export function ProjectGenerationPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
 
+  const cached = projectId ? getCachedProject(projectId) : null;
+  const activeGen = projectId ? generationManager.getActiveRun(projectId) : null;
+  const isCurrentlyActive = Boolean(
+    activeGen &&
+      activeGen.status !== 'COMPLETED' &&
+      activeGen.status !== 'FAILED',
+  );
+
   // Project context state
-  const [project, setProject] = useState<ProjectData | null>(null);
-  const [topics, setTopics] = useState<TopicItem[]>([]);
-  const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [project, setProject] = useState<ProjectData | null>(
+    (cached?.project as ProjectData | null) ?? null,
+  );
+  const [topics, setTopics] = useState<TopicItem[]>(
+    (Array.isArray(cached?.topics) ? (cached.topics as TopicItem[]) : []),
+  );
+  const [resources, setResources] = useState<ResourceItem[]>(
+    (Array.isArray(cached?.resources) ? (cached.resources as ResourceItem[]) : []),
+  );
   const [presets, setPresets] = useState<Preset[]>([]);
   const [recentRuns, setRecentRuns] = useState<GenerationRun[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!Array.isArray(cached?.topics) || cached.topics.length === 0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [collapsedModuleIds, setCollapsedModuleIds] = useState<
+    Record<string, boolean>
+  >({});
 
   // Active blueprint configuration
   const [activePresetName, setActivePresetName] =
@@ -104,11 +124,21 @@ export function ProjectGenerationPage() {
   const [targetModel, setTargetModel] = useState('gemini-flash-lite-latest');
 
   // Generation execution state
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [currentRun, setCurrentRun] = useState<GenerationRun | null>(null);
+  const [isGenerating, setIsGenerating] = useState(isCurrentlyActive);
+  const [currentRun, setCurrentRun] = useState<GenerationRun | null>(
+    activeGen
+      ? ({
+          accepted_count: activeGen.generatedCount,
+          id: activeGen.runId,
+          status: activeGen.status,
+        } as unknown as GenerationRun)
+      : null,
+  );
   const [activeStreamQuestion, setActiveStreamQuestion] =
     useState<GeneratedQuestionItem | null>(null);
-  const [executionStep, setExecutionStep] = useState<number>(0); // 0: idle, 1: retrieval, 2: planning, 3: inference, 4: validation
+  const [executionStep, setExecutionStep] = useState<number>(
+    activeGen ? activeGen.step : 0,
+  ); // 0: idle, 1: retrieval, 2: planning, 3: inference, 4: validation
 
   // Preset saving modal
   const [showSavePresetModal, setShowSavePresetModal] = useState(false);
@@ -150,7 +180,9 @@ export function ProjectGenerationPage() {
   useEffect(() => {
     async function loadData() {
       if (!projectId) return;
-      setIsLoading(true);
+      if (!cached?.topics) {
+        setIsLoading(true);
+      }
       try {
         // Load project
         const projectRes = await apiRequest(`/projects/${projectId}`);
@@ -165,11 +197,19 @@ export function ProjectGenerationPage() {
         const loadedTopics: TopicItem[] = topicsRes.data ?? [];
         setTopics(loadedTopics);
 
-        // Initialize topic weights
+        // Update session cache
+        updateProjectCache(projectId, {
+          project: projectRes.data,
+          resources: resRes.data,
+          topics: loadedTopics,
+        });
+
+        // Initialize topic weights and select all modules and subtopics by default
         const initialWeights: Record<string, number> = {};
         const initialSelected = new Set<string>();
         loadedTopics.forEach((t, idx) => {
           initialSelected.add(t.id);
+          (t.subtopics ?? []).forEach((s) => initialSelected.add(s.id));
           initialWeights[t.id] = idx === 0 ? 40 : idx === 1 ? 35 : 25;
         });
         setTopicWeights(initialWeights);
@@ -194,46 +234,36 @@ export function ProjectGenerationPage() {
     void loadData();
   }, [projectId]);
 
-  // Polling for generation run status if actively generating
+  // Subscribe to generation manager for background polling and live status across tabs
   useEffect(() => {
-    if (!currentRun || !isGenerating) return;
+    if (!projectId) return;
 
-    const interval = setInterval(async () => {
-      try {
-        const runRes = await apiRequest(
-          `/projects/${projectId}/generation-runs/${currentRun.id}`,
-        );
-        const updatedRun: GenerationRun = runRes.data;
-        setCurrentRun(updatedRun);
+    const unsubscribe = generationManager.subscribe(projectId, async (state) => {
+      const active =
+        state.status !== 'COMPLETED' && state.status !== 'FAILED';
+      setIsGenerating(active);
+      setExecutionStep(state.step);
+      setCurrentRun((prev) => ({
+        ...(prev ?? ({} as GenerationRun)),
+        accepted_count: state.generatedCount,
+        id: state.runId,
+        status: state.status,
+      } as GenerationRun));
 
-        if (updatedRun.status === 'PLANNING') {
-          setExecutionStep(2);
-        } else if (
-          updatedRun.status === 'RETRIEVING' ||
-          updatedRun.status === 'GENERATING'
-        ) {
-          setExecutionStep(3);
-        } else if (updatedRun.status === 'VALIDATING') {
-          setExecutionStep(4);
-        } else if (
-          updatedRun.status === 'COMPLETED' ||
-          updatedRun.status === 'FAILED'
-        ) {
-          setIsGenerating(false);
-          setExecutionStep(4);
-
-          // Fetch the generated questions to populate the preview
-          const qRes = await apiRequest(
-            `/projects/${projectId}/generation-runs/${currentRun.id}/questions`,
-          );
-          if (qRes.data && qRes.data.length > 0) {
+      if (state.status === 'COMPLETED' || state.status === 'FAILED') {
+        try {
+          const [runsRes, qRes] = await Promise.all([
+            apiRequest(`/projects/${projectId}/generation-runs`),
+            apiRequest(
+              `/projects/${projectId}/generation-runs/${state.runId}/questions`,
+            ),
+          ]);
+          if (runsRes?.data) setRecentRuns(runsRes.data);
+          if (qRes?.data && qRes.data.length > 0) {
             const first = qRes.data[0];
             const version = first.current_version;
             setActiveStreamQuestion({
-              attribution_score: 0.994,
               bloom_level: version?.bloom_levels?.name || 'Analyze',
-              citation_anchor:
-                version?.question_source_refs?.[0]?.evidence_text,
               difficulty: version?.difficulty_levels?.name || 'Hard',
               id: first.id,
               model_answer: version?.model_answer,
@@ -245,25 +275,14 @@ export function ProjectGenerationPage() {
               version_number: 1,
             });
           }
-
-          // Refresh recent runs
-          const runsRes = await apiRequest(
-            `/projects/${projectId}/generation-runs`,
-          );
-          setRecentRuns(runsRes.data ?? []);
-          showToast(
-            updatedRun.status === 'COMPLETED'
-              ? `Generation complete: ${updatedRun.accepted_count} questions synthesized & verified.`
-              : 'Generation run finished with notice.',
-          );
+        } catch {
+          // Ignore
         }
-      } catch (err) {
-        console.error('Error polling generation run:', err);
       }
-    }, 1500);
+    });
 
-    return () => clearInterval(interval);
-  }, [currentRun, isGenerating, projectId]);
+    return () => unsubscribe();
+  }, [projectId]);
 
   // Handle Preset selection
   const handleSelectPreset = (presetName: string) => {
@@ -345,6 +364,7 @@ export function ProjectGenerationPage() {
       });
 
       setCurrentRun(res.data);
+      generationManager.registerRun(projectId, res.data.id, questionCount);
       showToast(
         `Synthesis pipeline started: ${questionCount} questions requested.`,
       );
@@ -435,6 +455,10 @@ export function ProjectGenerationPage() {
     () => topics.reduce((acc, t) => acc + (t.chunk_count || 0), 0),
     [topics],
   );
+  const totalSubtopicsCount = useMemo(
+    () => topics.reduce((acc, t) => acc + (t.subtopics?.length || 0), 0),
+    [topics],
+  );
 
   return (
     <div className="min-h-screen bg-surface font-body-md text-body-md text-on-surface antialiased flex flex-col">
@@ -517,7 +541,7 @@ export function ProjectGenerationPage() {
                 </div>
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-container text-on-surface-variant">
                   <Icon name="database" size={14} />
-                  <span>{totalChunksCount} Chunks Mapped</span>
+                  <span>Full Syllabus ({totalChunksCount} Chunks Mapped)</span>
                 </div>
               </div>
             </div>
@@ -529,9 +553,6 @@ export function ProjectGenerationPage() {
                   <h1 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
                     {project?.name ?? 'Course Workspace'}
                   </h1>
-                  <span className="px-2 py-0.5 rounded bg-surface-container-highest text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wide">
-                    SEC-01 · GRADUATE
-                  </span>
                   <span className="px-2 py-0.5 rounded bg-primary/10 text-primary font-label-sm text-label-sm font-semibold">
                     Taxonomy Active
                   </span>
@@ -567,7 +588,9 @@ export function ProjectGenerationPage() {
                 to={`/app/projects/${projectId}/topics`}
               >
                 <Icon name="tree" size={16} />
-                <span>2. Topics ({topics.length})</span>
+                <span>
+                  2. Topics ({totalSubtopicsCount > 0 ? `${topics.length} Modules · ${totalSubtopicsCount} Topics` : topics.length})
+                </span>
               </Link>
               <div className="flex items-center gap-2 px-4 py-2.5 bg-surface-container-lowest text-primary font-body-sm text-body-sm font-medium border-b-2 border-primary whitespace-nowrap">
                 <Icon name="spark" size={16} />
@@ -585,6 +608,20 @@ export function ProjectGenerationPage() {
                 <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-label-sm text-label-sm font-semibold">
                   Review
                 </span>
+              </Link>
+              <Link
+                className="flex items-center gap-2 px-4 py-2.5 text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm transition-colors whitespace-nowrap"
+                to={`/app/projects/${projectId}/export`}
+              >
+                <Icon name="print" size={16} />
+                <span>5. Export Studio</span>
+              </Link>
+              <Link
+                className="flex items-center gap-2 px-4 py-2.5 text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm transition-colors whitespace-nowrap"
+                to={`/app/projects/${projectId}/practice`}
+              >
+                <Icon name="school" size={16} />
+                <span>6. Practice Studio</span>
               </Link>
             </nav>
           </div>
@@ -912,7 +949,9 @@ export function ProjectGenerationPage() {
                   </div>
                   <div className="flex items-center gap-1.5 px-3 py-1 rounded bg-secondary/15 text-secondary font-label-sm text-label-sm font-semibold">
                     <Icon name="verified" size={14} />
-                    <span>Total Selected: {selectedTopicIds.size} Topics</span>
+                    <span>
+                      Total Selected: {selectedTopicIds.size} Topics ({topics.length} Modules, {totalSubtopicsCount} Subtopics)
+                    </span>
                   </div>
                 </div>
                 <p className="font-body-sm text-body-sm text-on-surface-variant -mt-1">
@@ -940,75 +979,168 @@ export function ProjectGenerationPage() {
                       </Link>
                     </div>
                   ) : (
-                    topics.map((top) => {
-                      const isChecked = selectedTopicIds.has(top.id);
-                      const weight = topicWeights[top.id] ?? 25;
+                    topics.map((module) => {
+                      const isModuleChecked = selectedTopicIds.has(module.id);
+                      const subtopics = module.subtopics ?? [];
+                      const isExpanded = !collapsedModuleIds[module.id];
+                      const subSelectedCount = subtopics.filter((s) =>
+                        selectedTopicIds.has(s.id),
+                      ).length;
+                      const weight = topicWeights[module.id] ?? 25;
 
                       return (
                         <div
-                          className={`p-3.5 rounded bg-surface-container-low flex flex-col gap-2.5 transition-opacity ${
-                            isChecked ? 'opacity-100' : 'opacity-60'
-                          }`}
-                          key={top.id}
+                          className="rounded-xl border border-outline-variant/30 bg-surface-container-low overflow-hidden transition-all"
+                          key={module.id}
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-start gap-3">
-                              <input
-                                checked={isChecked}
-                                className="mt-1 accent-primary w-4 h-4 cursor-pointer"
-                                id={`topic-${top.id}`}
-                                onChange={(e) => {
-                                  const next = new Set(selectedTopicIds);
-                                  if (e.target.checked) next.add(top.id);
-                                  else next.delete(top.id);
-                                  setSelectedTopicIds(next);
-                                }}
-                                type="checkbox"
-                              />
-                              <div>
-                                <label
-                                  className="font-headline-sm text-headline-sm text-on-surface cursor-pointer"
-                                  htmlFor={`topic-${top.id}`}
-                                >
-                                  {top.name}
-                                </label>
-                                <p className="font-body-sm text-body-sm text-on-surface-variant">
-                                  {top.description ??
-                                    'Curriculum syllabus module and concepts'}
-                                </p>
+                          {/* Module Header */}
+                          <div className="p-3.5 flex flex-col gap-2.5 bg-surface-container/60">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-2.5">
+                                {subtopics.length > 0 && (
+                                  <button
+                                    aria-label="Toggle subtopics"
+                                    className="mt-0.5 text-on-surface-variant hover:text-on-surface transition-colors"
+                                    onClick={() =>
+                                      setCollapsedModuleIds((prev) => ({
+                                        ...prev,
+                                        [module.id]: !prev[module.id],
+                                      }))
+                                    }
+                                    type="button"
+                                  >
+                                    <span
+                                      className={`inline-block transition-transform duration-200 ${
+                                        !isExpanded ? '-rotate-90' : 'rotate-0'
+                                      }`}
+                                    >
+                                      <Icon name="chevron" size={16} />
+                                    </span>
+                                  </button>
+                                )}
+                                <input
+                                  checked={
+                                    isModuleChecked ||
+                                    (subtopics.length > 0 &&
+                                      subSelectedCount === subtopics.length)
+                                  }
+                                  className="mt-1 accent-primary w-4 h-4 cursor-pointer"
+                                  id={`mod-${module.id}`}
+                                  onChange={(e) => {
+                                    const next = new Set(selectedTopicIds);
+                                    if (e.target.checked) {
+                                      next.add(module.id);
+                                      subtopics.forEach((s) => next.add(s.id));
+                                    } else {
+                                      next.delete(module.id);
+                                      subtopics.forEach((s) => next.delete(s.id));
+                                    }
+                                    setSelectedTopicIds(next);
+                                  }}
+                                  type="checkbox"
+                                />
+                                <div>
+                                  <label
+                                    className="font-headline-sm text-headline-sm font-semibold text-on-surface cursor-pointer"
+                                    htmlFor={`mod-${module.id}`}
+                                  >
+                                    {module.name}
+                                  </label>
+                                  <p className="font-body-sm text-body-sm text-on-surface-variant">
+                                    {module.description ??
+                                      'Curriculum syllabus module and concepts'}
+                                  </p>
+                                  {subtopics.length > 0 && (
+                                    <span className="font-label-sm text-label-sm text-primary font-medium mt-0.5 inline-block">
+                                      {subSelectedCount} of {subtopics.length} Subtopics Active
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0 font-label-sm text-label-sm">
+                                <span className="px-2 py-0.5 rounded bg-surface-container-lowest text-secondary font-semibold shadow-sm">
+                                  {module.chunk_count ?? 12} chunks locked
+                                </span>
+                                <span className="px-2 py-0.5 rounded bg-primary/10 text-primary font-bold">
+                                  {isModuleChecked ? `${weight}%` : '0%'}
+                                </span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0 font-label-sm text-label-sm">
-                              <span className="px-2 py-0.5 rounded bg-surface-container-lowest text-secondary font-semibold shadow-sm">
-                                {top.chunk_count ?? 12} chunks locked
-                              </span>
-                              <span className="px-2 py-0.5 rounded bg-primary/10 text-primary font-bold">
-                                {isChecked ? `${weight}%` : '0%'}
-                              </span>
-                            </div>
-                          </div>
-                          {isChecked && (
-                            <>
-                              <div className="w-full bg-surface-container rounded h-2 overflow-hidden">
-                                <div
-                                  className="bg-primary h-2 rounded transition-all duration-300"
-                                  style={{ width: `${weight}%` }}
+
+                            {/* Weight range slider */}
+                            {isModuleChecked && (
+                              <div className="flex flex-col gap-1.5 pt-1">
+                                <div className="w-full bg-surface-container rounded h-2 overflow-hidden">
+                                  <div
+                                    className="bg-primary h-2 rounded transition-all duration-300"
+                                    style={{ width: `${weight}%` }}
+                                  />
+                                </div>
+                                <input
+                                  className="w-full accent-primary cursor-pointer h-1.5 bg-surface-container rounded"
+                                  max="100"
+                                  min="0"
+                                  onChange={(e) =>
+                                    setTopicWeights((prev) => ({
+                                      ...prev,
+                                      [module.id]: Number(e.target.value),
+                                    }))
+                                  }
+                                  type="range"
+                                  value={weight}
                                 />
                               </div>
-                              <input
-                                className="w-full accent-primary cursor-pointer h-1.5 bg-surface-container rounded"
-                                max="100"
-                                min="0"
-                                onChange={(e) =>
-                                  setTopicWeights((prev) => ({
-                                    ...prev,
-                                    [top.id]: Number(e.target.value),
-                                  }))
-                                }
-                                type="range"
-                                value={weight}
-                              />
-                            </>
+                            )}
+                          </div>
+
+                          {/* Subtopics Nested List */}
+                          {isExpanded && subtopics.length > 0 && (
+                            <div className="divide-y divide-outline-variant/15 border-t border-outline-variant/20 bg-surface-container-lowest">
+                              {subtopics.map((sub) => {
+                                const isSubChecked = selectedTopicIds.has(sub.id);
+                                return (
+                                  <div
+                                    className="p-3 pl-9 sm:pl-11 flex items-start justify-between gap-3 hover:bg-surface-container-low/40 transition-colors"
+                                    key={sub.id}
+                                  >
+                                    <div className="flex items-start gap-2.5">
+                                      <input
+                                        checked={isSubChecked}
+                                        className="mt-0.5 accent-primary w-3.5 h-3.5 cursor-pointer"
+                                        id={`sub-${sub.id}`}
+                                        onChange={(e) => {
+                                          const next = new Set(selectedTopicIds);
+                                          if (e.target.checked) {
+                                            next.add(sub.id);
+                                            next.add(module.id);
+                                          } else {
+                                            next.delete(sub.id);
+                                          }
+                                          setSelectedTopicIds(next);
+                                        }}
+                                        type="checkbox"
+                                      />
+                                      <div>
+                                        <label
+                                          className="font-body-sm text-body-sm font-medium text-on-surface cursor-pointer"
+                                          htmlFor={`sub-${sub.id}`}
+                                        >
+                                          {sub.name}
+                                        </label>
+                                        {sub.description && (
+                                          <p className="font-label-sm text-label-sm text-on-surface-variant">
+                                            {sub.description}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <span className="font-label-sm text-label-sm text-on-surface-variant shrink-0">
+                                      {sub.chunk_count ?? 0} chunks
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           )}
                         </div>
                       );
@@ -1498,7 +1630,7 @@ export function ProjectGenerationPage() {
                       Chunks In Scope
                     </span>
                     <span className="font-body-md text-body-md text-secondary font-bold">
-                      {totalChunksCount} Chunks Mapped
+                      Full Syllabus ({totalChunksCount} Chunks Mapped)
                     </span>
                   </div>
                   <div className="flex flex-col pt-1">
@@ -1640,61 +1772,51 @@ export function ProjectGenerationPage() {
                   </div>
                 </div>
 
-                {/* Active Stream Preview Box */}
-                <div className="p-4 rounded bg-surface-container-low flex flex-col gap-3 shadow-inner">
-                  <div className="flex items-center justify-between flex-wrap gap-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-label-sm text-label-sm font-semibold">
-                        {activeStreamQuestion?.bloom_level ??
-                          'Level 4: Analyze'}
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-label-sm text-label-sm">
-                        {activeStreamQuestion?.difficulty ?? 'Hard'}
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-secondary/10 text-secondary font-label-sm text-label-sm">
-                        {activeStreamQuestion?.question_type ??
-                          'Multiple Choice'}
-                      </span>
-                    </div>
-                    <span className="font-label-sm text-label-sm text-secondary font-bold flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-                      <span>Synthesized Spec</span>
-                    </span>
-                  </div>
-
-                  <div className="font-editorial-quote text-editorial-quote text-on-surface italic leading-snug">
-                    {activeStreamQuestion?.stem ??
-                      (isGenerating
-                        ? 'Synthesizing question stream from verified corpus...'
-                        : 'Awaiting generation run. Synthesized question items will stream and preview here in real time.')}
-                  </div>
-
-                  <div className="p-2 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface-variant flex flex-col gap-1 shadow-sm">
+                {/* Live Generation Telemetry Card */}
+                {isGenerating ? (
+                  <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 flex flex-col gap-2.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-on-surface font-semibold flex items-center gap-1">
-                        <span>⚓</span>
-                        <span>#RES-CHUNK-GROUNDING</span>
+                      <span className="font-label-sm text-label-sm text-primary font-bold flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
+                        <span>Live Synthesis in Progress</span>
                       </span>
-                      <span className="text-secondary font-bold">
-                        {activeStreamQuestion ? '99.4% Attribution Match' : 'Corpus Anchored'}
+                      <span className="font-mono text-xs font-semibold text-primary">
+                        {currentRun?.accepted_count ?? 0} / {questionCount}
                       </span>
                     </div>
-                    <p className="text-[11px] leading-tight text-on-surface-variant truncate">
-                      {activeStreamQuestion?.citation_anchor ??
-                        'Grounded dynamically in indexed document excerpts'}
+                    <div className="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            (((currentRun?.accepted_count ?? 0)) /
+                              Math.max(1, questionCount)) *
+                              100,
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant">
+                      Synthesizing and multi-constraint verifying against corpus chunks...
                     </p>
                   </div>
-
-                  <div className="flex items-center justify-between font-label-sm text-label-sm pt-1">
-                    <span className="text-secondary flex items-center gap-1">
-                      <Icon name="verified" size={14} />
-                      <span>Zero Hallucination Confirmed</span>
-                    </span>
-                    <span className="text-on-surface-variant">
-                      Deterministic Seed #42
-                    </span>
+                ) : (
+                  <div className="p-4 rounded-xl bg-surface-container-low border border-outline-variant/20 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-sm text-label-sm text-on-surface font-semibold flex items-center gap-1.5">
+                        <Icon name="verified" size={14} />
+                        <span>Ready for Synthesis</span>
+                      </span>
+                      <span className="font-label-sm text-label-sm text-on-surface-variant">
+                        Target: {questionCount} Qs
+                      </span>
+                    </div>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant text-xs">
+                      Adjust your target volume and topic balance above, then click synthesize.
+                    </p>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Recent Generation Runs History */}

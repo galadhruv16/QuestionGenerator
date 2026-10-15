@@ -4,6 +4,232 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-10-15] — Option 3: Student Interactive Practice & Timed Mock Exam Studio (Immediate Feedback, Question Matrix, Scientific Calculator, and Mastery Analytics)
+
+### Type
+Feature / UI / UX / Student Practice & Assessment / Academic Integrity / Quality Assurance
+
+### Status
+Implemented and verified locally across full workspace TypeScript typecheck (0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`), production build (`pnpm build`), and monorepo Vitest test suite (80/80 tests passed).
+
+### Context & User Directives
+1. **Mode Switcher (Practice vs Timed Mock)**:
+   - *Self-Paced Practice Mode*: Unlimited time, immediate answer validation upon option selection with verified green/red status indicators, pedagogical rationale explanations, and textbook chunk citations (`Page X, #chk-XXX`).
+   - *Timed Mock Exam Mode*: Live countdown timer with pause/resume, unrevealed answers during testing, and strict exam simulation followed by final submission.
+2. **Question Pool Source**: Defaults to taking all `ACCEPTED` questions from the active project bank, falling back gracefully to available items if none have been accepted yet.
+3. **Session Persistence**: Ongoing student answers, visited items, flagged questions, timer seconds, mode, and submission status persist in `sessionStorage` (`groundq_practice_${projectId}`) so page reloads or tab switches preserve all user progress.
+4. **Stitch Design Alignment**: High-fidelity reproduction of Stitch Screen `8337d9cb7d46499ead1c4fcd20e78f83` ("GroundQ — Student Interactive Practice & Mock Exam Studio"):
+   - Left Stage (65%): Question metadata header (Question X of N, Bloom level, Marks, Flag toggle), serif question stem, formal specification/code block, interactive radio matrix with keyboard navigation (`[1-4]` option select, `[F]` toggle flag, `[Enter]` next question), scratchpad textarea, and bottom navigation toolbar.
+   - Right Telemetry (35%): Assessment progress bar and status distribution (Answered, Flagged, Unvisited), interactive 5x5 Question Matrix palette with color-coded tokens (Answered, Flagged, Current, Unvisited), collapsible academic honor pledge, and submission readiness card.
+   - Built-in Scientific Utility Calculator modal with expression evaluation, decimal arithmetic, and square root operations.
+   - Scorecard & Pedagogical Review Report on submission: overall score, grade classification, cognitive breakdown across Bloom taxonomy, and item-by-item verified answer audits with textbook citations.
+
+### Changes Implemented
+1. **UI Components & Icons (`apps/web/src/app/components/ui.tsx`)**:
+   - Added `calculator`, `chart`, `checkCircle`, `crossCircle`, `flag`, `play`, `terminal`, and `timer` SVG icons cleanly to `IconName` and `paths`.
+2. **Session Persistence Store (`apps/web/src/app/services/session-store.ts`)**:
+   - Defined `PracticeSessionState` interface tracking `mode`, `selectedAnswers`, `freeResponseAnswers`, `flaggedQuestionIds`, `visitedQuestionIds`, `verifiedQuestionIds`, `secondsRemaining`, `isSubmitted`, and `currentQuestionIndex`.
+   - Implemented `getPracticeSession`, `savePracticeSession`, and `clearPracticeSession` helper methods.
+3. **Student Practice & Mock Exam Page (`apps/web/src/app/pages/ProjectPracticeStudioPage.tsx`)**:
+   - Full implementation of the two-column split stage matching Stitch screen `8337d9cb7d46499ead1c4fcd20e78f83`.
+   - Practice vs Mock mode toggling with mode badges, countdown timer, pause/resume controls.
+   - Real-time question matrix navigation, flag toggling, and keyboard navigation.
+   - Built-in scientific calculator modal with interactive keypad and display.
+   - Submission confirmation dialog and comprehensive pedagogical scorecard report with Bloom taxonomy mastery bars.
+4. **Routing & Navigation (`apps/web/src/app/App.tsx`, `ProjectQuestionsPage.tsx`, `ProjectExportStudioPage.tsx`, `ProjectTopicsPage.tsx`, `ProjectGenerationPage.tsx`)**:
+   - Registered `/app/projects/:projectId/practice` protected route in `App.tsx`.
+   - Added `06 Practice & Mock Studio` pipeline navigation tab across Question Bank, Export Studio, Topics, and Generation pages.
+   - Added quick "Practice & Mock" header ribbon action in `ProjectQuestionsPage.tsx`.
+5. **Unit Test Suite (`apps/web/test/practice.test.tsx`)**:
+   - Added 8 comprehensive unit tests covering mode toggling, question answering, matrix jumping, flag toggling, immediate feedback and grounding citations in Practice mode, scientific calculator operations, submission and scorecard evaluation, and session persistence.
+6. **Verification & Quality Assurance**:
+   - Monorepo TypeScript Typecheck (`pnpm typecheck`): 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+   - Monorepo Test Suite (`pnpm test`): 80/80 tests passed (Contracts: 4, API: 33, Web: 43).
+   - Production Build (`pnpm build`): Completed in 9.67s without errors.
+
+## [2026-10-15] — Option 1: Assessment Paper & Exam Export Studio (Split-Pane Live Canvas, Customizable Marks, and Deliverables Separation)
+
+### Type
+Feature / UI / UX / Assessment Export / Academic Integrity / Quality Assurance
+
+### Status
+Implemented and verified locally across full workspace TypeScript typecheck (0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`), production build (`pnpm build`), and monorepo Vitest test suite (72/72 tests passed).
+
+### Context & User Directives
+1. **Mark Allocation**: "allow instructor to customize" — Instructor can freely adjust marks/points per question in the Blueprint control panel, dynamically calculating the total assessment marks displayed in the paper header, section stats, and question badges.
+2. **Deliverables Separation**: "it should be seperate" — Student Question Paper and Instructor Answer Key & Rubric are generated as distinct, non-leaking deliverables with separate tabs (`[Student Question Paper]` vs `[Instructor Answer Key & Rubric]`), dedicated print stylesheets (`@media print`), and separate export actions.
+3. **Default Question Selection**: "default to accept" — Defaults to including all `ACCEPTED` questions from the active project question bank. If no accepted questions exist, gracefully falls back to available project questions.
+4. **Stitch Design Alignment**: Pixel-accurate reproduction of Stitch Screen `59e8f1aca2d142c7a13c9b35c82156e9` ("GroundQ — Exam Paper & Assessment Export Studio") featuring a two-column split-pane studio layout:
+   - Left Sidebar: Assessment Blueprint Controls (Metadata, Proctor Guidelines, Typography & Geometry, Assessment & Provenance Toggles, Question Selection & Marks).
+   - Right Canvas: Live A4 sheet preview with realistic page dimensions, zoom controls (75%–130%), formal university crest header, candidate fill box, Section A (MCQs with bubbles) and Section B (ruled student response lines), and institutional footer security hash.
+
+### Changes Implemented
+1. **UI Components & Icons (`apps/web/src/app/components/ui.tsx`)**:
+   - Added `badge`, `download`, `layers`, `print`, and `tune` SVG icons cleanly to `IconName` and `paths`.
+2. **Assessment Paper & Export Studio Page (`apps/web/src/app/pages/ProjectExportStudioPage.tsx`)**:
+   - **Header Bar**: Breadcrumb hierarchy, dynamic telemetry (`X Questions • Y Marks • Z Mins`), `Reset Layout`, `Print / Save PDF`, Word format export (`.txt`/`.docx`), and LMS Canvas/QTI JSON export.
+   - **Deliverable View Toggle**: Clean segmented toggle between `Student Question Paper` (clean assessment without answers/distractor keys) and `Instructor Answer Key & Rubric` (confidential faculty banner, verified answers, pedagogical explanations, and textbook chunk citations).
+   - **Left Control Panel ("Paper Blueprint")**:
+     - *Institutional Metadata*: Department, Course Code, Assessment Title, Exam Date, Time Limit, Total Marks, Candidate ID/Signature block toggle.
+     - *Proctor Guidelines & Honor Code*: Editable rubric textarea.
+     - *Typography & Page Geometry*: Layout (Single Column / Two-Column Eco / Ruled Lines), Font Scale (10pt, 11pt, 12pt), Print Margin calibration.
+     - *Assessment & Provenance Toggles*: Grounding Citations toggle, Bloom's Cognitive Badges toggle, Anti-Cheat Variant B shuffle.
+     - *Question Selection & Customizable Marks*: Question list with toggle checkboxes, question stem preview, and interactive points input updating exam marks in real time.
+   - **Right Live A4 Canvas Preview**:
+     - High-fidelity A4 sheet rendering (`210mm x 297mm` aspect ratio) with elevation shadow and zoom scaling (`scale(zoom/100)`).
+     - Print-optimized stylesheet (`@media print`) stripping UI chrome, sidebars, and backgrounds to output pure, professional paper sheets.
+3. **Routing & Navigation (`apps/web/src/app/App.tsx`, `ProjectQuestionsPage.tsx`, `ProjectTopicsPage.tsx`, `ProjectGenerationPage.tsx`)**:
+   - Registered route `/app/projects/:projectId/export` in `App.tsx`.
+   - Wired up `05 Export & Paper Builder` tab in the shared pipeline navigation across questions, topics, and generation studios.
+   - Added direct "Export Paper" action button in the `ProjectQuestionsPage` header ribbon for seamless transition from Question Review to Exam Export.
+4. **Unit Test Suite (`apps/web/test/export.test.tsx`)**:
+   - Added 6 comprehensive Vitest unit tests verifying:
+     - Header, breadcrumbs, live telemetry, and blueprint control rendering.
+     - Default selection of `ACCEPTED` questions from mock bank.
+     - Customizable question marks dynamically updating header total marks.
+     - Switching between Student Question Paper and Instructor Answer Key views.
+     - PDF / Print action triggering `window.print()`.
+5. **Verification & Quality Assurance**:
+   - Monorepo TypeScript Typecheck (`pnpm typecheck`): 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+   - Monorepo Test Suite (`pnpm test`): 72/72 tests passed (Contracts: 4, API: 33, Web: 35).
+   - Production Build (`pnpm build`): Completed in 9.51s without errors.
+
+## [2026-10-15] — Option 2: Targeted In-Place Question Regeneration, Tweak Drawer, Bulk Regeneration, and Deduplication Guardrail
+
+### Type
+Feature / Backend Pipeline / UI / UX / Quality Assurance / Architectural Integrity
+
+### Status
+Implemented and verified locally across full workspace TypeScript typecheck (0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`), production build (`pnpm build`), and monorepo Vitest test suite (66/66 tests passed).
+
+### Context & User Directives
+1. **Targeted In-Place Mutation**: "No I dont want any v1 or count update just regenerate the question in place" — Question ID and sort order must remain identical, and question stem, options, model answers, and explanations update in place without incrementing versions or sequence count.
+2. **Tweak Drawer**: When clicking "Regenerate in Place", open a slide-over configuration drawer with:
+   - Target Cognitive Level (Bloom: Remember, Understand, Apply, Analyze, Evaluate)
+   - Difficulty Calibration (Easy, Medium, Hard)
+   - AI Inference Engine selector (Google Gemini Cloud Turbo vs Localhost Ollama Qwen 2.5)
+   - Optional Instructor Guidance / Prompt Tweak textarea
+   - Anchored Source context (Document, Page, Chunk ID) & Deduplication telemetry
+3. **Lock on Accepted Questions**: "no for accepted they should not be mutable" — `ACCEPTED` questions are strictly locked against mutation to preserve academic assessment integrity.
+4. **Bulk Regeneration**: Multi-selected unaccepted items can be regenerated in bulk via a "Bulk Regenerate (X)" toolbar action with collective instructor direction and automatic preservation of locked accepted questions.
+5. **Deduplication Guardrail**: "and also have a guard rail of deduplication while regeneration while regenerating the regenerated questions should be unique from the other questions again" (<0.82 cosine similarity threshold enforced against other project items).
+
+### Changes Implemented
+1. **Shared Contracts (`packages/contracts/src/generation/index.ts`)**:
+   - Added `regenerateQuestionSchema` validating `bloom_slug`, `difficulty_slug`, `instructor_guidance`, `model_name`, and `model_provider`.
+   - Added `bulkRegenerateQuestionsSchema` validating `question_ids`, `bloom_slug`, `difficulty_slug`, `instructor_guidance`, `model_name`, and `model_provider`.
+2. **Backend Service (`apps/api/src/services/question-generator.ts`)**:
+   - Extended `SynthesizeParams` to support `instructorGuidance?: string`, injecting instructor guidance directly into `promptSystem` during synthesis.
+   - Implemented `regenerateQuestionInPlace`:
+     - Enforces lock on `ACCEPTED` questions (`400 Bad Request: QUESTION_LOCKED`).
+     - Loads reference tables and resolves source chunk content.
+     - Synthesizes replacement item with deduplication check against other project stems (`computeStemSimilarity`).
+     - If similarity $\ge 0.82$, automatically retries synthesis with variation prompt.
+     - Replaces `question_versions` content, re-shuffles and inserts options, updates `question_source_refs`, and resets status to `AVAILABLE` without changing question ID or sort order.
+3. **Backend API Routes (`apps/api/src/routes/questions.ts`)**:
+   - Registered `POST /api/v1/projects/:projectId/questions/:questionId/regenerate`.
+   - Registered `POST /api/v1/projects/:projectId/questions/bulk-regenerate` (positioned prior to `/:questionId` wildcard to prevent UUID collision).
+4. **Frontend UI (`apps/web/src/app/pages/ProjectQuestionsPage.tsx`)**:
+   - Slide-over **Targeted Regeneration & Calibration Drawer**: solid white container, telemetry strip, segmented Bloom & difficulty buttons, model selector, instructor direction textarea, and synthesis loading state.
+   - **Bulk Regeneration Modal**: batch guidance, AI engine selection, locked accepted items notice, and progress spinner.
+   - Accepted Question Lock: displays locked badge with tooltip in Column C and disables mutation on accepted question cards in Column B.
+   - Session store cache synchronization (`updateProjectCache`) for seamless UI persistence without page refresh.
+5. **Verification & Test Coverage**:
+   - API tests: Added rejection checks for unauthenticated `regenerate` and `bulk-regenerate` requests (`apps/api/test/generation.test.ts`).
+   - Web tests: Added tests for Tweak Drawer open/close, Accepted question lock enforcement, and Bulk Regeneration modal interaction (`apps/web/test/questions.test.tsx`).
+   - Monorepo Vitest suite: 66/66 tests passed (Contracts: 4, API: 33, Web: 29).
+   - Monorepo Typecheck: 0 errors.
+   - Production Build: Passed successfully via `pnpm build`.
+
+
+## [2026-10-14] — White Screen Resolution: React Root Error Boundary, Cache Sanitization, and Resource Null Safety
+
+### Type
+Bug Fix / React Architecture / Resilience / UX / Quality Assurance
+
+### Status
+Implemented and verified locally across full workspace TypeScript typecheck (0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`), production build (`pnpm build`), and monorepo Vitest test suite (61/61 tests passed).
+
+### Context & Root Cause Analysis
+1. **White Screen on Project Open (`/app/projects/:projectId/resources`)**:
+   - The user reported: *"getting a white screen on opening my project"* with a screenshot showing a completely blank canvas at `http://localhost:5173/app/projects/518ec294-1b08-4976-b70b-24bed43ff97d/resources`.
+   - **Root Cause**:
+     - When a project was opened or switched, session caching (`getCachedProject`) hydrated resources. In newly uploaded or unprocessed resources, `checksum_sha256` is `null` in PostgreSQL (`resources` table).
+     - In `ProjectResourcesPage.tsx`, line 1072 executed `{res.checksum_sha256.slice(0, 8)}..` and line 383 executed `!item.checksum_sha256.toLowerCase().includes(...)`.
+     - In JavaScript, attempting to read `.slice` or `.toLowerCase` on `null` throws an unhandled `TypeError: Cannot read properties of null (reading 'slice')`.
+     - Because `apps/web` lacked an Error Boundary, React 18's default error behavior unmounted the entire DOM tree (`<div id="root"></div>`), resulting in a 100% blank white screen with no user recovery interface.
+     - Additionally, mid-file `import` declarations in `ProjectResourcesPage.tsx`, `ProjectTopicsPage.tsx`, and `ProjectQuestionsPage.tsx` violated ESM standards.
+
+### Changes Implemented
+1. **Root Error Boundary (`apps/web/src/app/components/ErrorBoundary.tsx` & `App.tsx`)**:
+   - Created `ErrorBoundary` class component wrapping `<BrowserRouter>` and `<Routes>` in `App.tsx`.
+   - Traps unhandled render exceptions anywhere in the application tree.
+   - Replaces blank white screens with an academic recovery card ("Something went wrong loading this workspace") providing one-click "Clear Cache & Reload" and "Return to Projects" buttons, plus expandable diagnostic telemetry.
+2. **Defensive Cache Hydration & Null-Safe Attributes (`ProjectResourcesPage.tsx`)**:
+   - Sanitized `initialCachedResources` when reading from `sessionStorage`, ensuring `checksum_sha256`, `resource_kind`, `status`, and `file_size_bytes` default safely (`r.checksum_sha256 || r.id?.substring(0, 8) || 'pending'`).
+   - Replaced all raw `.slice(0, 8)` calls with `(res.checksum_sha256 || res.id || 'pending').slice(0, 8)`.
+   - Made search and filter predicates fully optional-chained (`item.original_filename?.toLowerCase()`, `!(item.checksum_sha256 || item.id || '').toLowerCase()`).
+   - Made drawer inspector metadata null-safe.
+3. **Array & Null Safety Across Stages (`ProjectTopicsPage.tsx`, `ProjectGenerationPage.tsx`, `ProjectQuestionsPage.tsx`)**:
+   - Hardened `ProjectTopicsPage`: guaranteed `initialCachedModules` and `cachedResourcesList` default to arrays; safe-guarded `r?.status === 'READY'`; protected `selectedSubtopic` against empty modules.
+   - Hardened `ProjectGenerationPage`: sanitized `topics` and `resources` arrays; protected initial loading state.
+   - Hardened `ProjectQuestionsPage`: protected `initialCachedQuestions` array reading and defaulted `selectedQuestionId`.
+4. **ESM Import Cleanliness**:
+   - Moved all mid-file `import` statements in `ProjectResourcesPage.tsx`, `ProjectTopicsPage.tsx`, and `ProjectQuestionsPage.tsx` to the top of their respective files.
+5. **Session Store Hardening (`apps/web/src/app/services/session-store.ts`)**:
+   - Validated parsed JSON structure in `getCachedProject`.
+   - Added `clearAllSessionCaches()` to cleanly wipe all session cache keys on demand.
+
+### Verification Results
+- `npx pnpm typecheck`: 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+- `npx pnpm test`: 61 / 61 tests passed (100% across all 3 workspace packages).
+- `npx pnpm build`: Production build completed successfully in 8.27s (0 errors).
+
+## [2026-10-14] — Session-Level Caching, Background Generation Continuity, Question Answer/Grounding Reveal Toggles, and Full Topic Hierarchy Visibility
+
+### Type
+Architecture / UX Polish / State Management / Quality Assurance / RAG Pipeline
+
+### Status
+Implemented and verified locally across Vitest monorepo test suites (61/61 passed across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`), full workspace TypeScript typecheck (0 errors), and production build (`pnpm build` succeeded).
+
+### Context & User Directives
+1. **Topic Count Inconsistency (26 topics vs 9 topics)**: The user had 26 topics inferred, but Generation Studio showed only 9 because only 9 parent modules were rendered/counted, hiding all 17 subtopics. Both modules and subtopics must be visible, expandable, selectable, and consistently counted across tabs (`X Modules · Y Topics`).
+2. **Remove Fake "99.4% Match" Claims**: Hardcoded claims of "99.4% Match" and cosine similarity percentage bars must be completely removed.
+3. **Hidden Answers & Toggle Button**: Questions must NOT reveal answers or explanations upfront. Add a clean "Show Answer" toggle button below questions.
+4. **Show Grounding Toggle Button**: Grounding citation (source document, page number, chunk ID, verbatim quote) must be hidden behind a "Show Grounding" toggle button without fake similarity scores.
+5. **Remove Automated 3-Point Validation Ledger**: Remove the bulky validation ledger cards from the review inspector.
+6. **Session Caching to Eliminate "0 Resource Error" Flashes**: Navigating between Resources, Topics, and Generation flashed a "0 resources" error before fetching. Cache resources, topics, questions, and project info locally so navigation is instant without empty-state flicker.
+7. **Background Generation Continuity & Real-Time Sync**: Switching tabs during generation must not halt generation or reset the `x / targetCount` progress. In Question Bank, questions must stream/append dynamically in real time without refreshing.
+8. **Remove Static Badges & Clutter**: Remove `SEC-01 · GRADUATE` badge, and replace the cluttered `#RES-CHUNK-GROUNDING / 99.4% Attribution Match / Corpus Anchored` box with a clean live telemetry card.
+9. **Monotonic Append Across Subsequent Runs**: Subsequent generation batches must append into the question bank sequentially, continuing numbering monotonically (`#01..#30`, `#31..#50`), and log in recent generation batches.
+
+### Changes Implemented
+1. **Session Store & Zero-Flash Cache (`apps/web/src/app/services/session-store.ts`)**:
+   - Implemented an in-memory and `sessionStorage`-backed reactive store (`getCachedProject`, `updateProjectCache`, `clearProjectCache`).
+   - Integrated into `ProjectResourcesPage.tsx`, `ProjectTopicsPage.tsx`, `ProjectGenerationPage.tsx`, and `ProjectQuestionsPage.tsx`. Initial page render mounts directly with cached state, eliminating empty-state flicker and premature "0 resources" error flashes.
+2. **Background Generation Manager (`apps/web/src/app/services/generation-manager.ts`)**:
+   - Created a singleton service tracking active generation runs across route transitions.
+   - In `ProjectGenerationPage.tsx`: Tab switching preserves active run status, target counts, and live generated progress without aborting.
+   - In `ProjectQuestionsPage.tsx`: Connected a 1.5s live polling loop that dynamically detects newly synthesized questions from the background run and appends them to the question bank in real time without refreshing.
+3. **Full Topic Hierarchy Visibility (`apps/web/src/app/pages/ProjectGenerationPage.tsx`, `ProjectTopicsPage.tsx`)**:
+   - In Generation Studio Section 1 ("Curriculum Distribution & Topic Targets"), rendered both parent modules and collapsible nested subtopics with individual checkboxes, chunk counts, and select-all controls.
+   - Aligned tab pills and headers across all pages to display `X Modules · Y Topics` (e.g., `9 Modules · 26 Topics`), ensuring full visibility and control over all 26 topics.
+4. **Answer & Grounding Reveal Toggles (`apps/web/src/app/pages/ProjectQuestionsPage.tsx`)**:
+   - Questions in the Deep Inspection drawer default to hidden answers. MCQ options render neutrally with options A, B, C, D and zero reveals.
+   - Added "Show Answer" / "Hide Answer" button: reveals green border, "CORRECT ANSWER" badge, strict proof explanation, and distractor rationales for MCQs, or exemplary model answer and pedagogical rationale for open-ended questions.
+   - Added "Show Grounding" / "Hide Grounding" button: reveals source document filename, page number (`Page 14`), chunk ID (`#chk-092`), and verbatim quote.
+   - Completely deleted the Automated 3-Point Validation Ledger card and all cosine similarity match percentage bars ("99.4% Match").
+5. **Monotonic Sequential Numbering Across Batches (`apps/api/src/services/question-generator.ts`)**:
+   - `generateQuestionsForProject` queries existing question counts and applies `baseSortOrder`, guaranteeing subsequent generation batches append monotonically (`#01..#30`, `#31..#50`) without sequence collisions or gaps.
+6. **Automated Test Updates (`apps/web/test/questions.test.tsx`)**:
+   - Updated Vitest assertions to verify initial hiding of answers and grounding citations, button toggle interactions, and absence of validation ledgers and percentage match claims.
+
+### Verification Results
+- `npx pnpm typecheck`: 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+- `npx pnpm test`: 61 / 61 tests passed (100%) across all 3 packages.
+- `npx pnpm build`: Succeeded with 0 errors (contracts, API, and Vite web production build).
+
 ## [2026-10-14] — Dual-Engine Hybrid AI Architecture (Gemini Cloud Turbo + Qwen 2.5 Localhost), Complete Abolition of Synthetic Fallbacks, and Handover Documentation Overhaul
 
 ### Type
@@ -48,6 +274,34 @@ Implemented and verified locally across Vitest unit/integration test suites (55/
 - `@groundq/api` test suite (`pnpm --filter @groundq/api test`): 29/29 passed (100%).
 - `@groundq/web` test suite (`pnpm --filter @groundq/web test`): 26/26 passed (100%).
 - Total automated tests: 55/55 passed.
+
+## [2026-10-14] — Topic-Driven Thematic Extraction, Monotonic Numbering Gap Elimination, Dynamic Sort Range, and Responsive Modals
+
+### Type
+UX / Algorithmic Reliability / RAG Pipeline / Responsive Design / Quality Assurance
+
+### Status
+Implemented and verified locally across full workspace TypeScript typecheck (0 errors) and Vitest monorepo test suites (61/61 passed across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`).
+
+### Context & Implementation
+1. **Monotonic Sequential Numbering & Duplicate Target Retry (`apps/api/src/services/question-generator.ts`)**:
+   - Fixed numbering gaps (e.g. `#26, #27, #30` missing `#28, #29`): Question persistence now numbers questions strictly sequentially by accepted count (`baseSortOrder + persistedIndex`), ensuring zero sequence gaps in the question bank.
+   - Built an automatic targeted retry when an item in a batch is dropped or duplicate-flagged: retries synthesis once with an alternative chunk and varied temperature (0.25) so the user's requested question volume (e.g. 30 out of 30) is completely fulfilled.
+2. **Dynamic Sequence Dropdown (`apps/web/src/app/pages/ProjectQuestionsPage.tsx`)**:
+   - Replaced static `#01 - #15` label with dynamic real-time range: `Sequence (#01 - #${String(questions.length > 0 ? questions.length : 1).padStart(2, '0')})`.
+3. **Natural Thematic Topic Extraction (`apps/api/src/services/topic-inferencer.ts`)**:
+   - Eliminated artificial module caps (e.g. "typically 2 to 6"). The number of modules is now driven naturally by the document's actual thematic divisions (short notes: 2–4; comprehensive notes/textbooks: 5–10+).
+   - Removed any difficulty-based partitioning. Divisions are determined purely by subject matter and curriculum units.
+   - Enforced coverage across the full document depth from Page 1 to the final page with explicit `[Document Page X of Y]` context tags.
+   - Increased subtopic chunk mapping from 5 to 15 chunks per subtopic.
+4. **Chunks in Scope Telemetry Clarification (`apps/web/src/app/pages/ProjectGenerationPage.tsx`)**:
+   - Clarified telemetry badges to display `Full Syllabus ({totalChunksCount} Chunks Mapped)` in both header and cockpit summary, preventing user confusion about artificial 100-chunk limits.
+5. **Responsive Engine Selection Modal (`apps/web/src/app/pages/ProjectTopicsPage.tsx`, `ProjectResourcesPage.tsx`)**:
+   - Modernized the model picker modal with `max-h-[90vh] flex flex-col`, `overflow-y-auto`, and responsive `flex-col sm:flex-row` cards and wrapping badge metadata for seamless display on small laptop screens, tablets, and desktops.
+
+### Verification Results
+- `npx pnpm typecheck`: 0 errors.
+- `npx pnpm test`: 61 / 61 tests passed across all 3 packages.
 
 ## [2026-10-14] — Full Monorepo QA Audit, Contracts Test Fix, and Production Build Verification
 

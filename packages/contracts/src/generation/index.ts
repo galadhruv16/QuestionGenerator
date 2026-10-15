@@ -229,3 +229,25 @@ export type CreateQuestionVersionRequest = z.infer<
   typeof createQuestionVersionSchema
 >;
 
+export const regenerateQuestionSchema = z.object({
+  bloom_slug: z.string().trim().optional(),
+  difficulty_slug: z.string().trim().optional(),
+  instructor_guidance: z.string().trim().max(1000).optional(),
+  model_name: z.string().trim().optional(),
+  model_provider: z.string().trim().optional(),
+});
+export type RegenerateQuestionRequest = z.infer<typeof regenerateQuestionSchema>;
+
+export const bulkRegenerateQuestionsSchema = z.object({
+  bloom_slug: z.string().trim().optional(),
+  difficulty_slug: z.string().trim().optional(),
+  instructor_guidance: z.string().trim().max(1000).optional(),
+  model_name: z.string().trim().optional(),
+  model_provider: z.string().trim().optional(),
+  question_ids: z.array(z.string().uuid()).min(1),
+});
+export type BulkRegenerateQuestionsRequest = z.infer<
+  typeof bulkRegenerateQuestionsSchema
+>;
+
+
