@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm --filter @groundq/contracts build && pnpm --filter @groundq/api build
+    buildCommand: pnpm install --no-frozen-lockfile --prod=false && pnpm --filter @groundq/contracts build && pnpm --filter @groundq/api build
     startCommand: node apps/api/dist/server.js
     envVars:
       - key: NODE_ENV
