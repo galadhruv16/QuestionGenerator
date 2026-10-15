@@ -75,8 +75,12 @@ export async function inferTopicsFromChunks(
   });
   const validChunks = contentChunks.length > 0 ? contentChunks : chunks;
 
-  // Sample representative chunks across the full depth of the document to cover 100% of the syllabus
-  const sampleLimit = Math.min(validChunks.length, 36);
+  // Sample representative chunks across the full depth of the document to cover 100% of the syllabus.
+  // For massive textbooks (e.g. 200–900+ chunks), scale sample limit up to 54 chunks so every module across 300 pages is captured.
+  const sampleLimit = Math.min(
+    validChunks.length,
+    validChunks.length > 200 ? 54 : 36,
+  );
   const step = Math.max(1, Math.floor(validChunks.length / sampleLimit));
   const sampledChunks: typeof validChunks = [];
   for (

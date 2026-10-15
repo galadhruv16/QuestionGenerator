@@ -362,16 +362,27 @@ export function ProjectResourcesPage({
                   }
                   if (run?.metadata?.stage) {
                     const st = String(run.metadata.stage);
+                    const meta = (run.metadata || {}) as Record<string, unknown>;
                     processingStage =
                       st === 'DOWNLOADING_FILE'
-                        ? 'Stage 1 of 3: Retrieving document'
+                        ? 'Stage 1 of 4: Retrieving document'
                         : st === 'EXTRACTING_TEXT'
-                          ? 'Stage 1 of 3: Text extraction'
-                          : st === 'CHUNKING'
-                            ? 'Stage 2 of 3: Semantic chunking'
-                            : st === 'EMBEDDING'
-                              ? 'Stage 3 of 3: Vector embedding'
-                              : processingStage;
+                          ? 'Stage 1 of 4: Digital text extraction'
+                          : st === 'OCR_VISION_TRANSCRIBING'
+                            ? `Stage 2 of 4: Vision OCR (Pages ${meta.current_window ?? '...'} · ${meta.progress_percent ?? 0}%)`
+                            : st === 'TRANSCRIBING_IMAGE_VISION'
+                              ? 'Stage 2 of 4: Vision OCR transcribing image'
+                              : st === 'PARSING_PRESENTATION'
+                                ? 'Stage 1 of 4: Parsing presentation slides'
+                                : st === 'PARSING_DOCX'
+                                  ? 'Stage 1 of 4: Parsing Word document'
+                                  : st === 'CHUNKING'
+                                    ? 'Stage 3 of 4: Semantic chunking'
+                                    : st === 'EMBEDDING'
+                                      ? `Stage 4 of 4: Vector embedding (${meta.progress_percent ?? 0}%)`
+                                      : st === 'PERSISTING_CHUNKS'
+                                        ? 'Stage 4 of 4: Persisting indexed chunks'
+                                        : processingStage;
                   }
                 } catch {
                   // Keep fallback values
@@ -589,8 +600,8 @@ export function ProjectResourcesPage({
       );
       return;
     }
-    if (file.size > 25 * 1024 * 1024) {
-      setUploadError('File exceeds the 25 MB limit for document uploads.');
+    if (file.size > 100 * 1024 * 1024) {
+      setUploadError('File exceeds the 100 MB limit for document uploads.');
       return;
     }
 
@@ -2027,7 +2038,7 @@ export function ProjectResourcesPage({
                   </span>
                 </p>
                 <span className="font-label-sm text-label-sm text-on-surface-variant mt-1">
-                  PDF (selectable & scanned), PPTX Presentations, DOCX, PNG/JPG/WEBP (Max 25 MB)
+                  PDF (selectable & scanned), PPTX Presentations, DOCX, PNG/JPG/WEBP (Max 100 MB)
                 </span>
                 <span className="font-label-sm text-[11px] text-primary font-medium mt-1">
                   ✦ Multimodal Vision OCR automatically transcribes scanned pages, diagrams & handwritten notes

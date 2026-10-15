@@ -10,8 +10,12 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
     .default('development'),
-  API_PORT: z.coerce.number().int().positive().default(3001),
-  WEB_ORIGIN: z.string().url().default('http://localhost:5173'),
+  API_PORT: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(Number(process.env.PORT) || 3001),
+  WEB_ORIGIN: z.string().default('http://localhost:5173'),
   SUPABASE_URL: optionalString.pipe(z.string().url().optional()),
   SUPABASE_ANON_KEY: optionalString,
   GEMINI_API_KEY: optionalString,

@@ -44,9 +44,9 @@ describe('shared contracts scaffold', () => {
     expect(validationCheckSchema.shape.status).toBeDefined();
   });
 
-  it('validates resource schemas and enforces 25MB limit on PDF uploads', () => {
+  it('validates resource schemas and enforces 100MB limit on PDF uploads', () => {
     const validInit = {
-      file_size_bytes: 10 * 1024 * 1024,
+      file_size_bytes: 85 * 1024 * 1024,
       filename: 'lecture-notes.pdf',
       mime_type: 'application/pdf',
       resource_kind: 'STUDY_MATERIAL',
@@ -55,7 +55,7 @@ describe('shared contracts scaffold', () => {
 
     const oversizedInit = {
       ...validInit,
-      file_size_bytes: 26 * 1024 * 1024,
+      file_size_bytes: 101 * 1024 * 1024,
     };
     expect(uploadInitRequestSchema.safeParse(oversizedInit).success).toBe(
       false,

@@ -282,12 +282,13 @@ export async function executeGenerationRun(
 
     const studyResourceIds = new Set((studyResources ?? []).map((r) => r.id));
 
-    // Fetch all resource chunks for context across the full document syllabus
+    // Fetch all resource chunks for context across the full document syllabus without artificial limits
     const { data: rawChunks } = await client
       .from('resource_chunks')
       .select('id, resource_id, text, page_number, chunk_index')
       .eq('project_id', projectId)
-      .order('chunk_index', { ascending: true });
+      .order('chunk_index', { ascending: true })
+      .range(0, 9999);
 
     // Prioritize non-PYQ study materials to prevent paraphrasing of past exam questions
     const filteredByStudy =
@@ -315,7 +316,8 @@ export async function executeGenerationRun(
         availableTopicIds.length > 0
           ? availableTopicIds
           : ['00000000-0000-0000-0000-000000000000'],
-      );
+      )
+      .range(0, 9999);
 
     const topicToChunkIds = new Map<string, string[]>();
     for (const link of chunkTopicLinks ?? []) {

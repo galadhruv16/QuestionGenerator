@@ -70,7 +70,7 @@ export const uploadInitRequestSchema = z.object({
     .number()
     .int()
     .positive()
-    .max(25 * 1024 * 1024, 'File size cannot exceed 25 MB'),
+    .max(100 * 1024 * 1024, 'File size cannot exceed 100 MB'),
   filename: z
     .string()
     .trim()
@@ -78,7 +78,7 @@ export const uploadInitRequestSchema = z.object({
     .max(255)
     .regex(
       /\.(pdf|pptx|ppt|docx|doc|png|jpg|jpeg|webp)$/i,
-      'Supported formats: PDF, PPTX/PPT, DOCX, PNG, JPG, and WEBP (up to 25 MB)',
+      'Supported formats: PDF, PPTX/PPT, DOCX, PNG, JPG, and WEBP (up to 100 MB)',
     ),
   mime_type: z.string().min(1),
   resource_kind: resourceKindSchema,

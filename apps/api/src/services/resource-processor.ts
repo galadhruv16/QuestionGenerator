@@ -3,6 +3,7 @@ import { PDFParse } from 'pdf-parse';
 import { env } from '../config/env.js';
 import { extractPagesFromDocx, extractPagesFromPptx } from './office-extractor.js';
 import {
+  countPdfPagesFromBuffer,
   transcribeImageWithVision,
   transcribePdfWithVision,
 } from './multimodal-transcriber.js';
@@ -91,9 +92,48 @@ export function chunkPages(
 }
 
 /**
- * Computes embedding vector using local Ollama instance.
+/**
+ * Computes 768-dimensional embedding vector using Google Gemini text-embedding-004 (cloud)
+ * with graceful fallback to local Ollama.
  */
 export async function getEmbedding(text: string): Promise<number[] | null> {
+  // 1. Cloud-native path: Use Google Gemini API text-embedding-004 (768 dimensions)
+  const apiKey = env.GEMINI_API_KEY ? env.GEMINI_API_KEY.trim() : undefined;
+  if (apiKey) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        body: JSON.stringify({
+          content: {
+            parts: [{ text }],
+          },
+          model: 'models/text-embedding-004',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+
+      if (response.ok) {
+        const payload = (await response.json()) as {
+          embedding?: { values?: number[] };
+        };
+        if (payload.embedding?.values && payload.embedding.values.length > 0) {
+          return payload.embedding.values;
+        }
+      } else {
+        console.warn(
+          `[resource-processor] Gemini embedding returned HTTP ${response.status}`,
+        );
+      }
+    } catch (err) {
+      console.warn('[resource-processor] Gemini embedding failed:', err);
+    }
+  }
+
+  // 2. Offline fallback: Local Ollama embedding instance
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -109,9 +149,6 @@ export async function getEmbedding(text: string): Promise<number[] | null> {
     }).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
-      console.warn(
-        `[resource-processor] Embedding request returned status ${response.status}`,
-      );
       return null;
     }
 
@@ -302,7 +339,27 @@ export async function processResourcePipeline(
         });
 
         try {
-          const visionResult = await transcribePdfWithVision(buffer);
+          const effectiveTotalPages =
+            digitalResult.totalPages > 0
+              ? digitalResult.totalPages
+              : countPdfPagesFromBuffer(buffer);
+
+          const visionResult = await transcribePdfWithVision(buffer, {
+            onProgress: async (p) => {
+              await updateRun({
+                metadata: {
+                  current_window: p.currentWindow,
+                  pages_transcribed: p.processedPages,
+                  progress_percent: p.progressPercent,
+                  reason: 'SCANNED_OR_HANDWRITTEN_PDF',
+                  stage: 'OCR_VISION_TRANSCRIBING',
+                  total_pages: p.totalPages,
+                },
+              });
+            },
+            totalPages: effectiveTotalPages,
+          });
+
           if (
             visionResult.pages.length > 0 &&
             visionResult.pages.some((p) => p.text.length > 20)
@@ -360,31 +417,76 @@ export async function processResourcePipeline(
       `[resource-processor] Generated ${chunks.length} page-bounded chunks`,
     );
 
-    // 4. Generate embeddings and persist chunks
-    await updateRun({ metadata: { stage: 'EMBEDDING' } });
+    // 4. Generate embeddings with bounded concurrency (concurrency = 4)
+    await updateRun({
+      metadata: {
+        embedded_chunks: 0,
+        progress_percent: 0,
+        stage: 'EMBEDDING',
+        total_chunks: chunks.length,
+      },
+    });
 
-    for (const chunk of chunks) {
-      const embedding = await getEmbedding(chunk.text);
+    const CONCURRENCY = 4;
+    let completedEmbeddings = 0;
+    const embeddings = new Array<number[] | null>(chunks.length);
+    let nextIdx = 0;
 
+    const workers = Array.from(
+      { length: Math.min(CONCURRENCY, chunks.length) },
+      async () => {
+        while (nextIdx < chunks.length) {
+          const idx = nextIdx++;
+          const chunk = chunks[idx]!;
+          embeddings[idx] = await getEmbedding(chunk.text);
+          completedEmbeddings++;
+
+          if (
+            completedEmbeddings % 25 === 0 ||
+            completedEmbeddings === chunks.length
+          ) {
+            await updateRun({
+              metadata: {
+                embedded_chunks: completedEmbeddings,
+                progress_percent: Math.round(
+                  (completedEmbeddings / chunks.length) * 100,
+                ),
+                stage: 'EMBEDDING',
+                total_chunks: chunks.length,
+              },
+            });
+          }
+        }
+      },
+    );
+    await Promise.all(workers);
+
+    // 5. Batch insert chunks in batches of 50 to optimize database round-trips
+    await updateRun({ metadata: { stage: 'PERSISTING_CHUNKS' } });
+    const chunkRows = chunks.map((chunk, idx) => ({
+      chunk_index: chunk.chunkIndex,
+      embedding: embeddings[idx] ?? undefined,
+      metadata: {
+        char_length: chunk.text.length,
+      },
+      page_number: chunk.pageNumber,
+      processing_run_id: runId,
+      project_id: projectId,
+      resource_id: resourceId,
+      text: chunk.text,
+      token_count: chunk.tokenCount,
+    }));
+
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < chunkRows.length; i += BATCH_SIZE) {
+      const batch = chunkRows.slice(i, i + BATCH_SIZE);
       const { error: insertError } = await client
         .from('resource_chunks')
-        .insert({
-          chunk_index: chunk.chunkIndex,
-          embedding: embedding ?? undefined,
-          metadata: {
-            char_length: chunk.text.length,
-          },
-          page_number: chunk.pageNumber,
-          processing_run_id: runId,
-          project_id: projectId,
-          resource_id: resourceId,
-          text: chunk.text,
-          token_count: chunk.tokenCount,
-        });
+        .insert(batch);
 
       if (insertError) {
         throw new Error(
-          `Failed to insert chunk ${chunk.chunkIndex}: ${insertError.message}`,
+          `Failed to insert chunk batch ${i}..${i + batch.length}: ${insertError.message}`,
         );
       }
     }

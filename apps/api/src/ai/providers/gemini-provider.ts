@@ -128,8 +128,40 @@ export class GeminiProvider implements AIProvider {
   }
 
   async embed(text: string): Promise<number[] | null> {
-    // Preserve local nomic-embed-text embedding compatibility with Supabase pgvector
-    return defaultAIProvider.embed(text);
+    if (!this.apiKey) {
+      return defaultAIProvider.embed(text);
+    }
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${this.apiKey}`;
+      const response = await fetch(url, {
+        body: JSON.stringify({
+          content: {
+            parts: [{ text }],
+          },
+          model: 'models/text-embedding-004',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeout));
+
+      if (!response.ok) {
+        console.warn(
+          `[GeminiProvider] Embedding returned HTTP ${response.status}, falling back to default provider`,
+        );
+        return defaultAIProvider.embed(text);
+      }
+
+      const payload = (await response.json()) as {
+        embedding?: { values?: number[] };
+      };
+      return payload.embedding?.values ?? defaultAIProvider.embed(text);
+    } catch (err) {
+      console.warn('[GeminiProvider] Embedding failed, falling back:', err);
+      return defaultAIProvider.embed(text);
+    }
   }
 }
 

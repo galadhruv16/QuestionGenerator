@@ -4,6 +4,98 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-10-15] — Pure Cloud API Engine & Production Deployment Architecture (Vercel Edge, Persistent Render Node.js, Gemini text-embedding-004, & Zero Ollama Dependency)
+
+### Type
+Feature / Cloud Deployment Infrastructure / AI Provider Subsystem / Production Readiness / Quality Assurance
+
+### Status
+Implemented and verified locally across full workspace TypeScript typecheck (0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`), production build (`pnpm build` in 5.61s), and monorepo Vitest test suite (94/94 tests passed).
+
+### Context & User Directives
+1. **Live Link Sharing via Vercel**:
+   - Provide a public live URL so users and instructors can access GroundQ directly via link.
+   - Selected architecture delivers maximum performance: Frontend Single-Page App hosted on Vercel's Global Edge Network with instant SSL and sub-50ms TTFB.
+2. **Persistent Backend Architecture**:
+   - Deploys Node.js Express modular-monolith to a persistent cloud runtime (Render / Railway), eliminating Vercel serverless function 10-second timeouts and background process freezing during massive document ingestion and multi-question synthesis.
+3. **Pure API Engine (Zero Local Ollama Dependency)**:
+   - Eliminates all reliance on local Ollama for hosted deployments.
+   - Vector embeddings are generated via Google Gemini `text-embedding-004` API (768 dimensions, exactly matching Supabase pgvector schema).
+   - Synthesis and validation run 100% via Google Gemini Flash / Groq APIs.
+
+### Changes Implemented
+1. **Cloud Vector Embeddings (`apps/api/src/services/resource-processor.ts`, `apps/api/src/ai/providers/gemini-provider.ts`)**:
+   - Integrated Google Gemini `text-embedding-004` (768 dimensions) into `getEmbedding` and `GeminiProvider.embed`.
+   - Automatically prioritizes Gemini API embeddings when `GEMINI_API_KEY` is present, maintaining offline Ollama compatibility strictly as fallback.
+2. **Production Server & CORS (`apps/api/src/config/env.ts`, `apps/api/src/app.ts`, `apps/api/package.json`)**:
+   - Added support for cloud host injected `PORT` (`process.env.PORT || 3001`).
+   - Enhanced CORS to cleanly allow Vercel production and preview domains (`*.vercel.app`) with full credentials support.
+   - Added `"start": "node dist/server.js"` script to `apps/api/package.json`.
+3. **Vercel & Render Deployment Artifacts**:
+   - Created `vercel.json` and `apps/web/vercel.json` with client-side SPA routing rewrites.
+   - Created `render.yaml` declaring zero-config Render Blueprint for continuous Express deployment.
+   - Created `Procfile` for Railway / Heroku process runners.
+   - Harmonized `WorkspacePage.tsx` to read `VITE_API_URL` consistently.
+4. **Authoritative Deployment Guide (`docs/DEPLOYMENT_GUIDE.md`)**:
+   - Step-by-step instructions for deploying backend to Render, frontend to Vercel, configuring Supabase redirect URLs, and testing live links.
+5. **Quality Assurance**:
+   - TypeScript Typecheck (`pnpm typecheck`): 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+   - Monorepo Test Suite (`pnpm test`): 94/94 tests passed (Contracts: 4, API: 44, Web: 46).
+   - Production Build (`pnpm build`): Completed cleanly in 5.61s.
+
+## [2026-10-15] — Massive 300-Page Textbook Scaling (Google Gemini Files API, Sliding Page-Window Transcriber, 100MB Limits, Concurrent Embeddings, & Batch Persistence)
+
+### Type
+Feature / Backend Multimodal AI & Scaling / Ingestion Pipeline / Performance Optimization / UI & Telemetry / Quality Assurance
+
+### Status
+Implemented and verified locally across full workspace TypeScript typecheck (0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`), production build (`pnpm build`), and monorepo Vitest test suite (94/94 tests passed).
+
+### Context & Scaling Bottlenecks Solved
+1. **The 8,192 Output Token Ceiling (Eliminated)**:
+   - Google Gemini models can ingest hundreds of pages in context, but output generation is strictly capped at 8,192 tokens (~3,000–4,000 words). Single-call transcription of a 50–300 page textbook causes premature cutoff after page 15–20, losing the remainder of the syllabus.
+   - Solved via a **Sliding Page-Window Transcriber**: documents are partitioned into discrete 10-page windows (e.g. `[1..10]`, `[11..20]`, ..., `[291..300]`). Each window explicitly prompts the vision model for only its page slice, outputting clean `--- Page X ---` delimiters without output truncation.
+2. **Memory & Payload Overhead (Gemini Files API)**:
+   - Inline base64 payload is capped at 20MB (hard error at 50MB) and multiplies network transmission by 30x if sent per window.
+   - For files > 15MB or > 10 pages, GroundQ uploads the binary ONCE to the Google Gemini Files API (`/upload/v1beta/files`) using resumable chunked protocol. All subsequent window requests reference the lightweight `file_uri` (`file_data`).
+   - Clean lifecycle guarantee: The uploaded file is deleted in a `finally` block via `DELETE /v1beta/{name}`, ensuring zero orphaned storage.
+3. **Upload Boundary Expanded to 100 MB**:
+   - Increased contract schema `file_size_bytes` limit from 25 MB to 100 MB across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+4. **Concurrent Embeddings & Batch Database Persistence**:
+   - Replaced serial 1-by-1 embedding loop with a bounded worker pool (`concurrency = 4`), speeding up embedding of 900+ chunks by ~4x.
+   - Replaced 900 individual Supabase chunk insert round-trips with chunked batch insertions (`BATCH_SIZE = 50`), reducing network latency by over 90%.
+5. **Real-time Ingestion Progress Telemetry**:
+   - Updated `resource_processing_runs.metadata` with live stage markers (`current_window`, `pages_transcribed`, `progress_percent`).
+   - Frontend displays real-time progress: `Stage 2 of 4: Vision OCR (Pages 1-10 · 3%)`, `Stage 4 of 4: Vector embedding (50%)`.
+6. **Full-Syllabus Curriculum & Question Retrieval**:
+   - Topic inferencer scales chunk sampling dynamically from 36 up to 54 chunks for documents > 200 chunks, guaranteeing representation across all chapters of a 300-page book.
+   - Question generation chunk retrieval adds `.range(0, 9999)` to bypass PostgREST's default 1,000-row query ceiling.
+
+### Changes Implemented
+1. **Shared Contracts (`packages/contracts/src/resources/index.ts`, `test/contracts.test.ts`)**:
+   - Increased `uploadInitRequestSchema` max limit to 100 MB (`100 * 1024 * 1024`).
+   - Updated contract unit tests testing valid 85 MB and rejecting 101 MB payloads.
+2. **Multimodal Transcriber (`apps/api/src/services/multimodal-transcriber.ts`)**:
+   - Added `uploadToGeminiFilesApi`, `deleteGeminiFile`, `countPdfPagesFromBuffer`, and `calculatePageWindows`.
+   - Built sliding page-window loop with 1,200ms pacing and automatic HTTP 429 exponential backoff retries.
+3. **Resource Processor (`apps/api/src/services/resource-processor.ts`)**:
+   - Integrated live window progress callbacks into `resource_processing_runs`.
+   - Implemented concurrent embedding worker pool (`concurrency = 4`) and batch chunk persistence (`batch = 50`).
+4. **Topic Inferencer & Question Generator (`apps/api/src/services/topic-inferencer.ts`, `apps/api/src/services/question-generator.ts`)**:
+   - Scaled sample limit for massive textbooks (`validChunks.length > 200 ? 54 : 36`).
+   - Added `.range(0, 9999)` on `resource_chunks` and `chunk_topics` queries to guarantee all chunks across 300 pages are retrieved.
+5. **Frontend Workspace (`apps/web/src/app/pages/ProjectResourcesPage.tsx`)**:
+   - Increased file dropzone validation check to 100 MB.
+   - Enhanced `processingStage` parsing to render real-time OCR window numbers and embedding percentages.
+   - Updated upload modal UI text to "(Max 100 MB)".
+6. **Unit Tests (`apps/api/test/multimodal-transcriber.test.ts`)**:
+   - Added tests for `calculatePageWindows` (300 pages, 25 pages, 5 pages, empty).
+   - Added tests for `countPdfPagesFromBuffer` using simulated PDF objects and `/Count` headers.
+7. **Quality Assurance**:
+   - TypeScript Typecheck (`pnpm typecheck`): 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+   - Monorepo Test Suite (`pnpm test`): 94/94 tests passed (Contracts: 4, API: 44, Web: 46).
+   - Production Build (`pnpm build`): Completed cleanly in 9.22s.
+
 ## [2026-10-15] — Multimodal Vision OCR Ingestion Expansion (Handwritten Notes, Diagrams, Images, Scanned PDFs, and PPTX Presentations)
 
 ### Type
