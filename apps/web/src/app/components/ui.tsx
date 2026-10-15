@@ -1,5 +1,6 @@
-import { useState, type ComponentProps } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import { Link } from 'react-router-dom';
+import { getSupabaseClient } from '../../lib/supabase';
 
 export type IconName =
   | 'alert'
@@ -337,9 +338,9 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   );
 }
 
-export function Logo() {
+export function Logo({ to = '/' }: { to?: string } = {}) {
   return (
-    <Link className="brand" to="/">
+    <Link className="brand" to={to}>
       <span className="brand-mark">
         <span />
         <span />
@@ -360,11 +361,37 @@ const navItems = [
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    void getSupabaseClient()
+      .auth.getSession()
+      .then(({ data }) => {
+        if (mounted && data.session) {
+          setIsAuthenticated(true);
+        }
+      })
+      .catch(() => {});
+
+    const {
+      data: { subscription },
+    } = getSupabaseClient().auth.onAuthStateChange((_event, session) => {
+      if (mounted) {
+        setIsAuthenticated(Boolean(session));
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   return (
     <header className="site-header">
       <div className="shell header-inner">
-        <Logo />
+        <Logo to={isAuthenticated ? '/app' : '/'} />
         <nav
           aria-label="Primary navigation"
           className={open ? 'main-nav is-open' : 'main-nav'}
@@ -376,12 +403,20 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="header-actions">
-          <Link className="header-signin" to="/sign-in">
-            Sign in
-          </Link>
-          <Link className="button button-primary button-small" to="/sign-in">
-            Get started <Icon name="arrowUpRight" size={15} />
-          </Link>
+          {isAuthenticated ? (
+            <Link className="button button-primary button-small" to="/app">
+              Go to Workspaces <Icon name="arrowUpRight" size={15} />
+            </Link>
+          ) : (
+            <>
+              <Link className="header-signin" to="/sign-in">
+                Sign in
+              </Link>
+              <Link className="button button-primary button-small" to="/sign-in">
+                Get started <Icon name="arrowUpRight" size={15} />
+              </Link>
+            </>
+          )}
         </div>
         <button
           aria-label={open ? 'Close menu' : 'Open menu'}

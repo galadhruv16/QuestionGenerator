@@ -1,5 +1,5 @@
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
-import { Logo, Icon } from './ui';
+import { Icon } from './ui';
 import { clearAllSessionCaches } from '../services/session-store';
 
 interface Props {
@@ -68,7 +68,14 @@ export class ErrorBoundary extends Component<Props, State> {
           {/* Minimal Header */}
           <header className="h-16 px-6 border-b border-black/10 bg-white/80 backdrop-blur-md flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Logo />
+              <a className="brand flex items-center gap-2 text-inherit no-underline font-serif font-bold text-lg" href="/">
+                <span className="brand-mark">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+                <span>GroundQ</span>
+              </a>
               <span className="text-xs uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800">
                 Workspace Recovery
               </span>

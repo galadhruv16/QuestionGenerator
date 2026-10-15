@@ -747,7 +747,7 @@ export function ProjectTopicsPage({
       <header className="fixed top-0 left-0 right-0 z-40 bg-surface/90 backdrop-blur-md border-b border-outline-variant/40 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
         <div className="h-16 w-full px-4 sm:px-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Logo />
+            <Logo to="/app" />
             <span className="px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
               WORKSPACE
             </span>

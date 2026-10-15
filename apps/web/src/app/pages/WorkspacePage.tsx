@@ -177,7 +177,7 @@ export function WorkspacePage() {
       <header className="fixed top-0 left-0 right-0 h-16 bg-surface/90 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.03)] border-b border-outline-variant/30 z-40">
         <div className="h-16 w-full max-w-[1440px] mx-auto px-4 sm:px-8 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Logo />
+            <Logo to="/app" />
             <div className="h-4 w-px bg-surface-variant hidden sm:block" />
             <nav
               aria-label="Breadcrumb"

@@ -81,7 +81,9 @@ export function ProjectGenerationPage() {
   // Active blueprint configuration
   const [activePresetName, setActivePresetName] =
     useState<string>('Balanced Exam Prep');
-  const [questionCount, setQuestionCount] = useState<number>(15);
+  const [questionCount, setQuestionCount] = useState<number>(
+    () => activeGen?.targetCount || 15,
+  );
 
   // Topic allocations: map of topicId -> weight (0..100)
   const [topicWeights, setTopicWeights] = useState<Record<string, number>>({});
@@ -139,6 +141,7 @@ export function ProjectGenerationPage() {
       ? ({
           accepted_count: activeGen.generatedCount,
           id: activeGen.runId,
+          requested_count: activeGen.targetCount,
           status: activeGen.status,
         } as unknown as GenerationRun)
       : null,
@@ -301,8 +304,12 @@ export function ProjectGenerationPage() {
         ...(prev ?? ({} as GenerationRun)),
         accepted_count: state.generatedCount,
         id: state.runId,
+        requested_count: state.targetCount || prev?.requested_count,
         status: state.status,
       } as GenerationRun));
+      if (state.targetCount && state.targetCount > 0) {
+        setQuestionCount(state.targetCount);
+      }
 
       if (state.status === 'COMPLETED' || state.status === 'FAILED') {
         try {
@@ -582,7 +589,7 @@ export function ProjectGenerationPage() {
       <header className="fixed top-0 left-0 right-0 z-40 bg-surface/90 backdrop-blur-md border-b border-outline-variant/40 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
         <div className="h-16 w-full px-4 sm:px-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Logo />
+            <Logo to="/app" />
             <span className="px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
               WORKSPACE
             </span>
@@ -1245,7 +1252,7 @@ export function ProjectGenerationPage() {
                         No syllabus topics have been extracted for this project yet.
                       </p>
                       <Link
-                        to={`/projects/${projectId}/topics`}
+                        to={`/app/projects/${projectId}/topics`}
                         className="px-4 py-1.5 rounded bg-primary text-on-primary font-label-md text-xs hover:opacity-90 transition-opacity"
                       >
                         Infer Topics from Uploaded Resources
@@ -2054,7 +2061,8 @@ export function ProjectGenerationPage() {
                         <span>Live Synthesis in Progress</span>
                       </span>
                       <span className="font-mono text-xs font-semibold text-primary">
-                        {currentRun?.accepted_count ?? 0} / {questionCount}
+                        {currentRun?.accepted_count ?? 0} /{' '}
+                        {currentRun?.requested_count || activeGen?.targetCount || questionCount}
                       </span>
                     </div>
                     <div className="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
@@ -2064,7 +2072,12 @@ export function ProjectGenerationPage() {
                           width: `${Math.min(
                             100,
                             (((currentRun?.accepted_count ?? 0)) /
-                              Math.max(1, questionCount)) *
+                              Math.max(
+                                1,
+                                currentRun?.requested_count ||
+                                  activeGen?.targetCount ||
+                                  questionCount,
+                              )) *
                               100,
                           )}%`,
                         }}

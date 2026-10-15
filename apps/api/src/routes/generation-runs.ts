@@ -396,12 +396,17 @@ generationRunsRouter.get(
         )
         .eq('generation_run_id', parsedRunId.data)
         .eq('project_id', parsedProjectId.data)
+        .not('current_version_id', 'is', null)
         .order('sort_order', { ascending: true });
 
       if (error) throw error;
 
+      const validQuestions = (questions ?? []).filter(
+        (q: { current_version?: unknown }) => q.current_version != null,
+      );
+
       return response.json({
-        data: questions ?? [],
+        data: validQuestions,
       });
     } catch (error) {
       return next(error);

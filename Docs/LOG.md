@@ -4,6 +4,126 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-10-16] — Auth-Aware Landing Page Navigation & Workspace Logo Routing Fix
+
+### Type
+UX / Routing / Authentication Flow / Navigation Architecture
+
+### Status
+Implemented and verified locally across full workspace TypeScript typecheck (0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`), production build (`npx pnpm -r build` passed in 5.60s), and monorepo Vitest test suite (94/94 tests passed).
+
+### Context & Root Cause Analysis
+User reported that after logging in, clicking the top-left GroundQ brand logo or navigating to the home page showed the public marketing landing page (`/`) with "Sign in" and "Create your first project" (leading to sign-up) instead of recognizing the logged-in user and keeping them inside their workspaces.
+
+Root causes identified:
+1. `<Logo />` in `apps/web/src/app/components/ui.tsx` was hardcoded to `<Link className="brand" to="/">`. Every workspace page (`WorkspacePage`, `ProjectResourcesPage`, `ProjectTopicsPage`, `ProjectGenerationPage`, `ProjectQuestionsPage`, `ProjectPracticeStudioPage`, `ProjectExportStudioPage`) rendered `<Logo />`. When an authenticated user clicked the logo to return to their dashboard, they were booted out of `/app` to the public marketing page `/`.
+2. `LandingPage.tsx` and `SiteHeader` in `ui.tsx` were completely unaware of Supabase auth sessions. `SiteHeader` unconditionally rendered `<Link to="/sign-in">Sign in</Link>` and `<Link to="/sign-in">Get started</Link>`, and the hero & final CTA buttons unconditionally prompted unauthenticated users to create an account.
+
+### Changes Implemented
+1. **Configurable `<Logo to={to} />` with Workspace Linking**:
+   - Updated `<Logo />` in `apps/web/src/app/components/ui.tsx` to accept an optional `to?: string` prop defaulting to `'/'`.
+   - Updated all application workspace and studio headers (`WorkspacePage.tsx`, `ProjectResourcesPage.tsx`, `ProjectTopicsPage.tsx`, `ProjectGenerationPage.tsx`, `ProjectQuestionsPage.tsx`, `ProjectPracticeStudioPage.tsx`, `ProjectExportStudioPage.tsx`) to pass `<Logo to="/app" />`. Clicking the logo inside any study project or studio now reliably returns to the user's `/app` project dashboard.
+2. **Auth-Aware `SiteHeader` (`apps/web/src/app/components/ui.tsx`)**:
+   - Subscribed to Supabase auth state (`getSession()` + `onAuthStateChange`).
+   - When authenticated, the header displays `<Logo to="/app" />` and replaces "Sign in" / "Get started" with a prominent primary button: **`Go to Workspaces →`** linking to `/app`.
+3. **Auth-Aware Landing Page Hero & Final CTA (`apps/web/src/app/pages/LandingPage.tsx`)**:
+   - Checked active Supabase session in `LandingPage`.
+   - When logged in, both the hero primary action and the final footer CTA button dynamically display **`Go to Workspaces →`** (`/app`), while the footer logo links to `/app`.
+4. **Verification**:
+   - Full monorepo TypeScript typecheck: 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+   - Full Vitest suite: All 94 unit/integration tests passed (Contracts: 4, API: 44, Web: 46).
+   - Full production build: `npx pnpm -r build` passed in 5.60s.
+
+## [2026-10-16] — Equi-Distributed Stratified Syllabus Sampler, Bank Query Limit Expansion (1000 Qs), & Generation Telemetry Fixes
+
+### Type
+Bugfix / AI Generation Pipeline / Retrieval & Sampling Architecture / API Pagination & Limit Expansion / Telemetry Synchronization / Quality Assurance
+
+### Status
+Implemented and verified locally across full workspace TypeScript typecheck (0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`), production build (`pnpm build` in 4.89s), and monorepo Vitest test suite (94/94 tests passed).
+
+### Context & Root Cause Analysis
+User reported three related systemic issues during live textbook question generation:
+1. **Unequal Page Distribution (Last 50 Pages Untouched)**:
+   - In a 71-page PDF, generating 15 questions concentrated almost entirely in pages 1 to 10 (all under page 20), leaving the last 50 pages untouched.
+   - *Root cause 1*: In `extractIntelligentModules` (`topic-inferencer.ts`), when explicit headings were detected, the system sliced `0..maxModules - 1` (the first 6 headings) sequentially from the beginning of the text, ignoring all headings and chapters in the remainder of the document.
+   - *Root cause 2*: In `persistInferredTopics`, when linking chunks to subtopics, `matched.slice(0, 15)` took only the earliest 15 chunks from pages 1-20.
+   - *Root cause 3*: In `question-generator.ts`, for every question target in the plan, `selectedChunk` was chosen from `mappedChunks[(target.sequenceNumber - 1) % mappedChunks.length]`. Since all mapped chunks were from pages 1-20, 100% of generated questions were restricted to pages 1-20.
+2. **Question Bank Truncated at 50 Questions**:
+   - The user generated 70 questions across 3 batches (10 + 50 + 10). The generation page displayed all 70 questions in the batch history, but the question bank capped at 50 questions and refused to display questions beyond 50.
+   - *Root cause*: `questionsQuerySchema` in `apps/api/src/routes/questions.ts` had a hardcoded default `limit: 50` and schema `max: 100`. The frontend calls in `ProjectQuestionsPage.tsx`, `ProjectPracticeStudioPage.tsx`, and `ProjectExportStudioPage.tsx` did not pass a limit parameter, causing PostgREST to execute `.limit(50)`.
+3. **Telemetry Denominator Reverting to 15 (e.g., "27 / 15")**:
+   - When generating 50 questions, switching tabs to Question Bank / Mock Test and navigating back caused the live progress card to display "27 / 15" with an overflown progress bar.
+   - *Root cause*: `questionCount` in `ProjectGenerationPage.tsx` was unmounted on tab switch and remounted with default `useState(15)`. The live progress bar directly rendered `{currentRun?.accepted_count ?? 0} / {questionCount}`, dividing the live count (27) by the unmounted local state default (15).
+
+### Changes Implemented
+1. **Equi-Distributed Stratified Syllabus Sampler (`apps/api/src/services/question-generator.ts`)**:
+   - Ordered all document content chunks monotonically by resource and page number.
+   - Partitioned the syllabus into `K = planTargets.length` proportional document strata (windows): question `i` of `K` is allocated window `[floor(i * totalChunks / K) .. floor((i+1) * totalChunks / K)]`.
+   - Anchored each question strictly to its syllabus window: prioritizes topic-matched chunks within that stratum, falling back to the stratum's central content chunk.
+   - Dynamically re-binds `target.topicId` to the topic governing that specific stratum, guaranteeing 100% proportional, uniform distribution from Page 1 to Page 71.
+2. **Evenly Distributed Module Extraction & Topic Links (`apps/api/src/services/topic-inferencer.ts`)**:
+   - Replaced sequential heading slicing with stratified heading sampling across `uniqueHeadings`.
+   - In `persistInferredTopics`, replaced `matched.slice(0, 15)` with uniform stratified sampling across all matching document pages.
+3. **Question Bank Query Limit Expansion (`apps/api/src/routes/questions.ts`, `ProjectQuestionsPage.tsx`, `ProjectPracticeStudioPage.tsx`, `ProjectExportStudioPage.tsx`)**:
+   - Expanded `questionsQuerySchema` limit to `.min(1).max(1000).default(250)`.
+   - Updated all client API queries to pass `?limit=1000`, ensuring question banks with 70, 100, 250, or 500+ questions display all items without truncation.
+4. **Live Synthesis Denominator & State Synchronization (`ProjectGenerationPage.tsx`, `generation-manager.ts`)**:
+   - Initialized `questionCount` to `() => activeGen?.targetCount || 15`.
+   - Preserved `requested_count` in `currentRun` and synchronized with `state.targetCount` from `generationManager`.
+   - Updated the live progress bar to render `{currentRun?.accepted_count ?? 0} / {currentRun?.requested_count || activeGen?.targetCount || questionCount}` and computed progress bar width against the authoritative target count.
+5. **Export Studio Brand Typography Cleanup (`ProjectExportStudioPage.tsx`)**:
+   - Removed duplicate `<span ...>GroundQ</span>` adjacent to `<Logo />` in the top app bar header, eliminating redundant double brand titles.
+6. **Quality Assurance & Verification**:
+   - Full monorepo TypeScript typecheck: 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+   - Vitest test suites: All 94 tests passing cleanly (Contracts: 4, API: 44, Web: 46).
+   - Production bundle build: Passed cleanly in 5.04s.
+
+## [2026-10-15] — Question Bank White Screen of Death Resolution & Router Boundary Hardening
+
+### Type
+Bugfix / Frontend Architecture / React Error Boundary / API Query Filtering / Null-Safety Hardening / Quality Assurance
+
+### Status
+Implemented and verified locally across full workspace TypeScript typecheck (0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`), production build (`pnpm build` in 4.10s), and monorepo Vitest test suite (94/94 tests passed).
+
+### Context & Root Cause Analysis
+During testing on a new account and project, navigating to or viewing the Questions tab during/after generation caused the browser screen to turn completely blank/white ("White Screen of Death"):
+1. **Uncaught Error in Error Boundary Component**:
+   - `ErrorBoundary.tsx` imported and rendered `<Logo />`, which rendered `<Link to="/">` from `react-router-dom`. When an uncaught runtime error occurred, `ErrorBoundary` was mounted outside of `<BrowserRouter>`, causing React Router's `useHref()` hook to throw an unhandled exception. This crashed React's top-level error recovery render loop, turning the entire browser viewport pure white.
+2. **In-Flight Question Version Null Dereferencing**:
+   - In `question-generator.ts`, generating questions creates a base row in `questions` with `current_version_id: null` before creating and linking the `question_versions` record.
+   - Live synchronization polling (1,500ms intervals) queried `/api/v1/projects/:projectId/questions`. PostgREST returned shell question objects with `current_version: null`.
+   - In `ProjectQuestionsPage.tsx`, dereferencing `q.current_version.topics`, `q.current_version.options`, `q.current_version.bloom_levels`, and sort comparators threw `TypeError: Cannot read properties of null`, immediately triggering the unhandled boundary crash.
+3. **Route Link Missing `/app` Prefix & Missing Wildcard Fallback**:
+   - Navigation links in the generation empty states and buttons pointed to `/projects/:projectId/*` instead of `/app/projects/:projectId/*`.
+   - Without a wildcard fallback route in `App.tsx`, path mismatches rendered empty routes, displaying a blank screen.
+
+### Changes Implemented
+1. **Bulletproof Error Boundary (`apps/web/src/app/components/ErrorBoundary.tsx`)**:
+   - Decoupled `ErrorBoundary` from `react-router-dom`: replaced `<Logo />` (which used `<Link>`) with standard anchor (`<a href="/">`) and native window navigation, ensuring the error boundary is 100% resilient and can never crash on router context loss.
+2. **App Router Hierarchy & Fallbacks (`apps/web/src/app/App.tsx`)**:
+   - Inverted wrapping order so `<BrowserRouter>` encloses `<ErrorBoundary>`.
+   - Added `LegacyProjectRedirect` component for backwards-compatible redirects from `/projects/:projectId/*` to `/app/projects/:projectId/*`.
+   - Added a wildcard `<Route path="*" element={<Navigate to="/app" replace />} />` ensuring any unexpected URL cleanly redirects to `/app` instead of a blank screen.
+3. **API Query Filtering (`apps/api/src/routes/questions.ts`, `apps/api/src/routes/generation-runs.ts`)**:
+   - In `GET /api/v1/projects/:projectId/questions`: Added `.not('current_version_id', 'is', null)` and in-memory `.filter((q) => q.current_version != null)` to ensure unhydrated/in-flight questions are never returned to client consumers.
+   - In `GET /api/v1/projects/:projectId/generation-runs/:runId/questions`: Added `.not('current_version_id', 'is', null)` and in-memory filter for complete safety.
+4. **Questions Studio Null-Safety (`apps/web/src/app/pages/ProjectQuestionsPage.tsx`)**:
+   - Updated `QuestionItem` interface to permit nullable `current_version?: ... | null`.
+   - Hardened `distinctTopics`, `filteredQuestions`, and sort comparators with optional chaining.
+   - Added fallback placeholder `(Generating question version...)` in Feed Card and a loading spinner in the Deep Inspection pane when a question version is hydrating.
+   - Protected regeneration handlers, edit modal, and citation drawers against incomplete question states.
+   - Corrected generation route link to `/app/projects/${projectId}/generation`.
+5. **Practice & Export Studios Null-Safety (`apps/web/src/app/pages/ProjectPracticeStudioPage.tsx`, `ProjectExportStudioPage.tsx`, `ProjectGenerationPage.tsx`)**:
+   - Added optional chaining across all `q.current_version?.` field references.
+   - Filtered out unhydrated question records when loading from API or session storage.
+   - Fixed broken `/app/projects/${projectId}/topics` link in `ProjectGenerationPage.tsx`.
+6. **Quality Assurance & Verification**:
+   - Full monorepo TypeScript typecheck: 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+   - Vitest test suites: All 94 tests passing cleanly (Contracts: 4, API: 44, Web: 46).
+   - Production bundle build: Passed cleanly in 4.10s.
+
 ## [2026-10-15] — Pure Cloud API Engine & Production Deployment Architecture (Vercel Edge, Persistent Render Node.js, Gemini text-embedding-004, & Zero Ollama Dependency)
 
 ### Type

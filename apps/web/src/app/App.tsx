@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { GuestRoute, ProtectedRoute } from './components/AuthGuards';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import {
@@ -16,10 +16,15 @@ import { ProjectExportStudioPage } from './pages/ProjectExportStudioPage';
 import { ProjectPracticeStudioPage } from './pages/ProjectPracticeStudioPage';
 import { WorkspacePage } from './pages/WorkspacePage';
 
+function LegacyProjectRedirect() {
+  const { projectId, '*': rest } = useParams<{ projectId: string; '*': string }>();
+  return <Navigate to={`/app/projects/${projectId}/${rest || 'resources'}`} replace />;
+}
+
 export function App() {
   return (
-    <ErrorBoundary>
-      <BrowserRouter>
+    <BrowserRouter>
+      <ErrorBoundary>
         <Routes>
         <Route element={<LandingPage />} path="/" />
         <Route
@@ -103,8 +108,19 @@ export function App() {
           }
           path="/app/projects/:projectId/practice"
         />
+        {/* Legacy / Direct project aliases redirecting to /app/projects/:projectId/* */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <LegacyProjectRedirect />
+            </ProtectedRoute>
+          }
+          path="/projects/:projectId/*"
+        />
+        {/* Wildcard 404 Fallback - never show blank page */}
+        <Route element={<Navigate to="/app" replace />} path="*" />
       </Routes>
-    </BrowserRouter>
-  </ErrorBoundary>
+    </ErrorBoundary>
+  </BrowserRouter>
 );
 }

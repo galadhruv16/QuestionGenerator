@@ -75,7 +75,7 @@ export function ProjectExportStudioPage({
       const marksMap: Record<string, number> = {};
       for (const q of initialData) {
         const typeSlug =
-          q.current_version.question_types?.slug?.toUpperCase() || 'MCQ';
+          q.current_version?.question_types?.slug?.toUpperCase() || 'MCQ';
         if (typeSlug === 'MCQ') {
           marksMap[q.id] = 4;
         } else if (typeSlug.includes('LONG') || typeSlug.includes('SCENARIO')) {
@@ -98,28 +98,31 @@ export function ProjectExportStudioPage({
 
     async function loadData() {
       try {
-        const res = await fetch(`/api/v1/projects/${projectId}/questions`, {
+        const res = await fetch(`/api/v1/projects/${projectId}/questions?limit=1000`, {
           headers: { 'Content-Type': 'application/json' },
         });
         if (res.ok) {
           const json = await res.json();
           if (Array.isArray(json.data) && json.data.length > 0) {
-            setQuestions(json.data);
-            const accepted = json.data
+            const validData: QuestionItem[] = json.data.filter(
+              (q: QuestionItem) => q && q.current_version != null,
+            );
+            setQuestions(validData);
+            const accepted = validData
               .filter((q: QuestionItem) => q.status === 'ACCEPTED')
               .map((q: QuestionItem) => q.id);
             if (accepted.length > 0) {
               setSelectedIds(new Set(accepted));
             } else {
-              setSelectedIds(new Set(json.data.map((q: QuestionItem) => q.id)));
+              setSelectedIds(new Set(validData.map((q: QuestionItem) => q.id)));
             }
 
             setQuestionMarks((prev) => {
               const updated = { ...prev };
-              for (const q of json.data) {
+              for (const q of validData) {
                 if (!updated[q.id]) {
                   const typeSlug =
-                    q.current_version.question_types?.slug?.toUpperCase() || 'MCQ';
+                    q.current_version?.question_types?.slug?.toUpperCase() || 'MCQ';
                   updated[q.id] =
                     typeSlug === 'MCQ'
                       ? 4
@@ -141,7 +144,7 @@ export function ProjectExportStudioPage({
 
   // Included questions ordered
   const includedQuestions = useMemo(() => {
-    let list = questions.filter((q) => selectedIds.has(q.id));
+    let list = questions.filter((q) => selectedIds.has(q.id) && q.current_version != null);
     if (shuffleVariantB) {
       // Deterministic reverse/interleave shuffle for Variant B
       list = [...list].reverse();
@@ -161,12 +164,12 @@ export function ProjectExportStudioPage({
   const sections = useMemo(() => {
     const sectionA = includedQuestions.filter(
       (q) =>
-        (q.current_version.question_types?.slug?.toUpperCase() || 'MCQ') ===
+        (q.current_version?.question_types?.slug?.toUpperCase() || 'MCQ') ===
         'MCQ',
     );
     const sectionB = includedQuestions.filter(
       (q) =>
-        (q.current_version.question_types?.slug?.toUpperCase() || 'MCQ') !==
+        (q.current_version?.question_types?.slug?.toUpperCase() || 'MCQ') !==
         'MCQ',
     );
     return { sectionA, sectionB };
@@ -211,8 +214,8 @@ export function ProjectExportStudioPage({
     if (viewMode === 'paper') {
       content += `=== SECTION A: MULTIPLE CHOICE QUESTIONS ===\n\n`;
       sections.sectionA.forEach((q, idx) => {
-        content += `Q${idx + 1}. [${questionMarks[q.id] ?? 4} Marks]\n${q.current_version.question_text}\n`;
-        const options = q.current_version.question_options ?? [];
+        content += `Q${idx + 1}. [${questionMarks[q.id] ?? 4} Marks]\n${q.current_version?.question_text || ''}\n`;
+        const options = q.current_version?.question_options ?? [];
         options.forEach((opt, oIdx) => {
           content += `  (${String.fromCharCode(65 + oIdx)}) ${opt.option_text}\n`;
         });
@@ -222,22 +225,22 @@ export function ProjectExportStudioPage({
       if (sections.sectionB.length > 0) {
         content += `=== SECTION B: SHORT & LONG ANSWER QUESTIONS ===\n\n`;
         sections.sectionB.forEach((q, idx) => {
-          content += `Q${sections.sectionA.length + idx + 1}. [${questionMarks[q.id] ?? 5} Marks]\n${q.current_version.question_text}\n\n`;
+          content += `Q${sections.sectionA.length + idx + 1}. [${questionMarks[q.id] ?? 5} Marks]\n${q.current_version?.question_text || ''}\n\n`;
         });
       }
     } else {
       content += `=== CONFIDENTIAL INSTRUCTOR ANSWER KEY & RUBRIC ===\n\n`;
       includedQuestions.forEach((q, idx) => {
-        content += `Q${idx + 1}. [${questionMarks[q.id] ?? 4} Marks]\nStem: ${q.current_version.question_text}\n`;
-        if (q.current_version.model_answer) {
-          content += `Model Answer / Solution: ${q.current_version.model_answer}\n`;
+        content += `Q${idx + 1}. [${questionMarks[q.id] ?? 4} Marks]\nStem: ${q.current_version?.question_text || ''}\n`;
+        if (q.current_version?.model_answer) {
+          content += `Model Answer / Solution: ${q.current_version?.model_answer}\n`;
         }
-        if (q.current_version.explanation) {
-          content += `Rationale: ${q.current_version.explanation}\n`;
+        if (q.current_version?.explanation) {
+          content += `Rationale: ${q.current_version?.explanation}\n`;
         }
-        if (q.current_version.question_source_refs?.[0]) {
-          const ref = q.current_version.question_source_refs[0];
-          content += `Source Citation: ${ref.resource_chunks?.resources?.original_filename || 'Curriculum PDF'}, Page ${ref.resource_chunks?.page_number || 1}, Chunk #${ref.chunk_id}\n`;
+        const sRef = q.current_version?.question_source_refs?.[0];
+        if (sRef) {
+          content += `Source Citation: ${sRef.resource_chunks?.resources?.original_filename || 'Curriculum PDF'}, Page ${sRef.resource_chunks?.page_number || 1}, Chunk #${sRef.chunk_id}\n`;
         }
         content += `\n----------------------------------------\n\n`;
       });
@@ -267,26 +270,26 @@ export function ProjectExportStudioPage({
       questions: includedQuestions.map((q, idx) => ({
         questionNumber: idx + 1,
         marks: questionMarks[q.id] ?? 4,
-        type: q.current_version.question_types?.slug || 'MCQ',
-        bloom: q.current_version.bloom_levels?.slug || 'understand',
-        difficulty: q.current_version.difficulty_levels?.slug || 'MEDIUM',
-        stem: q.current_version.question_text,
-        options: (q.current_version.question_options ?? []).map((o, oIdx) => ({
+        type: q.current_version?.question_types?.slug || 'MCQ',
+        bloom: q.current_version?.bloom_levels?.slug || 'understand',
+        difficulty: q.current_version?.difficulty_levels?.slug || 'MEDIUM',
+        stem: q.current_version?.question_text || '',
+        options: (q.current_version?.question_options ?? []).map((o, oIdx) => ({
           letter: String.fromCharCode(65 + oIdx),
           text: o.option_text,
           isCorrect: o.is_correct,
         })),
-        modelAnswer: q.current_version.model_answer,
-        explanation: q.current_version.explanation,
-        grounding: q.current_version.question_source_refs?.[0]
+        modelAnswer: q.current_version?.model_answer,
+        explanation: q.current_version?.explanation,
+        grounding: q.current_version?.question_source_refs?.[0]
           ? {
               document:
-                q.current_version.question_source_refs[0].resource_chunks
+                q.current_version?.question_source_refs?.[0]?.resource_chunks
                   ?.resources?.original_filename,
               pageNumber:
-                q.current_version.question_source_refs[0].resource_chunks
+                q.current_version?.question_source_refs?.[0]?.resource_chunks
                   ?.page_number,
-              chunkId: q.current_version.question_source_refs[0].chunk_id,
+              chunkId: q.current_version?.question_source_refs?.[0]?.chunk_id,
             }
           : null,
       })),
@@ -309,10 +312,7 @@ export function ProjectExportStudioPage({
       <header className="h-16 w-full border-b border-[#e2e8f0] bg-white px-4 sm:px-8 flex items-center justify-between shrink-0 z-30 shadow-[0_1px_3px_rgba(0,0,0,0.02)] print:hidden">
         <div className="flex items-center gap-4 min-w-0">
           <div className="flex items-center gap-2.5 shrink-0">
-            <Logo />
-            <span className="font-bold text-base text-[#0f172a] tracking-tight font-serif">
-              GroundQ
-            </span>
+            <Logo to="/app" />
           </div>
           <span className="h-4 w-px bg-[#e2e8f0]" />
           <nav
@@ -844,11 +844,11 @@ export function ProjectExportStudioPage({
                               </span>
                             )}
                             <span className="text-[#64748b] truncate">
-                              {q.current_version.question_types?.name || 'MCQ'}
+                              {q.current_version?.question_types?.name || 'MCQ'}
                             </span>
                           </div>
                           <p className="text-[11px] text-[#334155] line-clamp-2 leading-snug">
-                            {q.current_version.question_text}
+                            {q.current_version?.question_text || ''}
                           </p>
                         </div>
                       </div>
@@ -1059,7 +1059,7 @@ export function ProjectExportStudioPage({
                       {sections.sectionA.map((q, qIndex) => {
                         const marks = questionMarks[q.id] ?? 4;
                         const bloom =
-                          q.current_version.bloom_levels?.name || 'Analyze';
+                          q.current_version?.bloom_levels?.name || 'Analyze';
 
                         return (
                           <div className="space-y-2.5 break-inside-avoid" key={q.id}>
@@ -1078,12 +1078,12 @@ export function ProjectExportStudioPage({
                             </div>
 
                             <p className="font-serif text-justify text-[#0f172a] leading-relaxed">
-                              {q.current_version.question_text}
+                              {q.current_version?.question_text || ''}
                             </p>
 
                             {/* Multiple Choice Bubbles */}
                             <div className="space-y-1.5 pt-1 pl-2 font-sans text-xs">
-                              {(q.current_version.question_options ?? []).map(
+                              {(q.current_version?.question_options ?? []).map(
                                 (opt, oIdx) => (
                                   <div
                                     className="flex items-start gap-2.5"
@@ -1127,7 +1127,7 @@ export function ProjectExportStudioPage({
                       {sections.sectionB.map((q, qIndex) => {
                         const marks = questionMarks[q.id] ?? 5;
                         const bloom =
-                          q.current_version.bloom_levels?.name || 'Evaluate';
+                          q.current_version?.bloom_levels?.name || 'Evaluate';
 
                         return (
                           <div className="space-y-3 break-inside-avoid" key={q.id}>
@@ -1146,7 +1146,7 @@ export function ProjectExportStudioPage({
                             </div>
 
                             <p className="font-serif text-justify text-[#0f172a] leading-relaxed">
-                              {q.current_version.question_text}
+                              {q.current_version?.question_text || ''}
                             </p>
 
                             {/* Ruled lines for answer if in ruled mode or default */}
@@ -1217,11 +1217,11 @@ export function ProjectExportStudioPage({
                 <div className="space-y-6">
                   {includedQuestions.map((q, idx) => {
                     const marks = questionMarks[q.id] ?? 4;
-                    const correctOpt = q.current_version.question_options?.find(
+                    const correctOpt = q.current_version?.question_options?.find(
                       (o) => o.is_correct,
                     );
                     const sourceRef =
-                      q.current_version.question_source_refs?.[0];
+                      q.current_version?.question_source_refs?.[0];
 
                     return (
                       <div
@@ -1237,12 +1237,12 @@ export function ProjectExportStudioPage({
                               [{marks} Marks]
                             </span>
                             <span className="text-[#64748b]">
-                              Bloom: {q.current_version.bloom_levels?.name || 'Apply'}
+                              Bloom: {q.current_version?.bloom_levels?.name || 'Apply'}
                             </span>
                             <span className="text-[#cbd5e1]">•</span>
                             <span className="text-[#64748b]">
                               Difficulty:{' '}
-                              {q.current_version.difficulty_levels?.name || 'Medium'}
+                              {q.current_version?.difficulty_levels?.name || 'Medium'}
                             </span>
                           </div>
 
@@ -1251,7 +1251,7 @@ export function ProjectExportStudioPage({
                               Correct: Option{' '}
                               {String.fromCharCode(
                                 65 +
-                                  (q.current_version.question_options?.indexOf(
+                                  (q.current_version?.question_options?.indexOf(
                                     correctOpt,
                                   ) ?? 0),
                               )}
@@ -1261,7 +1261,7 @@ export function ProjectExportStudioPage({
 
                         {/* Question Stem */}
                         <p className="font-serif text-sm text-[#0f172a] font-medium leading-snug">
-                          {q.current_version.question_text}
+                          {q.current_version?.question_text || ''}
                         </p>
 
                         {/* Correct Answer & Distractor Explanation */}
@@ -1271,7 +1271,7 @@ export function ProjectExportStudioPage({
                               Correct Option:{' '}
                               {String.fromCharCode(
                                 65 +
-                                  (q.current_version.question_options?.indexOf(
+                                  (q.current_version?.question_options?.indexOf(
                                     correctOpt,
                                   ) ?? 0),
                               )}{' '}
@@ -1286,25 +1286,25 @@ export function ProjectExportStudioPage({
                         )}
 
                         {/* Model Answer / Solution for Subjective */}
-                        {q.current_version.model_answer && (
+                        {q.current_version?.model_answer && (
                           <div className="p-2.5 bg-white border border-[#e2e8f0] rounded text-xs space-y-1">
                             <span className="font-mono font-semibold text-[#0f172a] block">
                               Model Answer / Solution:
                             </span>
                             <p className="text-[#334155] leading-relaxed">
-                              {q.current_version.model_answer}
+                              {q.current_version?.model_answer}
                             </p>
                           </div>
                         )}
 
                         {/* Pedagogical Explanation */}
-                        {q.current_version.explanation && !correctOpt?.explanation && (
+                        {q.current_version?.explanation && !correctOpt?.explanation && (
                           <div className="p-2.5 bg-white border border-[#e2e8f0] rounded text-xs space-y-1">
                             <span className="font-mono font-semibold text-[#0f172a] block">
                               Pedagogical Explanation:
                             </span>
                             <p className="text-[#334155] leading-relaxed">
-                              {q.current_version.explanation}
+                              {q.current_version?.explanation}
                             </p>
                           </div>
                         )}

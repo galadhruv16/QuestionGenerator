@@ -20,7 +20,7 @@ const questionsQuerySchema = z.object({
   cursor: z.string().optional(),
   generation_run_id: z.string().uuid().optional(),
   include_archived: z.enum(['true', 'false']).default('false'),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  limit: z.coerce.number().int().min(1).max(1000).default(250),
   search: z.string().optional(),
   status: z.string().optional(),
   topic_id: z.string().uuid().optional(),
@@ -151,6 +151,7 @@ questionsRouter.get('/', async (request, response, next) => {
       .from('questions')
       .select(QUESTION_DETAIL_SELECT)
       .eq('project_id', parsedProjectId.data)
+      .not('current_version_id', 'is', null)
       .order('sort_order', { ascending: true })
       .limit(limit);
 
@@ -171,8 +172,12 @@ questionsRouter.get('/', async (request, response, next) => {
 
     if (error) throw error;
 
+    const validQuestions = (questions ?? []).filter(
+      (q: { current_version?: unknown }) => q.current_version != null,
+    );
+
     return response.json({
-      data: questions ?? [],
+      data: validQuestions,
     });
   } catch (error) {
     return next(error);

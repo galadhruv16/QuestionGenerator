@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Icon, Logo, SectionEyebrow, SiteHeader } from '../components/ui';
 import { Link } from 'react-router-dom';
+import { getSupabaseClient } from '../../lib/supabase';
 
 function QuestionBlueprint() {
   return (
@@ -267,6 +269,33 @@ function WorkflowCard({
 }
 
 export function LandingPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    void getSupabaseClient()
+      .auth.getSession()
+      .then(({ data }) => {
+        if (mounted && data.session) {
+          setIsAuthenticated(true);
+        }
+      })
+      .catch(() => {});
+
+    const {
+      data: { subscription },
+    } = getSupabaseClient().auth.onAuthStateChange((_event, session) => {
+      if (mounted) {
+        setIsAuthenticated(Boolean(session));
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
   return (
     <div className="site-page">
       <SiteHeader />
@@ -285,10 +314,16 @@ export function LandingPage() {
                 questions—strictly grounded in the resources you provide.
               </p>
               <div className="hero-actions">
-                <Link className="button button-primary" to="/sign-in">
-                  Create your first project{' '}
-                  <Icon name="arrowUpRight" size={16} />
-                </Link>
+                {isAuthenticated ? (
+                  <Link className="button button-primary" to="/app">
+                    Go to Workspaces <Icon name="arrowUpRight" size={16} />
+                  </Link>
+                ) : (
+                  <Link className="button button-primary" to="/sign-in">
+                    Create your first project{' '}
+                    <Icon name="arrowUpRight" size={16} />
+                  </Link>
+                )}
                 <a className="text-link" href="#workflow">
                   See how it works <Icon name="arrow" size={16} />
                 </a>
@@ -564,15 +599,21 @@ export function LandingPage() {
               Bring your material. Keep your standards. Let GroundQ handle the
               structure.
             </p>
-            <Link className="button button-primary" to="/sign-in">
-              Create your first project <Icon name="arrowUpRight" size={16} />
-            </Link>
+            {isAuthenticated ? (
+              <Link className="button button-primary" to="/app">
+                Go to Workspaces <Icon name="arrowUpRight" size={16} />
+              </Link>
+            ) : (
+              <Link className="button button-primary" to="/sign-in">
+                Create your first project <Icon name="arrowUpRight" size={16} />
+              </Link>
+            )}
           </div>
         </section>
       </main>
       <footer className="site-footer">
         <div className="shell footer-inner">
-          <Logo />
+          <Logo to={isAuthenticated ? '/app' : '/'} />
           <span>Grounded knowledge. Better questions.</span>
           <div>
             <a href="#product">Product</a>

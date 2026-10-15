@@ -20,7 +20,7 @@ export interface QuestionItem {
   id: string;
   sort_order: number;
   status: 'DRAFT' | 'AVAILABLE' | 'ACCEPTED' | 'REJECTED';
-  current_version: {
+  current_version?: {
     question_text: string;
     model_answer?: string | null;
     explanation?: string | null;
@@ -44,7 +44,7 @@ export interface QuestionItem {
         };
       };
     }>;
-  };
+  } | null;
 }
 
 // Fallback academic dataset if no questions exist
@@ -206,10 +206,11 @@ export function ProjectPracticeStudioPage({
 
   // Questions state: default to ACCEPTED items if present
   const [questions, setQuestions] = useState<QuestionItem[]>(() => {
-    if (initialQuestions && initialQuestions.length > 0) return initialQuestions;
+    if (initialQuestions && initialQuestions.length > 0) return initialQuestions.filter((q) => q && q.current_version != null);
     if (cachedData?.questions && cachedData.questions.length > 0) {
-      const accepted = cachedData.questions.filter((q) => q.status === 'ACCEPTED');
-      return accepted.length > 0 ? accepted : cachedData.questions;
+      const valid = cachedData.questions.filter((q) => q && q.current_version != null);
+      const accepted = valid.filter((q) => q.status === 'ACCEPTED');
+      return accepted.length > 0 ? accepted : valid;
     }
     return FALLBACK_PRACTICE_QUESTIONS;
   });
@@ -277,20 +278,23 @@ export function ProjectPracticeStudioPage({
 
     async function loadData() {
       try {
-        const res = await fetch(`/api/v1/projects/${projectId}/questions`, {
+        const res = await fetch(`/api/v1/projects/${projectId}/questions?limit=1000`, {
           headers: { 'Content-Type': 'application/json' },
         });
         if (res.ok) {
           const json = await res.json();
           if (Array.isArray(json.data) && json.data.length > 0) {
-            const accepted = json.data.filter((q: QuestionItem) => q.status === 'ACCEPTED');
-            const items = accepted.length > 0 ? accepted : json.data;
-            setQuestions(items);
-            setVisitedIds((prev) => {
-              const next = new Set(prev);
-              if (items[0]) next.add(items[0].id);
-              return next;
-            });
+            const valid = json.data.filter((q: QuestionItem) => q && q.current_version != null);
+            const accepted = valid.filter((q: QuestionItem) => q.status === 'ACCEPTED');
+            const items = accepted.length > 0 ? accepted : valid;
+            if (items.length > 0) {
+              setQuestions(items);
+              setVisitedIds((prev) => {
+                const next = new Set(prev);
+                if (items[0]) next.add(items[0].id);
+                return next;
+              });
+            }
           }
         }
       } catch (e) {
@@ -367,8 +371,8 @@ export function ProjectPracticeStudioPage({
   const activeOptions: QuestionOption[] = useMemo(() => {
     if (!activeQuestion) return [];
     const opts =
-      activeQuestion.current_version.question_options ??
-      activeQuestion.current_version.options ??
+      activeQuestion.current_version?.question_options ??
+      activeQuestion.current_version?.options ??
       [];
     return [...opts]
       .map((o, idx) => ({
@@ -537,7 +541,7 @@ export function ProjectPracticeStudioPage({
       const qMarks = 4; // default 4 marks
       totalMarks += qMarks;
 
-      const opts = q.current_version.question_options ?? q.current_version.options ?? [];
+      const opts = q.current_version?.question_options ?? q.current_version?.options ?? [];
       const correctOpt = opts.find((o) => o.is_correct);
       const studentAnsId = selectedAnswers[q.id];
       const isCorrect = correctOpt && studentAnsId === correctOpt.id;
@@ -547,7 +551,7 @@ export function ProjectPracticeStudioPage({
         earnedMarks += qMarks;
       }
 
-      const bloomName = q.current_version.bloom_levels?.name || 'Cognitive';
+      const bloomName = q.current_version?.bloom_levels?.name || 'Cognitive';
       if (!bloomStats[bloomName]) {
         bloomStats[bloomName] = { correct: 0, total: 0, name: bloomName };
       }
@@ -596,7 +600,7 @@ export function ProjectPracticeStudioPage({
         <div className="h-16 w-full px-4 lg:px-8 flex items-center justify-between gap-4">
           <div className="flex items-center space-x-3 min-w-0">
             <div className="shrink-0 flex items-center">
-              <Logo />
+              <Logo to="/app" />
             </div>
 
             <div className="h-4 w-px bg-[#cbd5e1] hidden md:block" />
@@ -902,11 +906,11 @@ export function ProjectPracticeStudioPage({
 
               <div className="flex flex-col gap-6">
                 {questions.map((q, idx) => {
-                  const opts = q.current_version.question_options ?? q.current_version.options ?? [];
+                  const opts = q.current_version?.question_options ?? q.current_version?.options ?? [];
                   const studentAnsId = selectedAnswers[q.id];
                   const correctOpt = opts.find((o) => o.is_correct);
                   const isCorrect = correctOpt && studentAnsId === correctOpt.id;
-                  const sourceRef = q.current_version.question_source_refs?.[0];
+                  const sourceRef = q.current_version?.question_source_refs?.[0];
 
                   return (
                     <article
@@ -923,7 +927,7 @@ export function ProjectPracticeStudioPage({
                             Q{idx + 1}.
                           </span>
                           <span className="px-2 py-0.5 rounded bg-white text-[#475569] font-mono text-[11px] border border-[#e2e8f0]">
-                            {q.current_version.bloom_levels?.name || 'Cognitive'}
+                            {q.current_version?.bloom_levels?.name || 'Cognitive'}
                           </span>
                           <span className="px-2 py-0.5 rounded bg-white text-[#475569] font-mono text-[11px] border border-[#e2e8f0]">
                             4 Marks
@@ -944,7 +948,7 @@ export function ProjectPracticeStudioPage({
 
                       {/* Stem */}
                       <p className="font-serif text-base text-[#0f172a] leading-relaxed mb-4">
-                        {q.current_version.question_text}
+                        {q.current_version?.question_text || '(Draft question version)'}
                       </p>
 
                       {/* Options */}
@@ -985,10 +989,10 @@ export function ProjectPracticeStudioPage({
 
                       {/* Pedagogical Explanation & Grounding */}
                       <div className="bg-white/80 rounded-lg p-3 border border-black/5 flex flex-col gap-1.5 text-xs">
-                        {q.current_version.explanation && (
+                        {q.current_version?.explanation && (
                           <div className="text-[#334155]">
                             <strong className="text-[#0f172a]">Pedagogical Rationale:</strong>{' '}
-                            {q.current_version.explanation}
+                            {q.current_version?.explanation}
                           </div>
                         )}
                         {sourceRef && (
@@ -1065,7 +1069,7 @@ export function ProjectPracticeStudioPage({
                   </p>
 
                   {/* Optional formal excerpt or spec block if present in prompt */}
-                  {activeQuestion?.current_version?.question_text.includes('Dijkstra') && (
+                  {activeQuestion?.current_version?.question_text?.includes('Dijkstra') && (
                     <div className="w-full bg-[#f8fafc] rounded-lg p-3.5 border border-[#e2e8f0] font-mono text-xs overflow-x-auto">
                       <div className="flex items-center justify-between pb-1.5 text-[#64748b] border-b border-[#e2e8f0]/60 mb-2">
                         <div className="flex items-center space-x-1.5">
@@ -1185,7 +1189,7 @@ export function ProjectPracticeStudioPage({
                     {activeQuestion?.current_version?.explanation && (
                       <p className="text-xs text-[#334155] leading-relaxed">
                         <strong className="text-[#0f172a]">Pedagogical Rationale:</strong>{' '}
-                        {activeQuestion.current_version.explanation}
+                        {activeQuestion.current_version?.explanation}
                       </p>
                     )}
 
@@ -1194,13 +1198,13 @@ export function ProjectPracticeStudioPage({
                         <Icon name="book" size={13} />
                         <span>
                           <strong className="text-[#0f172a]">Source:</strong>{' '}
-                          {activeQuestion.current_version.question_source_refs[0].resource_chunks?.resources
+                          {activeQuestion.current_version?.question_source_refs?.[0]?.resource_chunks?.resources
                             ?.original_filename || 'Course Textbook'}
                           , Page{' '}
-                          {activeQuestion.current_version.question_source_refs[0].resource_chunks?.page_number || 1}
+                          {activeQuestion.current_version?.question_source_refs?.[0]?.resource_chunks?.page_number || 1}
                           , Chunk{' '}
                           <code className="bg-white px-1 py-0.5 rounded text-[#3157d5] border border-black/5">
-                            #{activeQuestion.current_version.question_source_refs[0].chunk_id}
+                            #{activeQuestion.current_version?.question_source_refs?.[0]?.chunk_id}
                           </code>
                         </span>
                       </div>

@@ -193,6 +193,10 @@ class GenerationManager {
           status: run.status,
           step,
           generatedCount: genCount,
+          targetCount:
+            run.requested_count ||
+            this.activeRuns.get(projectId)?.targetCount ||
+            0,
           error: run.error_message,
         });
 

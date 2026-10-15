@@ -54,7 +54,7 @@ interface ValidationRun {
 export interface QuestionItem {
   archived_at: string | null;
   created_at: string;
-  current_version: {
+  current_version?: {
     bloom_levels?: { name: string; slug: string } | null;
     difficulty_levels?: { name: string; slug: string } | null;
     explanation?: string | null;
@@ -71,7 +71,7 @@ export interface QuestionItem {
     topics?: { name: string } | null;
     validation_runs?: ValidationRun[];
     version_number: number;
-  };
+  } | null;
   generation_run_id: string | null;
   id: string;
   project_id: string;
@@ -710,11 +710,12 @@ export function ProjectQuestionsPage({
       try {
         const [projRes, qRes] = await Promise.all([
           apiRequest(`/projects/${projectId}`),
-          apiRequest(`/projects/${projectId}/questions`),
+          apiRequest(`/projects/${projectId}/questions?limit=1000`),
         ]);
 
         setProject(projRes.data);
-        const loaded: QuestionItem[] = qRes.data ?? [];
+        const rawLoaded: QuestionItem[] = qRes.data ?? [];
+        const loaded = rawLoaded.filter((q) => q && q.current_version != null);
         setQuestions(loaded);
         if (loaded.length > 0) {
           if (!selectedQuestionId) {
@@ -749,15 +750,18 @@ export function ProjectQuestionsPage({
         activeRun.status !== 'FAILED'
       ) {
         try {
-          const qRes = await apiRequest(`/projects/${projectId}/questions`);
+          const qRes = await apiRequest(`/projects/${projectId}/questions?limit=1000`);
           if (qRes.data && Array.isArray(qRes.data)) {
+            const valid = qRes.data.filter(
+              (q: QuestionItem) => q && q.current_version != null,
+            );
             setQuestions((prev) => {
-              if (qRes.data.length !== prev.length) {
-                updateProjectCache(projectId, { questions: qRes.data });
-                if (!selectedQuestionId && qRes.data.length > 0) {
-                  setSelectedQuestionId(qRes.data[0].id);
+              if (valid.length !== prev.length) {
+                updateProjectCache(projectId, { questions: valid });
+                if (!selectedQuestionId && valid.length > 0) {
+                  setSelectedQuestionId(valid[0].id);
                 }
-                return qRes.data;
+                return valid;
               }
               return prev;
             });
@@ -806,7 +810,7 @@ export function ProjectQuestionsPage({
     const map = new Map<string, { count: number; name: string }>();
     for (const q of questions) {
       const tName =
-        q.current_version.topics?.name || 'Curriculum Subject Area';
+        q.current_version?.topics?.name || 'Curriculum Subject Area';
       const existing = map.get(tName);
       if (existing) {
         existing.count++;
@@ -845,6 +849,9 @@ export function ProjectQuestionsPage({
   // Filtered and Sorted Questions
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
+      // If current_version is not yet populated, exclude from display list
+      if (!q.current_version) return false;
+
       // Status filter
       if (statusFilter !== 'ALL' && q.status !== statusFilter) {
         return false;
@@ -858,11 +865,11 @@ export function ProjectQuestionsPage({
       // Search Query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
-        const text = (q.current_version.question_text || '').toLowerCase();
-        const topic = (q.current_version.topics?.name || '').toLowerCase();
-        const explanation = (q.current_version.explanation || '').toLowerCase();
-        const modelAnswer = (q.current_version.model_answer || '').toLowerCase();
-        const optionsText = (q.current_version.question_options || [])
+        const text = (q.current_version?.question_text || '').toLowerCase();
+        const topic = (q.current_version?.topics?.name || '').toLowerCase();
+        const explanation = (q.current_version?.explanation || '').toLowerCase();
+        const modelAnswer = (q.current_version?.model_answer || '').toLowerCase();
+        const optionsText = (q.current_version?.question_options || [])
           .map((o) => o.option_text)
           .join(' ')
           .toLowerCase();
@@ -880,14 +887,14 @@ export function ProjectQuestionsPage({
 
       // Topic Filter
       if (selectedTopics.size > 0) {
-        const tName = q.current_version.topics?.name || '';
+        const tName = q.current_version?.topics?.name || '';
         if (!selectedTopics.has(tName)) return false;
       }
 
       // Bloom Filter
       if (selectedBlooms.size > 0) {
         const bSlug = (
-          q.current_version.bloom_levels?.slug || ''
+          q.current_version?.bloom_levels?.slug || ''
         ).toLowerCase();
         if (!selectedBlooms.has(bSlug)) return false;
       }
@@ -895,7 +902,7 @@ export function ProjectQuestionsPage({
       // Difficulty Filter
       if (selectedDifficulty) {
         const dSlug = (
-          q.current_version.difficulty_levels?.slug || ''
+          q.current_version?.difficulty_levels?.slug || ''
         ).toUpperCase();
         if (dSlug !== selectedDifficulty.toUpperCase()) return false;
       }
@@ -903,14 +910,14 @@ export function ProjectQuestionsPage({
       // Type Filter
       if (selectedType) {
         const tSlug = (
-          q.current_version.question_types?.slug || ''
+          q.current_version?.question_types?.slug || ''
         ).toUpperCase();
         if (tSlug !== selectedType.toUpperCase()) return false;
       }
 
       // Verified citations only
       if (verifiedOnly) {
-        const refs = q.current_version.question_source_refs ?? [];
+        const refs = q.current_version?.question_source_refs ?? [];
         if (refs.length === 0) return false;
       }
 
@@ -926,17 +933,17 @@ export function ProjectQuestionsPage({
       }
       if (sortOrder === 'grounding') {
         const scoreA =
-          a.current_version.question_source_refs?.[0]?.relevance_score ?? 0;
+          a.current_version?.question_source_refs?.[0]?.relevance_score ?? 0;
         const scoreB =
-          b.current_version.question_source_refs?.[0]?.relevance_score ?? 0;
+          b.current_version?.question_source_refs?.[0]?.relevance_score ?? 0;
         return scoreB - scoreA;
       }
       if (sortOrder === 'difficulty') {
         const diffRank = (s?: string) =>
           s === 'HARD' ? 3 : s === 'MEDIUM' ? 2 : 1;
         return (
-          diffRank(b.current_version.difficulty_levels?.slug) -
-          diffRank(a.current_version.difficulty_levels?.slug)
+          diffRank(b.current_version?.difficulty_levels?.slug) -
+          diffRank(a.current_version?.difficulty_levels?.slug)
         );
       }
       if (sortOrder === 'bloom') {
@@ -949,10 +956,10 @@ export function ProjectQuestionsPage({
           'create',
         ];
         const rankA = bloomOrder.indexOf(
-          (a.current_version.bloom_levels?.slug || '').toLowerCase(),
+          (a.current_version?.bloom_levels?.slug || '').toLowerCase(),
         );
         const rankB = bloomOrder.indexOf(
-          (b.current_version.bloom_levels?.slug || '').toLowerCase(),
+          (b.current_version?.bloom_levels?.slug || '').toLowerCase(),
         );
         return rankB - rankA;
       }
@@ -1067,8 +1074,8 @@ export function ProjectQuestionsPage({
       return;
     }
     setTweakQuestion(q);
-    setTweakBloom(q.current_version.bloom_levels?.slug?.toLowerCase() || 'analyze');
-    setTweakDifficulty(q.current_version.difficulty_levels?.slug?.toUpperCase() || 'HARD');
+    setTweakBloom(q.current_version?.bloom_levels?.slug?.toLowerCase() || 'analyze');
+    setTweakDifficulty(q.current_version?.difficulty_levels?.slug?.toUpperCase() || 'HARD');
     setTweakGuidance('');
     setIsTweakDrawerOpen(true);
   };
@@ -1114,7 +1121,7 @@ export function ProjectQuestionsPage({
               return {
                 ...q,
                 current_version: {
-                  ...q.current_version,
+                  ...(q.current_version ?? {}),
                   bloom_levels: {
                     name:
                       tweakBloom.charAt(0).toUpperCase() + tweakBloom.slice(1),
@@ -1126,9 +1133,11 @@ export function ProjectQuestionsPage({
                       tweakDifficulty.slice(1).toLowerCase(),
                     slug: tweakDifficulty,
                   },
+                  id: q.current_version?.id || `ver-${Date.now()}`,
                   question_text: tweakGuidance
-                    ? `[Regenerated] ${q.current_version.question_text} (Focus: ${tweakGuidance})`
-                    : `[Regenerated in Place] ${q.current_version.question_text}`,
+                    ? `[Regenerated] ${q.current_version?.question_text || ''} (Focus: ${tweakGuidance})`
+                    : `[Regenerated in Place] ${q.current_version?.question_text || ''}`,
+                  version_number: (q.current_version?.version_number ?? 1) + 1,
                 },
                 status: 'AVAILABLE',
               };
@@ -1211,8 +1220,10 @@ export function ProjectQuestionsPage({
               return {
                 ...q,
                 current_version: {
-                  ...q.current_version,
-                  question_text: `[Regenerated] ${q.current_version.question_text}`,
+                  ...(q.current_version ?? {}),
+                  id: q.current_version?.id || `ver-${Date.now()}`,
+                  question_text: `[Regenerated] ${q.current_version?.question_text || ''}`,
+                  version_number: (q.current_version?.version_number ?? 1) + 1,
                 },
                 status: 'AVAILABLE',
               };
@@ -1238,13 +1249,13 @@ export function ProjectQuestionsPage({
 
   // Open Edit Modal with current active question values
   const handleOpenEditModal = () => {
-    if (!activeQuestion) return;
-    setEditStem(activeQuestion.current_version.question_text);
-    setEditModelAnswer(activeQuestion.current_version.model_answer || '');
-    setEditExplanation(activeQuestion.current_version.explanation || '');
+    if (!activeQuestion || !activeQuestion.current_version) return;
+    setEditStem(activeQuestion.current_version?.question_text || '');
+    setEditModelAnswer(activeQuestion.current_version?.model_answer || '');
+    setEditExplanation(activeQuestion.current_version?.explanation || '');
     setEditOptions(
-      activeQuestion.current_version.question_options
-        ? [...activeQuestion.current_version.question_options]
+      activeQuestion.current_version?.question_options
+        ? [...(activeQuestion.current_version?.question_options ?? [])]
         : [],
     );
     setIsEditingModalOpen(true);
@@ -1253,7 +1264,7 @@ export function ProjectQuestionsPage({
   // Submit Edit Version
   const handleSaveEditedVersion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeQuestion) return;
+    if (!activeQuestion || !activeQuestion.current_version) return;
 
     setIsSavingEdit(true);
     try {
@@ -1288,13 +1299,14 @@ export function ProjectQuestionsPage({
               return {
                 ...q,
                 current_version: {
-                  ...q.current_version,
+                  ...(q.current_version ?? {}),
                   explanation: editExplanation,
+                  id: q.current_version?.id || `ver-${Date.now()}`,
                   model_answer: editModelAnswer,
                   origin: 'INSTRUCTOR_EDITED',
                   question_options: editOptions,
                   question_text: editStem,
-                  version_number: q.current_version.version_number + 1,
+                  version_number: (q.current_version?.version_number ?? 1) + 1,
                 },
               };
             }
@@ -1327,7 +1339,7 @@ export function ProjectQuestionsPage({
       {/* 1. TOP GLOBAL APPLICATION HEADER (h-16) */}
       <header className="h-16 w-full border-b border-outline-variant/40 bg-surface/90 backdrop-blur-md px-4 sm:px-8 flex items-center justify-between shrink-0 z-30 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
         <div className="flex items-center gap-3">
-          <Logo />
+          <Logo to="/app" />
           <span className="px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
             WORKSPACE
           </span>
@@ -1896,7 +1908,7 @@ export function ProjectQuestionsPage({
                 </p>
                 {questions.length === 0 && (
                   <Link
-                    to={`/projects/${projectId}/generation`}
+                    to={`/app/projects/${projectId}/generation`}
                     className="px-4 py-2 rounded bg-[#3157d5] text-white font-mono text-xs hover:bg-[#2544ab] transition-colors"
                   >
                     Synthesize Questions Now
@@ -1908,7 +1920,7 @@ export function ProjectQuestionsPage({
                 const isSelected = activeQuestion?.id === q.id;
                 const isChecked = bulkSelectedIds.has(q.id);
                 const sourceRef =
-                  q.current_version.question_source_refs?.[0];
+                  q.current_version?.question_source_refs?.[0];
                 const filename =
                   sourceRef?.resource_chunks?.resources?.original_filename ||
                   'lecture_04_sync.pdf';
@@ -1916,13 +1928,13 @@ export function ProjectQuestionsPage({
                   sourceRef?.resource_chunks?.page_number || 14;
 
                 const bloomSlug = (
-                  q.current_version.bloom_levels?.slug || 'analyze'
+                  q.current_version?.bloom_levels?.slug || 'analyze'
                 ).toUpperCase();
                 const diffSlug = (
-                  q.current_version.difficulty_levels?.slug || 'MED'
+                  q.current_version?.difficulty_levels?.slug || 'MED'
                 ).toUpperCase();
                 const typeSlug = (
-                  q.current_version.question_types?.slug || 'MCQ'
+                  q.current_version?.question_types?.slug || 'MCQ'
                 ).toUpperCase();
 
                 return (
@@ -2006,14 +2018,14 @@ export function ProjectQuestionsPage({
 
                     {/* Stem Snippet */}
                     <h4 className="text-xs font-normal text-[#0f172a] line-clamp-2 leading-relaxed mb-2 font-sans">
-                      {q.current_version.question_text}
+                      {q.current_version?.question_text || '(Generating question version...)'}
                     </h4>
 
                     {/* Metadata Footer */}
                     <div className="text-[10px] font-mono text-[#64748b] mb-2 flex items-center space-x-1.5">
                       <span className="text-[#94a3b8]">Topic:</span>
                       <span className="text-[#334155] font-medium truncate">
-                        {q.current_version.topics?.name || 'General Module'}
+                        {q.current_version?.topics?.name || 'General Module'}
                       </span>
                     </div>
 
@@ -2091,7 +2103,7 @@ export function ProjectQuestionsPage({
         </section>
 
         {/* COLUMN C: DEEP INSPECTION & PROVENANCE PANE (~550px) */}
-        {activeQuestion ? (
+        {activeQuestion && activeQuestion.current_version ? (
           <section className="flex-1 bg-white flex flex-col overflow-hidden min-w-[520px]">
             {/* Inspection Header */}
             <div className="h-12 border-b border-[#e2e8f0] bg-[#f8fafc] px-5 flex items-center justify-between shrink-0">
@@ -2102,8 +2114,8 @@ export function ProjectQuestionsPage({
                 </span>
                 <span className="text-[#cbd5e1]">|</span>
                 <span className="font-mono text-[11px] bg-white text-[#64748b] border border-[#e2e8f0] px-2 py-0.5 rounded shadow-sm">
-                  v{activeQuestion.current_version.version_number} (
-                  {activeQuestion.current_version.origin ===
+                  v{activeQuestion.current_version?.version_number ?? 1} (
+                  {activeQuestion.current_version?.origin ===
                   'INSTRUCTOR_EDITED'
                     ? 'Instructor Edited'
                     : 'AI-Generated'}
@@ -2164,13 +2176,13 @@ export function ProjectQuestionsPage({
                   <div className="text-[11px] font-mono text-[#64748b]">
                     <span>Bloom: </span>
                     <span className="text-[#3157d5] font-semibold">
-                      {activeQuestion.current_version.bloom_levels?.name ||
+                      {activeQuestion.current_version?.bloom_levels?.name ||
                         'Analyze'}
                     </span>
                     <span className="text-[#cbd5e1] mx-1">•</span>
                     <span>Format: </span>
                     <span className="text-[#0f172a] font-medium">
-                      {activeQuestion.current_version.question_types?.name ||
+                      {activeQuestion.current_version?.question_types?.name ||
                         'Multiple Choice'}
                     </span>
                   </div>
@@ -2178,7 +2190,7 @@ export function ProjectQuestionsPage({
 
                 {/* Question Stem Text Box */}
                 <div className="p-3.5 rounded bg-[#f8fafc] border border-[#e2e8f0] text-sm leading-relaxed text-[#0f172a]">
-                  {activeQuestion.current_version.question_text}
+                  {activeQuestion.current_version?.question_text}
                 </div>
 
                 {/* Show Answer & Show Grounding Toggle Buttons */}
@@ -2211,8 +2223,8 @@ export function ProjectQuestionsPage({
                 </div>
 
                 {/* MCQ Options Distractor Ledger */}
-                {activeQuestion.current_version.question_options &&
-                activeQuestion.current_version.question_options.length > 0 ? (
+                {activeQuestion.current_version?.question_options &&
+                (activeQuestion.current_version?.question_options?.length ?? 0) > 0 ? (
                   <div className="space-y-2.5">
                     <div className="text-[11px] font-mono uppercase tracking-wider text-[#64748b] font-semibold flex items-center justify-between">
                       <span>Assessment Options</span>
@@ -2222,7 +2234,7 @@ export function ProjectQuestionsPage({
                         </span>
                       )}
                     </div>
-                    {activeQuestion.current_version.question_options.map(
+                    {activeQuestion.current_version?.question_options?.map(
                       (opt, idx) => {
                         const letter = String.fromCharCode(65 + idx);
 
@@ -2315,23 +2327,23 @@ export function ProjectQuestionsPage({
                   <div className="space-y-3">
                     {showAnswer ? (
                       <>
-                        {activeQuestion.current_version.model_answer && (
+                        {activeQuestion.current_version?.model_answer && (
                           <div className="p-3 rounded border border-[#e2e8f0] bg-[#f8fafc] text-xs space-y-1">
                             <span className="font-mono text-emerald-700 font-semibold uppercase text-[10px]">
                               Exemplary Model Answer
                             </span>
                             <p className="text-[#0f172a] leading-relaxed font-sans">
-                              {activeQuestion.current_version.model_answer}
+                              {activeQuestion.current_version?.model_answer}
                             </p>
                           </div>
                         )}
-                        {activeQuestion.current_version.explanation && (
+                        {activeQuestion.current_version?.explanation && (
                           <div className="p-3 rounded border border-[#e2e8f0] bg-[#f8fafc] text-xs space-y-1">
                             <span className="font-mono text-[#3157d5] font-semibold uppercase text-[10px]">
                               Pedagogical Rationale
                             </span>
                             <p className="text-[#334155] leading-relaxed font-sans">
-                              {activeQuestion.current_version.explanation}
+                              {activeQuestion.current_version?.explanation}
                             </p>
                           </div>
                         )}
@@ -2345,14 +2357,14 @@ export function ProjectQuestionsPage({
                 )}
 
                 {/* Rubric Criteria Tags */}
-                {activeQuestion.current_version.rubric_criteria &&
-                  activeQuestion.current_version.rubric_criteria.length > 0 && (
+                {activeQuestion.current_version?.rubric_criteria &&
+                  (activeQuestion.current_version?.rubric_criteria?.length ?? 0) > 0 && (
                     <div className="pt-2 border-t border-[#f1f5f9] space-y-1.5">
                       <div className="text-[10px] font-mono uppercase tracking-wider text-[#64748b]">
                         Rubric Criteria
                       </div>
                       <div className="flex flex-wrap gap-1.5">
-                        {activeQuestion.current_version.rubric_criteria.map(
+                        {activeQuestion.current_version?.rubric_criteria?.map(
                           (rc, i) => (
                             <span
                               className="px-2 py-0.5 rounded bg-[#f8fafc] border border-[#e2e8f0] text-[#475569] text-[11px] font-mono"
@@ -2370,7 +2382,7 @@ export function ProjectQuestionsPage({
               {/* CARD 2: GROUNDING EVIDENCE & PDF CITATION DRAWER (Visible when showGrounding is toggled) */}
               {showGrounding && (() => {
                 const sRef =
-                  activeQuestion.current_version.question_source_refs?.[0];
+                  activeQuestion.current_version?.question_source_refs?.[0];
                 const filename =
                   sRef?.resource_chunks?.resources?.original_filename ||
                   'Source Document';
@@ -2378,7 +2390,7 @@ export function ProjectQuestionsPage({
                 const chunkId = sRef?.chunk_id || 'chk-01';
                 const quote =
                   sRef?.evidence_text ||
-                  activeQuestion.current_version.question_source_refs?.[0]?.evidence_text ||
+                  activeQuestion.current_version?.question_source_refs?.[0]?.evidence_text ||
                   'No verbatim evidence excerpt available for this question.';
 
                 return (
@@ -2474,6 +2486,11 @@ export function ProjectQuestionsPage({
                 <span>Accept Question to Bank</span>
               </button>
             </div>
+          </section>
+        ) : activeQuestion ? (
+          <section className="flex-1 bg-white flex flex-col items-center justify-center p-8 text-[#64748b] font-mono text-xs gap-3">
+            <div className="w-6 h-6 border-2 border-[#3157d5] border-t-transparent rounded-full animate-spin" />
+            <p>Question #{String(activeQuestion.sort_order).padStart(2, '0')} details are currently hydrating...</p>
           </section>
         ) : (
           <section className="flex-1 bg-white flex flex-col items-center justify-center p-8 text-[#64748b] font-mono text-xs gap-3">
@@ -2690,20 +2707,20 @@ export function ProjectQuestionsPage({
                 <div className="flex items-center space-x-2 text-[#334155]">
                   <Icon name="file" size={14} />
                   <span className="truncate font-semibold text-[#0f172a] max-w-[200px]">
-                    {tweakQuestion.current_version.question_source_refs?.[0]
+                    {tweakQuestion.current_version?.question_source_refs?.[0]
                       ?.resource_chunks?.resources?.original_filename ||
                       'Source Document'}
                   </span>
                   <span className="text-[#cbd5e1]">•</span>
                   <span>
                     Page{' '}
-                    {tweakQuestion.current_version.question_source_refs?.[0]
+                    {tweakQuestion.current_version?.question_source_refs?.[0]
                       ?.resource_chunks?.page_number || 1}
                   </span>
                   <span className="text-[#cbd5e1]">•</span>
                   <code className="text-[#3157d5] bg-[#eef2ff] px-1 py-0.5 rounded font-bold">
                     #
-                    {tweakQuestion.current_version.question_source_refs?.[0]
+                    {tweakQuestion.current_version?.question_source_refs?.[0]
                       ?.chunk_id || 'chk-01'}
                   </code>
                 </div>

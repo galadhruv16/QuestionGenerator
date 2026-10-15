@@ -357,6 +357,28 @@ export async function executeGenerationRun(
     const isCloud = chosenProvider === 'gemini' || chosenProvider === 'groq';
     const BATCH_SIZE = isCloud ? 3 : 1;
 
+    // Ensure chunks are sorted monotonically by resource and page number for strictly proportional coverage
+    const sortedPoolChunks = [...poolChunks].sort((a, b) => {
+      if (a.resource_id !== b.resource_id) {
+        return a.resource_id.localeCompare(b.resource_id);
+      }
+      const pageA = a.page_number ?? 0;
+      const pageB = b.page_number ?? 0;
+      if (pageA !== pageB) return pageA - pageB;
+      return a.chunk_index - b.chunk_index;
+    });
+
+    const totalPool = sortedPoolChunks.length;
+    const totalTargets = planTargets.length;
+
+    // Build reverse lookup from chunk_id to linked topic_id
+    const chunkToTopicIds = new Map<string, string[]>();
+    for (const link of chunkTopicLinks ?? []) {
+      const arr = chunkToTopicIds.get(link.chunk_id) ?? [];
+      arr.push(link.topic_id);
+      chunkToTopicIds.set(link.chunk_id, arr);
+    }
+
     // Partition targets with their selected chunks into batches
     const batchList: Array<
       Array<{
@@ -368,15 +390,16 @@ export async function executeGenerationRun(
     > = [];
 
     let currentBatch: (typeof batchList)[0] = [];
-    for (const target of planTargets) {
+    for (let tIdx = 0; tIdx < planTargets.length; tIdx++) {
+      const target = planTargets[tIdx]!;
       const planItemId = planItemMap.get(target.sequenceNumber);
       if (!planItemId) continue;
 
-      const topicName = target.topicId
+      let topicName = target.topicId
         ? topicMap.get(target.topicId) || 'Curriculum Subject'
         : 'Core Subject Area';
 
-      // 1. First preference: chunks explicitly linked to target.topicId via chunk_topics
+      // Chunks explicitly linked to target.topicId via chunk_topics
       const mappedChunkIds = target.topicId
         ? topicToChunkIds.get(target.topicId) ?? []
         : [];
@@ -384,37 +407,75 @@ export async function executeGenerationRun(
         .map((id) => chunkById.get(id))
         .filter((c): c is NonNullable<typeof c> => Boolean(c));
 
+      // Compute this question's proportional stratum across the entire document
+      // e.g., question 1 of 15 is 0%..6.6% (Page 1-5), question 15 of 15 is 93.3%..100% (Page 67-71)
+      const windowStart = Math.floor((tIdx * totalPool) / totalTargets);
+      const windowEnd = Math.min(
+        totalPool - 1,
+        Math.floor(((tIdx + 1) * totalPool) / totalTargets) - 1,
+      );
+      const effectiveWindowEnd = Math.max(windowStart, windowEnd);
+      const stratumChunks = sortedPoolChunks.slice(
+        windowStart,
+        effectiveWindowEnd + 1,
+      );
+
+      const topicWords = topicName
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 3 && !STOPWORDS.has(w));
+
+      // 1. First priority: Check if this stratum contains chunks explicitly linked to target.topicId
+      const stratumTopicLinked = stratumChunks.filter((c) =>
+        mappedChunkIds.includes(c.id),
+      );
+
+      // 2. Second priority: Check if this stratum contains keyword matches for the topic
+      const stratumKeywordMatched = stratumChunks.filter((c) => {
+        const lower = c.text.toLowerCase();
+        return topicWords.some((w) => lower.includes(w));
+      });
+
       let selectedChunk: (typeof poolChunks)[0] | undefined;
 
-      if (mappedChunks.length > 0) {
-        selectedChunk =
-          mappedChunks[(target.sequenceNumber - 1) % mappedChunks.length];
-      } else {
-        // 2. Second preference: topic keyword matching across poolChunks
-        const topicWords = topicName
-          .toLowerCase()
-          .split(/\s+/)
-          .filter((w) => w.length > 3 && !STOPWORDS.has(w));
+      if (stratumTopicLinked.length > 0) {
+        selectedChunk = stratumTopicLinked[tIdx % stratumTopicLinked.length];
+      } else if (stratumKeywordMatched.length > 0) {
+        selectedChunk = stratumKeywordMatched[tIdx % stratumKeywordMatched.length];
+      } else if (mappedChunks.length > 0) {
+        // If topic has mapped chunks elsewhere, find the one closest to this window's position
+        const closestMapped = mappedChunks.reduce((best, curr) => {
+          const bestDist = Math.abs(best.chunk_index - windowStart);
+          const currDist = Math.abs(curr.chunk_index - windowStart);
+          return currDist < bestDist ? curr : best;
+        }, mappedChunks[0]!);
 
-        const matchingChunks = poolChunks.filter((c) => {
-          const lower = c.text.toLowerCase();
-          return topicWords.some((w) => lower.includes(w));
-        });
-
-        if (matchingChunks.length > 0) {
-          selectedChunk =
-            matchingChunks[(target.sequenceNumber - 1) % matchingChunks.length];
+        // If the closest mapped chunk is within 35% document distance, use it;
+        // otherwise, use the stratum chunk to guarantee 100% full-document syllabus coverage!
+        const maxAllowedDistance = Math.max(6, Math.floor(totalPool * 0.35));
+        if (Math.abs(closestMapped.chunk_index - windowStart) <= maxAllowedDistance) {
+          selectedChunk = closestMapped;
         } else {
-          // 3. Fallback: Stratified sampling across the FULL syllabus range (beginning, middle, end)
-          const stride = Math.max(
-            1,
-            Math.floor(poolChunks.length / Math.max(1, planTargets.length)),
-          );
-          const chunkIndex = Math.min(
-            poolChunks.length - 1,
-            (target.sequenceNumber - 1) * stride,
-          );
-          selectedChunk = poolChunks[chunkIndex];
+          selectedChunk =
+            stratumChunks[Math.floor(stratumChunks.length / 2)] ||
+            sortedPoolChunks[windowStart];
+        }
+      } else {
+        // 3. Fallback: Select central chunk of this document stratum
+        selectedChunk =
+          stratumChunks[Math.floor(stratumChunks.length / 2)] ||
+          sortedPoolChunks[windowStart];
+      }
+
+      // If selectedChunk is linked to a specific topic in the document, adopt that topic
+      if (selectedChunk) {
+        const linkedTopics = chunkToTopicIds.get(selectedChunk.id);
+        if (linkedTopics && linkedTopics.length > 0 && linkedTopics[0]) {
+          const linkedId = linkedTopics[0];
+          if (topicMap.has(linkedId)) {
+            topicName = topicMap.get(linkedId)!;
+            target.topicId = linkedId;
+          }
         }
       }
 

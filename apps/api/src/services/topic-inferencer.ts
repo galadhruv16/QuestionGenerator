@@ -439,10 +439,15 @@ export function extractIntelligentModules(
   const modules: InferredModule[] = [];
 
   if (uniqueHeadings.length >= 2) {
-    // Distinct explicit headings found across the content
-    const maxModules = Math.min(uniqueHeadings.length, 6);
+    // Distinct explicit headings found across the content: distribute modules evenly across the full document
+    const maxModules = Math.min(
+      uniqueHeadings.length,
+      activeChunks.length > 100 ? 10 : activeChunks.length > 40 ? 8 : 6,
+    );
+    const step = (uniqueHeadings.length - 1) / Math.max(1, maxModules - 1);
     for (let i = 0; i < maxModules; i++) {
-      const item = uniqueHeadings[i]!;
+      const headingIdx = Math.round(i * step);
+      const item = uniqueHeadings[headingIdx]!;
       const relevantChunks = activeChunks.filter(
         (c) =>
           c.id === item.chunkId ||
@@ -577,10 +582,19 @@ export async function persistInferredTopics(
         });
       }
 
-      // If still no keyword match, assign from this module's proportional section of the document
+      // Assign up to 15 chunks evenly distributed across the matching document range
       let targets: typeof chunks = [];
       if (matched.length > 0) {
-        targets = matched.slice(0, 15);
+        if (matched.length <= 15) {
+          targets = matched;
+        } else {
+          const sampleCount = 15;
+          const sampleStep = (matched.length - 1) / (sampleCount - 1);
+          targets = [];
+          for (let sIdx = 0; sIdx < sampleCount; sIdx++) {
+            targets.push(matched[Math.round(sIdx * sampleStep)]!);
+          }
+        }
       } else {
         const modIdx = Math.max(0, sortOrder - 2);
         const sliceSize = Math.max(
@@ -591,7 +605,17 @@ export async function persistInferredTopics(
           modIdx * sliceSize,
           (modIdx + 1) * sliceSize,
         );
-        targets = (modSlice.length > 0 ? modSlice : validChunks).slice(0, 15);
+        const candidateSlice = modSlice.length > 0 ? modSlice : validChunks;
+        if (candidateSlice.length <= 15) {
+          targets = candidateSlice;
+        } else {
+          const sampleCount = 15;
+          const sampleStep = (candidateSlice.length - 1) / (sampleCount - 1);
+          targets = [];
+          for (let sIdx = 0; sIdx < sampleCount; sIdx++) {
+            targets.push(candidateSlice[Math.round(sIdx * sampleStep)]!);
+          }
+        }
       }
 
       for (const targetChunk of targets) {
