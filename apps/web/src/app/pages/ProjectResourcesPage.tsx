@@ -28,8 +28,10 @@ export interface ResourceItem {
   evidence_summary?: string;
   evidence_tokens?: number;
   failure_reason?: string;
+  file_extension?: string;
   file_size_bytes: number;
   id: string;
+  metadata?: Record<string, unknown>;
   original_filename: string;
   page_count: number | null;
   processing_stage?: string;
@@ -567,17 +569,54 @@ export function ProjectResourcesPage({
   };
 
   const validateAndStageFile = (file: File) => {
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
+    const lower = file.name.toLowerCase();
+    const validExtensions = [
+      '.pdf',
+      '.pptx',
+      '.ppt',
+      '.docx',
+      '.doc',
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.webp',
+    ];
+    const isValid = validExtensions.some((ext) => lower.endsWith(ext));
+
+    if (!isValid) {
       setUploadError(
-        'Only PDF files are currently supported in V1. DOCX and PPTX support will be added in upcoming updates.',
+        'Supported formats: PDF (selectable & scanned/handwritten), PPTX Presentations, DOCX Documents, and Images (PNG, JPG, WEBP).',
       );
       return;
     }
     if (file.size > 25 * 1024 * 1024) {
-      setUploadError('File exceeds the 25 MB limit for single PDF uploads.');
+      setUploadError('File exceeds the 25 MB limit for document uploads.');
       return;
     }
+
+    if (lower.endsWith('.pptx') || lower.endsWith('.ppt')) {
+      setUploadKind('PRESENTATION');
+    }
+
     setStagedFile(file);
+  };
+
+  const getFileMimeType = (file: File): string => {
+    if (file.type && file.type !== 'application/octet-stream') {
+      return file.type;
+    }
+    const lower = file.name.toLowerCase();
+    if (lower.endsWith('.pdf')) return 'application/pdf';
+    if (lower.endsWith('.pptx'))
+      return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    if (lower.endsWith('.ppt')) return 'application/vnd.ms-powerpoint';
+    if (lower.endsWith('.docx'))
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if (lower.endsWith('.doc')) return 'application/msword';
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    return 'application/pdf';
   };
 
   const confirmStagedUpload = async () => {
@@ -586,13 +625,15 @@ export function ProjectResourcesPage({
     try {
       setUploadError(null);
       setUploadProgress(20);
+      const mimeType = getFileMimeType(stagedFile);
+
       const initPayload = await apiRequest(
         `/projects/${projectId}/resources/upload-init`,
         {
           body: JSON.stringify({
             file_size_bytes: stagedFile.size,
             filename: stagedFile.name,
-            mime_type: 'application/pdf',
+            mime_type: mimeType,
             resource_kind: uploadKind,
           }),
           method: 'POST',
@@ -610,7 +651,7 @@ export function ProjectResourcesPage({
       const { error: uploadError } = await getSupabaseClient()
         .storage.from('resources')
         .upload(bucketObjectKey, stagedFile, {
-          contentType: 'application/pdf',
+          contentType: mimeType,
           upsert: true,
         });
 
@@ -869,12 +910,12 @@ export function ProjectResourcesPage({
                   type="button"
                 >
                   <Icon name="upload" size={16} />
-                  <span>+ Upload PDF</span>
+                  <span>+ Upload Resource</span>
                 </button>
               </div>
             </div>
 
-            {/* Scanned Document Error Alert Banner (Shown dynamically when a scanned PDF is detected) */}
+            {/* Scanned Document Error Alert Banner (Shown dynamically when an unparseable scanned PDF is detected) */}
             {resources.some(
               (r) =>
                 r.status === 'FAILED' &&
@@ -889,11 +930,10 @@ export function ProjectResourcesPage({
                   </div>
                   <div className="flex-1">
                     <h3 className="font-headline-sm text-headline-sm text-error font-semibold">
-                      Corpus Ingestion Blocked: 1 Scanned Document Detected
+                      Corpus Ingestion Blocked: Unreadable Document Detected
                     </h3>
                     <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-                      GroundQ&apos;s deterministic engine relies on digital text
-                      layers and vector font glyphs. Document{' '}
+                      Document{' '}
                       <code className="font-label-sm text-label-sm text-on-surface bg-surface-container px-1 py-0.5 rounded font-mono font-bold">
                         {resources.find(
                           (r) =>
@@ -901,11 +941,10 @@ export function ProjectResourcesPage({
                             (r.failure_reason?.includes('Scanned') ||
                               r.failure_reason?.includes('OCR') ||
                               r.failure_reason?.includes('extractable')),
-                        )?.original_filename ?? 'Uploaded Document.pdf'}
+                        )?.original_filename ?? 'Uploaded Document'}
                       </code>{' '}
-                      contains no selectable digital text. GroundQ requires
-                      digital PDFs with text layers to guarantee 100% grounded
-                      questions (OCR is out of scope for V1).
+                      contains scanned images or handwritten text that could not be parsed.
+                      Ensure <code className="font-mono font-bold text-primary">GEMINI_API_KEY</code> is configured in your backend environment (<code className="font-mono text-outline">.env</code>) to automatically transcribe scanned pages, whiteboard captures, and handwritten notes with Gemini Multimodal Vision OCR.
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-2 font-body-sm text-body-sm">
                       <button
@@ -914,7 +953,7 @@ export function ProjectResourcesPage({
                         type="button"
                       >
                         <Icon name="upload" size={14} />
-                        <span>Upload digital PDF with selectable text</span>
+                        <span>Upload new resource</span>
                       </button>
                       <button
                         className="px-3 py-1.5 rounded bg-surface-container text-on-surface hover:bg-surface-container-high transition-all"
@@ -1119,6 +1158,19 @@ export function ProjectResourcesPage({
                             res.status === 'READY_TO_PROCESS';
                           const isFailed = res.status === 'FAILED';
 
+                          const filename = res.original_filename || '';
+                          const ext = filename.split('.').pop()?.toLowerCase() || 'pdf';
+                          const isPptx =
+                            ext === 'pptx' ||
+                            ext === 'ppt' ||
+                            res.resource_kind === 'PRESENTATION';
+                          const isDocx = ext === 'docx' || ext === 'doc';
+                          const isImage = ['png', 'jpg', 'jpeg', 'webp'].includes(ext);
+                          const isVisionOcr = Boolean(
+                            res.metadata?.ocr_applied ||
+                              res.metadata?.reason === 'SCANNED_OR_HANDWRITTEN_PDF',
+                          );
+
                           return (
                             <tr
                               className={`hover:bg-surface-container-low/60 transition-colors group cursor-pointer ${
@@ -1136,7 +1188,13 @@ export function ProjectResourcesPage({
                                         ? 'bg-primary text-on-primary animate-pulse'
                                         : isFailed
                                           ? 'bg-error-container text-error'
-                                          : 'bg-primary/10 text-primary'
+                                          : isPptx
+                                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                            : isImage
+                                              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                              : isDocx
+                                                ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                                                : 'bg-primary/10 text-primary'
                                     }`}
                                   >
                                     <Icon
@@ -1145,16 +1203,42 @@ export function ProjectResourcesPage({
                                           ? 'refresh'
                                           : isFailed
                                             ? 'alert'
-                                            : 'pdf'
+                                            : isPptx
+                                              ? 'layers'
+                                              : isImage
+                                                ? 'chart'
+                                                : isDocx
+                                                  ? 'file'
+                                                  : 'pdf'
                                       }
                                       size={18}
                                     />
                                   </div>
                                   <div className="min-w-0">
-                                    <div className="font-medium text-on-surface group-hover:text-primary transition-colors flex items-center gap-1.5">
+                                    <div className="font-medium text-on-surface group-hover:text-primary transition-colors flex items-center gap-1.5 flex-wrap">
                                       <span className="truncate">
                                         {res.original_filename}
                                       </span>
+                                      {isPptx && (
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/25">
+                                          PPTX
+                                        </span>
+                                      )}
+                                      {isImage && (
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/25">
+                                          IMAGE
+                                        </span>
+                                      )}
+                                      {isDocx && (
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-500/15 text-blue-800 dark:text-blue-300 border border-blue-500/25">
+                                          DOCX
+                                        </span>
+                                      )}
+                                      {isVisionOcr && (
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-500/30">
+                                          ✦ VISION OCR
+                                        </span>
+                                      )}
                                       {isReady && (
                                         <span
                                           className="text-secondary"
@@ -1188,9 +1272,11 @@ export function ProjectResourcesPage({
                                   className={`px-2 py-0.5 rounded font-label-sm text-label-sm font-semibold ${
                                     res.resource_kind === 'PYQ'
                                       ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/25'
-                                      : res.resource_kind === 'SYLLABUS'
+                                      : res.resource_kind === 'PRESENTATION'
                                         ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25'
-                                        : 'bg-surface-container text-on-surface'
+                                        : res.resource_kind === 'SYLLABUS'
+                                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25'
+                                          : 'bg-surface-container text-on-surface'
                                   }`}
                                 >
                                   {res.resource_kind === 'PYQ'
@@ -1202,7 +1288,13 @@ export function ProjectResourcesPage({
                               {/* Page Count */}
                               <td className="py-3 px-4 font-label-sm text-label-sm text-on-surface whitespace-nowrap">
                                 {res.page_count ? (
-                                  `${res.page_count} pp`
+                                  isPptx ? (
+                                    `${res.page_count} slides`
+                                  ) : isImage ? (
+                                    '1 image'
+                                  ) : (
+                                    `${res.page_count} pp`
+                                  )
                                 ) : isProcessing ? (
                                   <span className="italic text-outline">
                                     Reading...
@@ -1221,13 +1313,19 @@ export function ProjectResourcesPage({
                               <td className="py-3 px-4">
                                 {isReady && (
                                   <div className="flex flex-col gap-1">
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
                                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-secondary-container/50 text-secondary font-label-sm text-label-sm font-semibold">
                                         <Icon name="check" size={12} />
                                         READY
                                       </span>
                                       <span className="font-label-sm text-label-sm text-on-surface-variant">
-                                        v1.4 Parser
+                                        {isVisionOcr
+                                          ? 'Vision Multimodal OCR'
+                                          : isPptx
+                                            ? 'Slide Parser'
+                                            : isDocx
+                                              ? 'DOCX Parser'
+                                              : 'Digital Parser'}
                                       </span>
                                     </div>
                                     <div className="text-label-sm font-label-sm text-on-surface-variant">
@@ -1544,8 +1642,7 @@ export function ProjectResourcesPage({
                     'Document extraction could not be completed.'}
                 </p>
                 <div className="mt-1 pt-1.5 border-t border-error/20 text-label-sm text-outline">
-                  GroundQ requires text-selectable digital PDFs. OCR for scanned
-                  documents is out of scope for V1.
+                  GroundQ automatically uses Gemini Multimodal Vision OCR for scanned PDFs, diagrams, and handwritten notes. Ensure GEMINI_API_KEY is configured in your backend environment (.env).
                 </div>
               </div>
             )}
@@ -1860,10 +1957,11 @@ export function ProjectResourcesPage({
                 <span className="block font-label-sm text-label-sm uppercase text-on-surface-variant mb-2 font-semibold">
                   Resource Classification
                 </span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   {(
                     [
                       { id: 'STUDY_MATERIAL', label: 'Study Material' },
+                      { id: 'PRESENTATION', label: 'Presentation (Slides)' },
                       { id: 'PYQ', label: 'PYQ (Exams)' },
                       { id: 'SYLLABUS', label: 'Syllabus' },
                       { id: 'OTHER', label: 'Reference' },
@@ -1889,11 +1987,13 @@ export function ProjectResourcesPage({
                         name={
                           option.id === 'STUDY_MATERIAL'
                             ? 'book'
-                            : option.id === 'PYQ'
-                              ? 'file'
-                              : option.id === 'SYLLABUS'
-                                ? 'verified'
-                                : 'file'
+                            : option.id === 'PRESENTATION'
+                              ? 'layers'
+                              : option.id === 'PYQ'
+                                ? 'chart'
+                                : option.id === 'SYLLABUS'
+                                  ? 'verified'
+                                  : 'file'
                         }
                         size={20}
                       />
@@ -1912,7 +2012,7 @@ export function ProjectResourcesPage({
                 onDrop={handleFileDrop}
               >
                 <input
-                  accept="application/pdf,.pdf"
+                  accept=".pdf,.pptx,.ppt,.docx,.doc,.png,.jpg,.jpeg,.webp"
                   className="absolute inset-0 opacity-0 cursor-pointer"
                   onChange={handleFileInput}
                   type="file"
@@ -1921,13 +2021,16 @@ export function ProjectResourcesPage({
                   <Icon name="upload" size={24} />
                 </div>
                 <p className="font-body-md text-body-md text-on-surface font-medium">
-                  Drop PDF here, or{' '}
+                  Drop document or image here, or{' '}
                   <span className="text-primary underline">
                     browse local files
                   </span>
                 </p>
                 <span className="font-label-sm text-label-sm text-on-surface-variant mt-1">
-                  PDF format only (Max 25 MB per document)
+                  PDF (selectable & scanned), PPTX Presentations, DOCX, PNG/JPG/WEBP (Max 25 MB)
+                </span>
+                <span className="font-label-sm text-[11px] text-primary font-medium mt-1">
+                  ✦ Multimodal Vision OCR automatically transcribes scanned pages, diagrams & handwritten notes
                 </span>
               </div>
 

@@ -1,6 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { PDFParse } from 'pdf-parse';
 import { env } from '../config/env.js';
+import { extractPagesFromDocx, extractPagesFromPptx } from './office-extractor.js';
+import {
+  transcribeImageWithVision,
+  transcribePdfWithVision,
+} from './multimodal-transcriber.js';
 
 export interface ExtractedPage {
   pageNumber: number;
@@ -201,48 +206,152 @@ export async function processResourcePipeline(
     const arrayBuffer = await blob.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // 2. Extract text and detect scanned/image-only PDFs
-    await updateRun({ metadata: { stage: 'EXTRACTING_TEXT' } });
-    console.log(
-      `[resource-processor] Extracting pages from PDF buffer (${buffer.length} bytes)...`,
-    );
-    const { pages, totalPages } = await extractPagesFromPdf(buffer);
+    // 2. Fetch resource details for format-specific routing
+    const { data: resourceRecord } = await client
+      .from('resources')
+      .select('file_extension, mime_type, original_filename')
+      .eq('id', resourceId)
+      .maybeSingle();
+
+    const fileExt = (
+      resourceRecord?.file_extension ||
+      storagePath.split('.').pop() ||
+      ''
+    ).toLowerCase();
+    const mimeType = (resourceRecord?.mime_type || '').toLowerCase();
+
+    let pages: ExtractedPage[] = [];
+    let totalPages = 0;
+    let parserVersion = 'pdf-parse-v1';
+    let ocrApplied = false;
+
+    if (
+      fileExt === 'pptx' ||
+      fileExt === 'ppt' ||
+      mimeType.includes('presentation')
+    ) {
+      await updateRun({ metadata: { stage: 'PARSING_PRESENTATION' } });
+      console.log(
+        `[resource-processor] Extracting slides from presentation (${buffer.length} bytes)...`,
+      );
+      const presResult = extractPagesFromPptx(buffer);
+      pages = presResult.pages;
+      totalPages = presResult.totalPages;
+      parserVersion = 'pptx-slide-parser-v1';
+    } else if (
+      fileExt === 'docx' ||
+      fileExt === 'doc' ||
+      mimeType.includes('wordprocessingml')
+    ) {
+      await updateRun({ metadata: { stage: 'PARSING_DOCX' } });
+      console.log(
+        `[resource-processor] Extracting text from Word document (${buffer.length} bytes)...`,
+      );
+      const docResult = extractPagesFromDocx(buffer);
+      pages = docResult.pages;
+      totalPages = docResult.totalPages;
+      parserVersion = 'docx-parser-v1';
+    } else if (
+      ['png', 'jpg', 'jpeg', 'webp'].includes(fileExt) ||
+      mimeType.startsWith('image/')
+    ) {
+      await updateRun({ metadata: { stage: 'TRANSCRIBING_IMAGE_VISION' } });
+      console.log(
+        `[resource-processor] Extracting handwritten notes & diagrams from image (${buffer.length} bytes)...`,
+      );
+      const effectiveMime = mimeType.startsWith('image/')
+        ? mimeType
+        : `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`;
+      const imageResult = await transcribeImageWithVision(
+        buffer,
+        effectiveMime,
+      );
+      pages = imageResult.pages;
+      totalPages = imageResult.totalPages;
+      parserVersion = 'gemini-vision-image-v1';
+      ocrApplied = true;
+    } else {
+      // PDF processing: extract selectable text layer first
+      await updateRun({ metadata: { stage: 'EXTRACTING_TEXT' } });
+      console.log(
+        `[resource-processor] Extracting pages from PDF buffer (${buffer.length} bytes)...`,
+      );
+      const digitalResult = await extractPagesFromPdf(buffer);
+      const digitalChars = digitalResult.pages.reduce(
+        (sum, p) => sum + p.text.length,
+        0,
+      );
+
+      console.log(
+        `[resource-processor] Digital text extraction result: ${digitalResult.totalPages} pages, ${digitalChars} characters`,
+      );
+
+      // Check if document is scanned or has non-selectable/handwritten text
+      if (
+        digitalChars < 50 ||
+        digitalChars / (digitalResult.totalPages || 1) < 10
+      ) {
+        console.log(
+          `[resource-processor] Scanned or handwritten PDF detected (${digitalChars} digital chars). Engaging Gemini Multimodal Vision OCR...`,
+        );
+        await updateRun({
+          metadata: {
+            reason: 'SCANNED_OR_HANDWRITTEN_PDF',
+            stage: 'OCR_VISION_TRANSCRIBING',
+          },
+        });
+
+        try {
+          const visionResult = await transcribePdfWithVision(buffer);
+          if (
+            visionResult.pages.length > 0 &&
+            visionResult.pages.some((p) => p.text.length > 20)
+          ) {
+            pages = visionResult.pages;
+            totalPages = visionResult.totalPages;
+            parserVersion = 'gemini-vision-multimodal-v1';
+            ocrApplied = true;
+          } else {
+            throw new Error(
+              'Gemini Vision OCR returned empty text from scanned document.',
+            );
+          }
+        } catch (visionErr) {
+          console.warn(
+            `[resource-processor] Vision OCR transcription failed:`,
+            visionErr,
+          );
+          if (digitalResult.pages.length > 0 && digitalChars > 0) {
+            pages = digitalResult.pages;
+            totalPages = digitalResult.totalPages;
+            parserVersion = 'pdf-parse-v1 (partial)';
+          } else {
+            throw new Error(
+              `Non-selectable or handwritten PDF could not be transcribed. OCR Error: ${visionErr instanceof Error ? visionErr.message : String(visionErr)}`,
+            );
+          }
+        }
+      } else {
+        pages = digitalResult.pages;
+        totalPages = digitalResult.totalPages;
+        parserVersion = 'pdf-parse-v1';
+      }
+    }
 
     const totalExtractedChars = pages.reduce(
       (sum, p) => sum + p.text.length,
       0,
     );
 
-    console.log(
-      `[resource-processor] Extraction completed: ${totalPages} pages, ${totalExtractedChars} text characters`,
-    );
-
-    // Scanned document detection: non-extractable text
-    if (
-      totalExtractedChars < 50 ||
-      totalExtractedChars / (totalPages || 1) < 10
-    ) {
-      const scannedError =
-        'Scanned or image-only document detected. No extractable digital text layers found. GroundQ V1 requires digital PDFs with selectable text (OCR is not supported in V1).';
-      console.warn(
-        `[resource-processor] Resource ${resourceId} rejected: ${scannedError}`,
+    if (pages.length === 0 || totalExtractedChars === 0) {
+      throw new Error(
+        'Document processing produced no extractable text, handwritten notes, or diagrams.',
       );
-      await updateRun(
-        {
-          completed_at: new Date().toISOString(),
-          error_message: scannedError,
-          metadata: {
-            reason: 'SCANNED_DOCUMENT',
-            stage: 'EXTRACTING_TEXT',
-            total_chars: totalExtractedChars,
-            total_pages: totalPages,
-          },
-        },
-        'FAILED',
-      );
-      await updateResource({ page_count: totalPages }, 'FAILED');
-      return;
     }
+
+    console.log(
+      `[resource-processor] Extraction completed via ${parserVersion}: ${totalPages} pages/slides, ${totalExtractedChars} characters (OCR: ${ocrApplied})`,
+    );
 
     // 3. Chunk page text
     await updateRun({ metadata: { stage: 'CHUNKING' } });
@@ -289,11 +398,12 @@ export async function processResourcePipeline(
         embedding_model: env.EMBEDDING_MODEL,
         metadata: {
           chunk_count: chunks.length,
+          ocr_applied: ocrApplied,
           page_count: totalPages,
           stage: 'COMPLETED',
           total_chars: totalExtractedChars,
         },
-        parser_version: 'pdf-parse-v1',
+        parser_version: parserVersion,
       },
       'READY',
     );

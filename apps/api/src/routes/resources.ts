@@ -124,10 +124,14 @@ resourcesRouter.post('/upload-init', async (request, response, next) => {
     const bucketObjectKey = `${projectId}/${resourceId}/${safeFilename}`;
     const storagePath = `resources/${bucketObjectKey}`;
 
+    const extMatch = filename.match(/\.([a-zA-Z0-9]+)$/);
+    const fileExtension =
+      extMatch && extMatch[1] ? extMatch[1].toLowerCase() : 'pdf';
+
     const { error: insertError } = await client
       .from('resources')
       .insert({
-        file_extension: 'pdf',
+        file_extension: fileExtension,
         file_size_bytes,
         id: resourceId,
         mime_type,

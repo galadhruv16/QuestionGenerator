@@ -61,10 +61,36 @@ describe('shared contracts scaffold', () => {
       false,
     );
 
-    const nonPdfInit = {
+    // Verify multi-format support
+    expect(
+      uploadInitRequestSchema.safeParse({
+        ...validInit,
+        filename: 'lecture-notes.docx',
+      }).success,
+    ).toBe(true);
+
+    expect(
+      uploadInitRequestSchema.safeParse({
+        ...validInit,
+        filename: 'distributed-systems.pptx',
+        resource_kind: 'PRESENTATION',
+      }).success,
+    ).toBe(true);
+
+    expect(
+      uploadInitRequestSchema.safeParse({
+        ...validInit,
+        filename: 'whiteboard-notes.png',
+      }).success,
+    ).toBe(true);
+
+    // Reject unsupported formats
+    const unsupportedInit = {
       ...validInit,
-      filename: 'lecture-notes.docx',
+      filename: 'malicious-script.exe',
     };
-    expect(uploadInitRequestSchema.safeParse(nonPdfInit).success).toBe(false);
+    expect(uploadInitRequestSchema.safeParse(unsupportedInit).success).toBe(
+      false,
+    );
   });
 });

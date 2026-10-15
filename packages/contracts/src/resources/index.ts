@@ -42,6 +42,29 @@ export const resourceSchema = z.object({
 
 export type Resource = z.infer<typeof resourceSchema>;
 
+export const supportedFileExtensions = [
+  'pdf',
+  'pptx',
+  'ppt',
+  'docx',
+  'doc',
+  'png',
+  'jpg',
+  'jpeg',
+  'webp',
+] as const;
+
+export const supportedMimeTypes = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+] as const;
+
 export const uploadInitRequestSchema = z.object({
   file_size_bytes: z
     .number()
@@ -53,8 +76,11 @@ export const uploadInitRequestSchema = z.object({
     .trim()
     .min(1)
     .max(255)
-    .regex(/\.pdf$/i, 'Only PDF files are currently supported in V1'),
-  mime_type: z.literal('application/pdf'),
+    .regex(
+      /\.(pdf|pptx|ppt|docx|doc|png|jpg|jpeg|webp)$/i,
+      'Supported formats: PDF, PPTX/PPT, DOCX, PNG, JPG, and WEBP (up to 25 MB)',
+    ),
+  mime_type: z.string().min(1),
   resource_kind: resourceKindSchema,
 });
 

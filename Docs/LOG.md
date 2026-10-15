@@ -4,7 +4,51 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
-## [2026-10-15] — Option A: Previous Year Question (PYQ) Pattern Analysis & Blueprint-Driven Question Synthesis (PRD §4.1, §11, §25)
+## [2026-10-15] — Multimodal Vision OCR Ingestion Expansion (Handwritten Notes, Diagrams, Images, Scanned PDFs, and PPTX Presentations)
+
+### Type
+Feature / Backend Multimodal AI & Parsers / Ingestion Pipeline / UI / UX / Quality Assurance
+
+### Status
+Implemented and verified locally across full workspace TypeScript typecheck (0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`), production build (`pnpm build`), and monorepo Vitest test suite (91/91 tests passed).
+
+### Context & User Directives
+1. **Multimodal Document Processing Expansion**:
+   - Beyond text-selectable PDFs: full support for non-selectable scanned PDFs, handwritten documents, photos of whiteboard lecture notes, and diagrams.
+   - Automatic multimodal OCR routing: when a PDF is detected as scanned or image-heavy (`< 50` text characters or `< 10` chars/page), the system automatically transcribes it with Gemini Multimodal Vision OCR instead of rejecting it with a hard error.
+2. **Presentations (PPTX / PPT)**:
+   - Full support for slide decks, parsing slide titles, body bullet points, and speaker notes slide-by-slide (`[Slide N]` and `[Speaker Notes]`).
+3. **Images (PNG / JPG / JPEG / WEBP)**:
+   - Full support for handwritten lecture notes, textbook captures, and architectural/flowchart diagrams with comprehensive structural breakdowns for question grounding.
+4. **Zero Extra Native Dependencies**:
+   - Implemented standard Central Directory ZIP archive reader using Node.js built-in `node:zlib.inflateRawSync`, ensuring 100% lightweight, platform-agnostic execution without heavy OS binaries.
+
+### Changes Implemented
+1. **Shared Contracts (`packages/contracts/src/resources/index.ts`, `test/contracts.test.ts`)**:
+   - Defined `supportedFileExtensions` (`pdf`, `pptx`, `ppt`, `docx`, `doc`, `png`, `jpg`, `jpeg`, `webp`) and `supportedMimeTypes`.
+   - Updated `uploadInitRequestSchema` to accept all supported document and image types up to 25 MB.
+2. **Office Document Extractor (`apps/api/src/services/office-extractor.ts`)**:
+   - Implemented `readZipEntries`, `extractPagesFromPptx`, and `extractPagesFromDocx` with numerical slide ordering, XML text decoding, and speaker notes preservation.
+3. **Multimodal Vision Transcriber (`apps/api/src/services/multimodal-transcriber.ts`)**:
+   - Implemented `transcribePdfWithVision` and `transcribeImageWithVision` calling Google Gemini generateContent with inline base64 data.
+   - Built `parsePageDelimitedMarkdown` extracting page-bounded transcriptions across `--- Page X ---` delimiters.
+4. **Resource Processor & Upload Routes (`apps/api/src/services/resource-processor.ts`, `apps/api/src/routes/resources.ts`)**:
+   - Format routing based on `file_extension` and `mime_type`.
+   - Automatic scanned PDF detection triggering Gemini Vision OCR.
+   - Dynamic `file_extension` persistence and metadata tracking (`ocr_applied: true`, `parser_version`).
+5. **Frontend Resources Workspace (`apps/web/src/app/pages/ProjectResourcesPage.tsx`)**:
+   - File dropzone and picker updated to accept `.pdf,.pptx,.ppt,.docx,.doc,.png,.jpg,.jpeg,.webp`.
+   - Added `Presentation (Slides)` option to classification radio group.
+   - Table rows display format-specific icons and badges (`PPTX`, `IMAGE`, `DOCX`, `PDF`, and `✦ VISION OCR`).
+   - Page count column displays slide counts (`X slides`) or image tags (`1 image`).
+   - Updated scanned document alert banner and drawer failure notes with Gemini Vision OCR guidance.
+6. **Unit Test Suites (`apps/api/test/office-extractor.test.ts`, `apps/api/test/multimodal-transcriber.test.ts`, `apps/web/test/resources.test.tsx`)**:
+   - Added unit tests for ZIP archive reading, PPTX slide parsing, DOCX page splitting, vision markdown parsing, and multi-format UI rendering.
+7. **Verification & Quality Assurance**:
+   - Monorepo TypeScript Typecheck (`pnpm typecheck`): 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+   - Monorepo Test Suite (`pnpm test`): 91/91 tests passed (Contracts: 4, API: 41, Web: 46).
+   - Production Build (`pnpm build`): Completed cleanly in 9.94s without errors.
+
 
 ### Type
 Feature / Backend AI & Heuristics / Curricular Blueprint / UI / UX / Academic Grounding Subordination / Quality Assurance
