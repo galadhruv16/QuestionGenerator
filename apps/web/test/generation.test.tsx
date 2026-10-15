@@ -37,13 +37,15 @@ describe('ProjectGenerationPage', () => {
     expect(screen.getByText(/2. Topics/i)).toBeInTheDocument();
   });
 
-  it('renders the 4 blueprint archetype cards', () => {
+  it('renders the 5 blueprint archetype cards including PYQ Blueprint Synthesis', () => {
     renderGenerationPage();
 
     expect(screen.getByText('Balanced Exam Prep')).toBeInTheDocument();
     expect(screen.getByText('High-Order Analytical')).toBeInTheDocument();
     expect(screen.getByText('Foundational Recall')).toBeInTheDocument();
     expect(screen.getByText('Custom Blueprint')).toBeInTheDocument();
+    expect(screen.getByText('PYQ Blueprint Synthesis')).toBeInTheDocument();
+    expect(screen.getByText('EXAM CALIBRATED')).toBeInTheDocument();
   });
 
   it('renders Vector Matrices for curriculum, bloom, difficulty, and quality safeguards', () => {
@@ -145,4 +147,30 @@ describe('ProjectGenerationPage', () => {
       screen.queryByText('Save Blueprint as Preset'),
     ).not.toBeInTheDocument();
   });
+
+  it('calibrates generation parameters when PYQ Blueprint Synthesis preset is selected', () => {
+    renderGenerationPage();
+
+    const pyqCard = screen.getByText('PYQ Blueprint Synthesis').closest('button');
+    expect(pyqCard).toBeInTheDocument();
+
+    if (pyqCard) {
+      fireEvent.click(pyqCard);
+    }
+
+    // Verify Active Exam Blueprint banner
+    expect(screen.getByText(/Active Exam Blueprint:/i)).toBeInTheDocument();
+
+    // Verify Academic Grounding Subordination Invariant (PRD §11 & §25)
+    expect(
+      screen.getByText(/Grounding Subordination Invariant \(PRD §11 & §25\):/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/All newly synthesized questions will be grounded strictly in your current syllabus notes/i),
+    ).toBeInTheDocument();
+
+    // Verify PYQ Focus Areas
+    expect(screen.getByText('PYQ Focus Areas:')).toBeInTheDocument();
+  });
 });
+

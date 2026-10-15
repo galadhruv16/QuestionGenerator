@@ -12,6 +12,8 @@ import {
   requireAuth,
   type AuthenticatedRequest,
 } from '../middleware/require-auth.js';
+import { listProjectPyqPatterns } from '../services/pyq-analyzer.js';
+
 
 const projectIdSchema = z.string().uuid();
 const projectListQuerySchema = z.object({
@@ -237,6 +239,28 @@ projectsRouter.post('/:projectId/archive', async (request, response, next) => {
 
     if (error) throw error;
     return response.json({ data });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+projectsRouter.get('/:projectId/pyq-patterns', async (request, response, next) => {
+  const parsedProjectId = projectIdSchema.safeParse(request.params.projectId);
+  if (!parsedProjectId.success) {
+    return response.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Project id is invalid.',
+        details: {},
+      },
+    });
+  }
+
+  try {
+    const authenticatedRequest = request as unknown as AuthenticatedRequest;
+    const client = createSupabaseUserClient(authenticatedRequest.accessToken);
+    const patterns = await listProjectPyqPatterns(client, parsedProjectId.data);
+    return response.json({ data: patterns });
   } catch (error) {
     return next(error);
   }

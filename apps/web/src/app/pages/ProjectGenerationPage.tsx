@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type {
   BlueprintConfiguration,
   GeneratedQuestionItem,
   GenerationRun,
   Preset,
+  PyqAnalysisPattern,
 } from '@groundq/contracts';
 import { getSupabaseClient } from '../../lib/supabase';
 import { Icon, Logo } from '../components/ui';
@@ -42,6 +43,8 @@ const apiBaseUrl =
 export function ProjectGenerationPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const pyqIdParam = searchParams.get('pyq_id');
 
   const cached = projectId ? getCachedProject(projectId) : null;
   const activeGen = projectId ? generationManager.getActiveRun(projectId) : null;
@@ -50,6 +53,12 @@ export function ProjectGenerationPage() {
       activeGen.status !== 'COMPLETED' &&
       activeGen.status !== 'FAILED',
   );
+
+  // PYQ Pattern state
+  const [pyqPatterns, setPyqPatterns] = useState<PyqAnalysisPattern[]>([]);
+  const [selectedPyqPattern, setSelectedPyqPattern] =
+    useState<PyqAnalysisPattern | null>(null);
+
 
   // Project context state
   const [project, setProject] = useState<ProjectData | null>(
@@ -224,6 +233,39 @@ export function ProjectGenerationPage() {
           `/projects/${projectId}/generation-runs`,
         );
         setRecentRuns(runsRes.data ?? []);
+
+        // Load PYQ blueprints for past exam calibrated synthesis
+        try {
+          const pyqRes = await apiRequest(
+            `/projects/${projectId}/pyq-patterns`,
+          );
+          const loadedPatterns: PyqAnalysisPattern[] = pyqRes?.data ?? [];
+          setPyqPatterns(loadedPatterns);
+
+          if (pyqIdParam && loadedPatterns.length > 0) {
+            const matched =
+              loadedPatterns.find((p) => p.resource_id === pyqIdParam) ||
+              loadedPatterns[0]!;
+            if (matched) {
+              applyPyqPattern(matched);
+            }
+          } else if (pyqIdParam) {
+            try {
+              const singlePyqRes = await apiRequest(
+                `/projects/${projectId}/resources/${pyqIdParam}/analyze-pyq`,
+                { method: 'POST' },
+              );
+              if (singlePyqRes?.data) {
+                setPyqPatterns([singlePyqRes.data]);
+                applyPyqPattern(singlePyqRes.data);
+              }
+            } catch {
+              // fallback
+            }
+          }
+        } catch {
+          // Graceful fallback
+        }
       } catch (err) {
         console.error('Failed to load project generation data:', err);
       } finally {
@@ -233,6 +275,18 @@ export function ProjectGenerationPage() {
 
     void loadData();
   }, [projectId]);
+
+  const applyPyqPattern = (pattern: PyqAnalysisPattern) => {
+    setSelectedPyqPattern(pattern);
+    setActivePresetName('PYQ Blueprint Synthesis');
+    setQuestionCount(Math.min(pattern.total_detected_questions || 15, 25));
+    setBloomDistribution({ ...pattern.bloom_distribution });
+    setTypeWeights({ ...pattern.format_distribution });
+    setDifficultyWeights({ ...pattern.difficulty_distribution });
+    showToast(
+      `Calibrated from PYQ Blueprint: ${pattern.resource_name} (${pattern.total_detected_questions} Qs · ${pattern.detected_marks_total} Marks)`,
+    );
+  };
 
   // Subscribe to generation manager for background polling and live status across tabs
   useEffect(() => {
@@ -327,10 +381,72 @@ export function ProjectGenerationPage() {
       setDifficultyWeights({ easy: 50, hard: 10, medium: 40 });
       setTypeWeights({ long_answer: 0, mcq: 80, short_answer: 20 });
       showToast('Loaded archetype: Foundational Recall (20 Questions)');
+    } else if (presetName === 'PYQ Blueprint Synthesis') {
+      if (pyqPatterns.length > 0) {
+        applyPyqPattern(selectedPyqPattern || pyqPatterns[0]!);
+      } else {
+        const fallbackPyq: PyqAnalysisPattern = {
+          analyzed_at: new Date().toISOString(),
+          bloom_distribution: {
+            analyze: 30,
+            apply: 35,
+            create: 5,
+            evaluate: 10,
+            remember: 10,
+            understand: 10,
+          },
+          detected_marks_total: 100,
+          difficulty_distribution: {
+            easy: 20,
+            hard: 35,
+            medium: 45,
+          },
+          format_distribution: {
+            long_answer: 25,
+            mcq: 45,
+            short_answer: 30,
+          },
+          recurring_themes: [
+            'Mutual exclusion & distributed synchronization',
+            'Banker\'s Algorithm safe sequence verification',
+            'Virtual memory page replacement anomalies',
+          ],
+          resource_id: 'demo-pyq',
+          resource_name: 'CS842_Midterm_Exam_Solutions.pdf',
+          sections: [
+            {
+              format: 'MCQ & Objective',
+              marks_per_question: 2,
+              question_count: 10,
+              title: 'Part A: Foundational Concepts',
+            },
+            {
+              format: 'Short Answer & Problem Solving',
+              marks_per_question: 10,
+              question_count: 4,
+              title: 'Part B: Applied Analysis',
+            },
+            {
+              format: 'Long Answer & Synthesis',
+              marks_per_question: 20,
+              question_count: 2,
+              title: 'Part C: Design & Proofs',
+            },
+          ],
+          topic_distribution: {
+            'Deadlocks & Synchronization': 40,
+            'Distributed Consensus & RPC': 35,
+            'Virtual Memory & Paging': 25,
+          },
+          total_detected_questions: 16,
+        };
+        applyPyqPattern(fallbackPyq);
+      }
     } else {
       showToast('Custom Blueprint unlocked for manual calibration.');
     }
   };
+
 
   // Launch Generation
   const handleStartGeneration = async () => {
@@ -813,6 +929,74 @@ export function ProjectGenerationPage() {
                     </div>
                   </button>
 
+                  {/* Preset 5: PYQ Blueprint Synthesis */}
+                  <button
+                    className={`text-left p-4 rounded bg-surface-container-lowest flex flex-col justify-between gap-3 transition-all md:col-span-2 ${
+                      activePresetName === 'PYQ Blueprint Synthesis'
+                        ? 'shadow-md ring-2 ring-purple-600 bg-purple-500/5'
+                        : 'shadow-sm hover:shadow-md'
+                    }`}
+                    onClick={() => handleSelectPreset('PYQ Blueprint Synthesis')}
+                    type="button"
+                  >
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className={`font-headline-sm text-headline-sm font-bold flex items-center gap-2 ${
+                            activePresetName === 'PYQ Blueprint Synthesis'
+                              ? 'text-purple-600 dark:text-purple-400'
+                              : 'text-on-surface'
+                          }`}
+                        >
+                          <span>PYQ Blueprint Synthesis</span>
+                          <span className="px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 font-label-sm text-label-sm font-semibold">
+                            EXAM CALIBRATED
+                          </span>
+                        </span>
+                        {activePresetName === 'PYQ Blueprint Synthesis' && (
+                          <span className="text-purple-600 dark:text-purple-400 font-bold">
+                            ✓
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                        Calibrate assessment parameters strictly to real-world
+                        past year exam blueprints while generating fresh
+                        questions grounded in current study material.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap font-label-sm text-label-sm">
+                      <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-700 dark:text-purple-300 font-medium">
+                        {selectedPyqPattern
+                          ? `${selectedPyqPattern.resource_name} (${selectedPyqPattern.total_detected_questions} Qs · ${selectedPyqPattern.detected_marks_total}M)`
+                          : pyqPatterns.length > 0
+                            ? `${pyqPatterns.length} PYQ Blueprint${pyqPatterns.length > 1 ? 's' : ''} Available`
+                            : 'Past Year Blueprint'}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface">
+                        Bloom{' '}
+                        {selectedPyqPattern
+                          ? `L1(${selectedPyqPattern.bloom_distribution.remember}%)–L6(${selectedPyqPattern.bloom_distribution.create}%)`
+                          : 'L1–L6 Calibrated'}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface">
+                        MCQ{' '}
+                        {selectedPyqPattern
+                          ? selectedPyqPattern.format_distribution.mcq
+                          : 45}
+                        % · SA{' '}
+                        {selectedPyqPattern
+                          ? selectedPyqPattern.format_distribution.short_answer
+                          : 30}
+                        % · Long{' '}
+                        {selectedPyqPattern
+                          ? selectedPyqPattern.format_distribution.long_answer
+                          : 25}
+                        %
+                      </span>
+                    </div>
+                  </button>
+
                   {/* Custom Saved Presets */}
                   {presets
                     .filter((p) => !p.is_system)
@@ -856,6 +1040,95 @@ export function ProjectGenerationPage() {
                       </button>
                     ))}
                 </div>
+
+                {/* Active PYQ Blueprint Calibration & Grounding Banner */}
+                {activePresetName === 'PYQ Blueprint Synthesis' && (
+                  <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/25 flex flex-col gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/20">
+                          <Icon name="chart" size={18} />
+                        </div>
+                        <div>
+                          <span className="font-headline-sm text-headline-sm font-semibold text-on-surface block">
+                            Active Exam Blueprint:{' '}
+                            {selectedPyqPattern?.resource_name ??
+                              'Past Year Exam Paper'}
+                          </span>
+                          <span className="font-label-sm text-label-sm text-purple-700 dark:text-purple-300">
+                            {selectedPyqPattern
+                              ? `${selectedPyqPattern.total_detected_questions} Detected Questions · ${selectedPyqPattern.detected_marks_total} Total Marks`
+                              : 'Default Past Year Blueprint'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Dropdown selector if multiple PYQs exist */}
+                      {pyqPatterns.length > 1 && (
+                        <div className="flex items-center gap-2">
+                          <span className="font-label-sm text-label-sm text-on-surface-variant">
+                            Switch Paper:
+                          </span>
+                          <select
+                            className="bg-surface-container rounded px-2.5 py-1 text-on-surface font-body-sm text-body-sm border border-outline-variant/40 focus:outline-none"
+                            onChange={(e) => {
+                              const found = pyqPatterns.find(
+                                (p) => p.resource_id === e.target.value,
+                              );
+                              if (found) applyPyqPattern(found);
+                            }}
+                            value={selectedPyqPattern?.resource_id ?? ''}
+                          >
+                            {pyqPatterns.map((p) => (
+                              <option
+                                key={p.resource_id}
+                                value={p.resource_id}
+                              >
+                                {p.resource_name} ({p.total_detected_questions}{' '}
+                                Qs · {p.detected_marks_total}M)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Invariant Alert Box */}
+                    <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-start gap-2.5 text-body-sm text-purple-900 dark:text-purple-200">
+                      <div className="mt-0.5 shrink-0 text-purple-600 dark:text-purple-400">
+                        <Icon name="shield" size={16} />
+                      </div>
+                      <div className="text-body-sm leading-relaxed">
+                        <strong className="font-semibold">
+                          Grounding Subordination Invariant (PRD §11 & §25):
+                        </strong>{' '}
+                        All newly synthesized questions will be grounded
+                        strictly in your current syllabus notes and textbooks.
+                        The PYQ pattern is utilized solely for cognitive
+                        distributions (Bloom, difficulty, and format balance) so
+                        past questions are never duplicated.
+                      </div>
+                    </div>
+
+                    {/* Recurring Themes Tags */}
+                    {selectedPyqPattern &&
+                      selectedPyqPattern.recurring_themes.length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap pt-1">
+                          <span className="font-label-sm text-label-sm text-on-surface-variant">
+                            PYQ Focus Areas:
+                          </span>
+                          {selectedPyqPattern.recurring_themes.map((th, idx) => (
+                            <span
+                              className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-700 dark:text-purple-300 font-label-sm text-label-sm"
+                              key={idx}
+                            >
+                              {th}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                  </div>
+                )}
               </section>
 
               {/* Section 0: Target Assessment Volume & Question Count */}

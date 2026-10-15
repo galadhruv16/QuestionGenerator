@@ -250,4 +250,55 @@ export type BulkRegenerateQuestionsRequest = z.infer<
   typeof bulkRegenerateQuestionsSchema
 >;
 
+export const pyqSectionBreakdownSchema = z.object({
+  format: z.string().trim().optional(),
+  marks_per_question: z.number().nonnegative().optional(),
+  question_count: z.number().int().nonnegative(),
+  title: z.string().trim(),
+});
+export type PyqSectionBreakdown = z.infer<typeof pyqSectionBreakdownSchema>;
+
+export const pyqAnalysisPatternSchema = z.object({
+  analyzed_at: z.string().datetime().optional(),
+  bloom_distribution: z.object({
+    analyze: z.number().min(0).max(100),
+    apply: z.number().min(0).max(100),
+    create: z.number().min(0).max(100),
+    evaluate: z.number().min(0).max(100),
+    remember: z.number().min(0).max(100),
+    understand: z.number().min(0).max(100),
+  }),
+  detected_marks_total: z.number().nonnegative(),
+  difficulty_distribution: z.object({
+    easy: z.number().min(0).max(100),
+    hard: z.number().min(0).max(100),
+    medium: z.number().min(0).max(100),
+  }),
+  format_distribution: z.object({
+    long_answer: z.number().min(0).max(100),
+    mcq: z.number().min(0).max(100),
+    short_answer: z.number().min(0).max(100),
+  }),
+  recurring_themes: z.array(z.string().trim()),
+  resource_id: z.string().uuid(),
+  resource_name: z.string().trim(),
+  sections: z.array(pyqSectionBreakdownSchema).default([]),
+  topic_distribution: z.record(z.string(), z.number().min(0).max(100)),
+  total_detected_questions: z.number().int().nonnegative(),
+});
+export type PyqAnalysisPattern = z.infer<typeof pyqAnalysisPatternSchema>;
+
+export const analyzePyqResponseSchema = z.object({
+  data: pyqAnalysisPatternSchema,
+});
+export type AnalyzePyqResponse = z.infer<typeof analyzePyqResponseSchema>;
+
+export const listPyqPatternsResponseSchema = z.object({
+  data: z.array(pyqAnalysisPatternSchema),
+});
+export type ListPyqPatternsResponse = z.infer<
+  typeof listPyqPatternsResponseSchema
+>;
+
+
 

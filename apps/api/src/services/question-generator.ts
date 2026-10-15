@@ -272,12 +272,30 @@ export async function executeGenerationRun(
     const baseSortOrder =
       (maxOrderData as { sort_order?: number } | null)?.sort_order ?? 0;
 
+    // Fetch non-PYQ resource IDs so generated questions are grounded strictly in syllabus study material (PRD §11 & §25)
+    const { data: studyResources } = await client
+      .from('resources')
+      .select('id')
+      .eq('project_id', projectId)
+      .neq('resource_kind', 'PYQ')
+      .is('archived_at', null);
+
+    const studyResourceIds = new Set((studyResources ?? []).map((r) => r.id));
+
     // Fetch all resource chunks for context across the full document syllabus
-    const { data: chunks } = await client
+    const { data: rawChunks } = await client
       .from('resource_chunks')
       .select('id, resource_id, text, page_number, chunk_index')
       .eq('project_id', projectId)
       .order('chunk_index', { ascending: true });
+
+    // Prioritize non-PYQ study materials to prevent paraphrasing of past exam questions
+    const filteredByStudy =
+      studyResourceIds.size > 0
+        ? (rawChunks ?? []).filter((c) => studyResourceIds.has(c.resource_id))
+        : rawChunks ?? [];
+    const chunks =
+      filteredByStudy.length > 0 ? filteredByStudy : rawChunks ?? [];
 
     // Filter out front-matter and Table of Contents chunks
     const validContentChunks = (chunks ?? []).filter((c) => {

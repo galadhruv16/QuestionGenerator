@@ -123,4 +123,68 @@ describe('ProjectResourcesPage', () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it('renders PYQ Exam Paper badge and allows analyzing exam blueprint', async () => {
+    const pyqReadyResource = {
+      checksum_sha256: 'd490ef7711a8c9',
+      created_at: '2026-10-11T13:30:00Z',
+      evidence_summary: '28 pp indexed · 42 text anchors locked',
+      evidence_tokens: 42,
+      file_size_bytes: 5_347_737,
+      id: 'res_pyq_test',
+      original_filename: 'Midterm_Exam_2024_Paper.pdf',
+      page_count: 28,
+      resource_kind: 'PYQ' as const,
+      status: 'READY' as const,
+      storage_path: 'resources/projects/cs842/Midterm_Exam_2024_Paper.pdf',
+    };
+
+    window.history.pushState(
+      {},
+      '',
+      '/app/projects/123e4567-e89b-12d3-a456-426614174000/resources',
+    );
+    render(
+      <BrowserRouter>
+        <Routes>
+          <Route
+            element={
+              <ProjectResourcesPage initialResources={[pyqReadyResource]} />
+            }
+            path="/app/projects/:projectId/resources"
+          />
+        </Routes>
+      </BrowserRouter>,
+    );
+
+    expect(screen.getByText('PYQ Exam Paper')).toBeInTheDocument();
+    const analyzeBtn = screen.getByRole('button', {
+      name: /Analyze Blueprint/i,
+    });
+    expect(analyzeBtn).toBeInTheDocument();
+
+    fireEvent.click(analyzeBtn);
+
+    // Verify modal appears
+    expect(
+      await screen.findByText('Exam Blueprint Analysis'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('PYQ PATTERN')).toBeInTheDocument();
+    expect(screen.getByText(/Total Questions/i)).toBeInTheDocument();
+    expect(screen.getByText(/Detected Marks/i)).toBeInTheDocument();
+    expect(screen.getByText("Bloom's Cognitive Demands")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Apply Blueprint to Generation Studio/i),
+    ).toBeInTheDocument();
+
+    // Close modal
+    const closeBtn = screen.getByRole('button', {
+      name: /Close blueprint modal/i,
+    });
+    fireEvent.click(closeBtn);
+    expect(
+      screen.queryByText('Exam Blueprint Analysis'),
+    ).not.toBeInTheDocument();
+  });
 });
+

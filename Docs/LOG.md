@@ -4,7 +4,56 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
-## [2026-10-15] — Option 3: Student Interactive Practice & Timed Mock Exam Studio (Immediate Feedback, Question Matrix, Scientific Calculator, and Mastery Analytics)
+## [2026-10-15] — Option A: Previous Year Question (PYQ) Pattern Analysis & Blueprint-Driven Question Synthesis (PRD §4.1, §11, §25)
+
+### Type
+Feature / Backend AI & Heuristics / Curricular Blueprint / UI / UX / Academic Grounding Subordination / Quality Assurance
+
+### Status
+Implemented and verified locally across full workspace TypeScript typecheck (0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`), production build (`pnpm build`), and monorepo Vitest test suite (84/84 tests passed).
+
+### Context & Architectural Invariants
+1. **Academic Grounding Subordination Invariant (PRD §11 & §25)**:
+   - Generated questions are strictly grounded in textbook and study material chunks (`resource_kind != 'PYQ'`).
+   - Previous Year Question papers serve solely as structural and pedagogical blueprints (Bloom cognitive levels, question format mix, difficulty distribution, section breakdown, total exam marks) without copying, leaking, or paraphrasing past exam items.
+2. **Dual-Engine Pattern Analysis with Deterministic Heuristic Fallback**:
+   - LLM analysis prompt extracting structured schema (`PyqAnalysisPattern`) via available AI providers (Gemini, Groq, Ollama).
+   - Robust deterministic parser detecting paper header totals (`Maximum Marks: 100` / `Total Marks: 100`), per-question marks, pedagogical action verb mappings across Bloom's Taxonomy (L1 Remember to L6 Create), format weighting (MCQ, Short, Long), difficulty classification, recurring themes, and section breakdowns.
+   - Percentage normalizations guaranteeing all distribution metrics sum strictly to 100%.
+3. **Generation Studio 1-Click Calibration**:
+   - Added 5th Curricular Blueprint Archetype Card: **"PYQ Blueprint Synthesis"** (`EXAM CALIBRATED`).
+   - Seamless parameter synchronization: Question count, format sliders, Bloom distribution, and difficulty sliders automatically adjust to match the analyzed PYQ paper.
+   - Active Blueprint Banner displaying selected paper title, recurring focus themes, and the grounding subordination invariant reminder.
+4. **Resources Workspace & Blueprint Inspector**:
+   - Distinctive purple badge (`PYQ Exam Paper`) for PYQ resources in the documents workspace.
+   - "Analyze Blueprint" button in the resource table and drawer.
+   - Interactive Exam Blueprint Modal displaying marks, question counts, Bloom distribution bars, format breakdowns, section statistics, and direct CTA (`Apply Blueprint to Generation Studio →`).
+
+### Changes Implemented
+1. **Shared Contracts (`packages/contracts/src/generation/index.ts`)**:
+   - Defined `pyqSectionBreakdownSchema`, `pyqAnalysisPatternSchema`, `analyzePyqResponseSchema`, and `listPyqPatternsResponseSchema`.
+   - Exported corresponding TypeScript types `PyqAnalysisPattern`, `AnalyzePyqResponse`, and `ListPyqPatternsResponse`.
+2. **Backend Analyzer Service (`apps/api/src/services/pyq-analyzer.ts`)**:
+   - Implemented `analyzePyqPattern`, `parsePyqHeuristically`, `getPyqPatternFromCache`, and `listProjectPyqPatterns`.
+   - Integrated header marks parsing, Bloom action verb classification, format detection, and normalization.
+3. **Question Generator Subordination Filter (`apps/api/src/services/question-generator.ts`)**:
+   - Filtered candidate retrieval chunks to prioritize `resource_kind != 'PYQ'`, enforcing PRD §11 & §25 requirements.
+4. **API Endpoints (`apps/api/src/routes/resources.ts`, `apps/api/src/routes/projects.ts`)**:
+   - Registered `POST /api/v1/projects/:projectId/resources/:resourceId/analyze-pyq`.
+   - Registered `GET /api/v1/projects/:projectId/resources/pyq-patterns` and alias route in projects.
+5. **Frontend Resources Workspace (`apps/web/src/app/pages/ProjectResourcesPage.tsx`)**:
+   - Added PYQ visual badges and "Analyze Blueprint" triggers.
+   - Built the Blueprint Analysis Modal with comprehensive telemetry, Bloom bars, and navigation to Generation Studio.
+6. **Frontend Generation Studio (`apps/web/src/app/pages/ProjectGenerationPage.tsx`)**:
+   - Integrated `?pyq_id=...` URL parameter handling.
+   - Added "PYQ Blueprint Synthesis" archetype preset and active blueprint banner.
+7. **Unit Test Suites (`apps/api/test/pyq-analyzer.test.ts`, `apps/web/test/generation.test.tsx`, `apps/web/test/resources.test.tsx`)**:
+   - Added unit tests covering heuristic parsing, cache operations, preset selection, blueprint banner rendering, and modal interaction.
+8. **Verification & Quality Assurance**:
+   - Monorepo TypeScript Typecheck (`pnpm typecheck`): 0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`.
+   - Monorepo Test Suite (`pnpm test`): 84/84 tests passed (Contracts: 4, API: 35, Web: 45).
+   - Production Build (`pnpm build`): Completed cleanly in 9.66s without errors.
+
 
 ### Type
 Feature / UI / UX / Student Practice & Assessment / Academic Integrity / Quality Assurance

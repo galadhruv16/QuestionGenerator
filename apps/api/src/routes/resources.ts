@@ -14,6 +14,10 @@ import {
   type AuthenticatedRequest,
 } from '../middleware/require-auth.js';
 import { processResourcePipeline } from '../services/resource-processor.js';
+import {
+  analyzePyqPattern,
+  listProjectPyqPatterns,
+} from '../services/pyq-analyzer.js';
 
 const uuidSchema = z.string().uuid();
 
@@ -700,3 +704,102 @@ resourcesRouter.post(
     }
   },
 );
+
+// List all analyzed PYQ patterns for the project
+resourcesRouter.get('/pyq-patterns', async (request, response, next) => {
+  const { projectId } = getParams(request);
+  const parsedProjectId = uuidSchema.safeParse(projectId);
+
+  if (!parsedProjectId.success) {
+    return response.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid project ID format.',
+        details: {},
+      },
+    });
+  }
+
+  try {
+    const authenticatedRequest = request as unknown as AuthenticatedRequest;
+    const client = createSupabaseUserClient(authenticatedRequest.accessToken);
+
+    const project = await ensureProjectAccess(
+      client,
+      parsedProjectId.data,
+      authenticatedRequest.authUser.id,
+    );
+    if (!project) {
+      return response.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Project not found or archived.',
+        },
+      });
+    }
+
+    const patterns = await listProjectPyqPatterns(client, parsedProjectId.data);
+    return response.json({ data: patterns });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// Analyze blueprint patterns from a specific PYQ resource
+resourcesRouter.post(
+  '/:resourceId/analyze-pyq',
+  async (request, response, next) => {
+    const { projectId, resourceId } = getParams(request);
+    const parsedProjectId = uuidSchema.safeParse(projectId);
+    const parsedResourceId = uuidSchema.safeParse(resourceId);
+
+    if (!parsedProjectId.success || !parsedResourceId.success) {
+      return response.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid project ID or resource ID format.',
+          details: {},
+        },
+      });
+    }
+
+    try {
+      const authenticatedRequest = request as unknown as AuthenticatedRequest;
+      const client = createSupabaseUserClient(authenticatedRequest.accessToken);
+
+      const project = await ensureProjectAccess(
+        client,
+        parsedProjectId.data,
+        authenticatedRequest.authUser.id,
+      );
+      if (!project) {
+        return response.status(404).json({
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Project not found or archived.',
+          },
+        });
+      }
+
+      const { model, provider } = request.body || {};
+
+      const pattern = await analyzePyqPattern({
+        client,
+        model,
+        projectId: parsedProjectId.data,
+        provider,
+        resourceId: parsedResourceId.data,
+      });
+
+      return response.json({ data: pattern });
+    } catch (error: any) {
+      return response.status(400).json({
+        error: {
+          code: 'ANALYSIS_ERROR',
+          message: error?.message || 'Failed to analyze PYQ pattern.',
+        },
+      });
+    }
+  },
+);
+
