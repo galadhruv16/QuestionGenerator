@@ -23,8 +23,8 @@ const envSchema = z.object({
   GROQ_API_KEY: optionalString,
   GROQ_MODEL: z.string().default('llama-3.3-70b-versatile'),
   OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),
-  OLLAMA_MODEL: z.string().default('qwen2.5:7b'),
-  EMBEDDING_MODEL: z.string().default('nomic-embed-text'),
+  OLLAMA_MODEL: z.string().default('mistral:latest'),
+  EMBEDDING_MODEL: z.string().default('nomic-embed-text:latest'),
 });
 
 export const env = envSchema.parse(process.env);

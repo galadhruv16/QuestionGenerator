@@ -13,7 +13,7 @@ export interface ActiveGenerationState {
   runId: string;
   targetCount: number;
   generatedCount: number;
-  status: 'QUEUED' | 'PLANNING' | 'RETRIEVING' | 'GENERATING' | 'VALIDATING' | 'COMPLETED' | 'FAILED';
+  status: 'QUEUED' | 'PLANNING' | 'RETRIEVING' | 'GENERATING' | 'VALIDATING' | 'COMPLETED' | 'FAILED' | 'NEEDS_REVIEW';
   step: number;
   error?: string;
   lastQuestionStem?: string;
@@ -187,7 +187,10 @@ class GenerationManager {
           // Fallback to accepted_count
         }
 
-        const isFinished = run.status === 'COMPLETED' || run.status === 'FAILED';
+        const isFinished =
+          run.status === 'COMPLETED' ||
+          run.status === 'FAILED' ||
+          run.status === 'NEEDS_REVIEW';
 
         this.updateState(projectId, {
           status: run.status,

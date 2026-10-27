@@ -1,0 +1,453 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+% Essential packages
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{microtype}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Syllabus-Grounded Controllable Question Generation Using RAG and Lightweight Large Language Models}
+
+% Professional Multi-Column Author Block
+\author{
+    \IEEEauthorblockN{Dhruv Gala}
+    \IEEEauthorblockA{\textit{Dept. of Computer Engineering} \\
+    \textit{Shah \& Anchor Kutchhi Engg. College}\\
+    Mumbai, India \\
+    dhruv.17719@sakec.ac.in}
+    \and
+    \IEEEauthorblockN{Yash Pajwani}
+    \IEEEauthorblockA{\textit{Dept. of Computer Engineering} \\
+    \textit{Shah \& Anchor Kutchhi Engg. College}\\
+    Mumbai, India \\
+    yash.pajwani16858@sakec.ac.in}
+    \and
+    \IEEEauthorblockN{Shravan Padhar}
+    \IEEEauthorblockA{\textit{Dept. of Computer Engineering} \\
+    \textit{Shah \& Anchor Kutchhi Engg. College}\\
+    Mumbai, India \\
+    shravan.17927@sakec.ac.in}
+    \vspace{0.4cm}
+    \and
+    \IEEEauthorblockN{Sahil Shah}
+    \IEEEauthorblockA{\textit{Dept. of Computer Engineering} \\
+    \textit{Shah \& Anchor Kutchhi Engg. College}\\
+    Mumbai, India \\
+    sahil.17713@sakec.ac.in}
+    \and
+    \IEEEauthorblockN{Dr. Atul Haribhau Kachare}
+    \IEEEauthorblockA{\textit{Professor, Dept. of Computer Engg.} \\
+    \textit{Shah \& Anchor Kutchhi Engg. College}\\
+    Mumbai, India \\
+    atul.kachare@sakec.ac.in}
+}
+
+\maketitle
+
+\begin{abstract}
+Automated Educational Question Generation (EQG) using Large Language Models (LLMs) offers significant potential to alleviate educator workload and scale assessment authoring. However, naive prompting approaches ($Prompt \to LLM \to Questions$) suffer from severe operational pathologies: curriculum drift outside the prescribed syllabus, factual hallucinations, cognitive collapse into low-order recall regardless of requested Bloom's taxonomy levels, uncalibrated difficulty, weak distractors, and rapid saturation with semantic duplicates. Commercial cloud LLM APIs mitigate some linguistic deficiencies but introduce recurring financial overhead, data privacy violations regarding institutional exam confidentiality, and external network dependencies unsuitable for edge deployments. 
+
+In this paper, we propose a fully local, privacy-preserving question generation framework that orchestrates Retrieval-Augmented Generation (RAG) with quantized open-weights models (Qwen-2.5-7B and LLaMA-3-8B). The proposed architecture couples hierarchical syllabus-scoped vector retrieval with a multi-dimensional constraint controller, an oversampled candidate generator, an automated three-gate acceptance validator (grounding, cognitive alignment, and distractor structure), and embedding-based semantic diversity pruning. We conduct a rigorous five-stage component-wise ablation study ($A_0$ to $A_4$) on undergraduate Computer Science curricula across Operating Systems and Database Systems executed strictly on commodity hardware (16~GB RAM, single consumer CPU/GPU). Empirical results demonstrate that our full pipeline boosts syllabus alignment to 95.0\%, lifts Bloom's compliance to 87.0\%, slashes factual hallucination rates to 3.3\%, and suppresses semantic duplicates to 1.5\%, proving that structured retrieval and multi-gate validation govern generation quality far more effectively than model scale alone.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Retrieval-Augmented Generation (RAG), Controllable Question Generation, Lightweight LLMs, Bloom's Revised Taxonomy, Automated Validation, Semantic Diversity, Local Inference, Educational AI.
+\end{IEEEkeywords}
+
+\section{Introduction}
+Designing balanced, rigorous, and syllabus-conforming academic assessments represents one of the most critical and time-intensive obligations in higher education. Formulating diagnostic tests, periodic quizzes, and university semester examinations requires careful blueprinting across diverse curriculum modules, cognitive depths (such as Bloom's revised taxonomy), and difficulty spectrums. Traditionally, manual question authoring relies entirely on individual educators studying prescribed textbooks, syllabi outlines, and historical exam patterns. While manual authoring ensures strict curriculum grounding, it is non-scalable, labor-intensive, and inherently prone to subjective cognitive skew---frequently over-indexing on simple factual recall and rote memorization rather than higher-order analytical or design capabilities \cite{elkins2024teachers, scaria2024modern}.
+
+The rapid maturation of Generative Pre-trained Transformers and Large Language Models (LLMs) has sparked intense interest in automating educational content synthesis \cite{vaswani2017attention, devlin2019bert}. When prompted directly, modern LLMs demonstrate remarkable linguistic fluency and wide general knowledge. Nevertheless, when applied to formal academic assessment authoring via naive zero-shot or few-shot prompts ($Prompt \to LLM \to Questions$), severe limitations emerge:
+\begin{enumerate}
+    \item \textbf{Syllabus Mismatch and Out-of-Scope Drift:} The parametric memory of general LLMs spans vast web-scale corpora. Without rigid constraints, models frequently hallucinate or generate questions involving external tools, advanced frameworks, or divergent notation not sanctioned by the institution's syllabus.
+    \item \textbf{Bloom's Taxonomy Collapse:} When explicitly commanded to produce higher-order cognitive items (such as ``Analyze'' or ``Evaluate''), models typically output simple definitional recall items disguised under complex vocabulary, failing to assess genuine procedural or critical reasoning \cite{duong2024bloomllm}.
+    \item \textbf{Difficulty Instability:} Unquantified difficulty labels (e.g., ``hard'' vs. ``easy'') yield subjective, unpredictable questions with erratic reasoning paths and inconsistent prerequisite demands.
+    \item \textbf{Plausible Factual Hallucinations:} LLMs invent non-existent protocol specifications, incorrect algorithms, or contradictory facts with high linguistic confidence.
+    \item \textbf{Substandard MCQ Distractors:} Generated distractors in multiple-choice questions are often implausible, trivially eliminated by students, or overlap semantically with the answer key, violating standard psychometric guidelines \cite{luo2024chain}.
+    \item \textbf{Semantic Redundancy:} Repeated invocations produce lexical paraphrases testing identical underlying concepts, preventing the creation of diverse question banks.
+\end{enumerate}
+
+While proprietary cloud APIs offer powerful capabilities, relying on them introduces privacy risks, exposing unreleased exam papers to third-party endpoints. Furthermore, API quotas and recurring token costs create budgetary barriers for academic institutions in developing regions.
+
+\textbf{Core Research Question:} \textit{How can an open-weights, lightweight Large Language Model (7B--8B parameters) be orchestrated locally with syllabus-grounded retrieval and automated validation gates to reliably synthesize diverse, curriculum-compliant questions under multi-dimensional cognitive constraints on commodity institutional hardware?}
+
+To address this, we present a syllabus-grounded, controllable question generation framework that operates completely offline on consumer hardware (16~GB RAM). The primary contributions of this paper are:
+\begin{itemize}
+    \item \textbf{Syllabus-Scoped Hierarchical RAG:} A structured document ingestion and vector retrieval pipeline using Sentence-BERT embeddings and HNSW indexing, enforcing hard metadata boundaries across university subject units.
+    \item \textbf{Six-Dimensional Generation Controller:} A condition vector formulation governing Topic, Bloom Cognitive Level, Difficulty, Question Type, Grounding Strictness, and Diversity Thresholds simultaneously.
+    \item \textbf{Automated Multi-Gate Acceptance Validator:} An automated verification layer implementing Grounding entailment, Cognitive verb-reasoning consistency, and Distractor psychometric quality checks.
+    \item \textbf{Embedding-Based Semantic Diversity Pruning:} A pairwise cosine similarity pruning module preventing semantic duplicate saturation across the question bank.
+    \item \textbf{Empirical Component-Wise Ablation:} A thorough five-configuration ablation study ($A_0 \to A_4$) isolating the precise performance dividend contributed by each pipeline component on undergraduate engineering coursework.
+\end{itemize}
+
+\section{Related Work and Gap Analysis}
+
+\subsection{Cognitive-Level Question Generation}
+Conditioning question generation on cognitive frameworks, specifically Bloom's Revised Taxonomy \cite{bloom1956taxonomy, anderson2001taxonomy}, has been a longstanding goal in educational technology. Elkins et al. \cite{elkins2024teachers} demonstrated that while teachers derive value from LLM-generated quizzes, models struggle to target specific learning outcomes without extensive prompt engineering. Scaria et al. \cite{scaria2024modern} evaluated modern autoregressive LLMs across Indian secondary school curricula, discovering that model accuracy degrades markedly as questions transition from lower-order (Remember, Understand) to higher-order cognitive bands (Analyze, Evaluate). Duong-Trung et al. \cite{duong2024bloomllm} proposed BloomLLM using supervised parameter fine-tuning; however, fine-tuned models remain prone to factual hallucination if decoupled from an authoritative factual source.
+
+\subsection{Distractor Generation and Quality Control}
+Multiple-Choice Questions (MCQs) demand that incorrect alternatives (distractors) be contextually plausible, unambiguously incorrect, and concept-adjacent. Luo et al. \cite{luo2024chain} introduced a chain-of-exemplar framework to enhance distractor plausibility. Traditional NLP approaches relying on WordNet or static concept graphs generate brittle distractors. Meanwhile, general LLMs often introduce absurd options or provide unintended formatting clues that compromise item validity. Psychometric item-writing literature \cite{haladyna2002review} mandates that distractors share structural symmetry and target common student misconceptions without overlapping the keyed response.
+
+\subsection{Retrieval-Augmented Generation (RAG) in Education}
+Retrieval-Augmented Generation, pioneered by Lewis et al. \cite{lewis2020retrieval}, conditions generative outputs on dynamically retrieved reference passages. Pan et al. \cite{pan2025survey} and Maity et al. \cite{maity2025leveraging} surveyed RAG systems in tutoring and automated assessment, establishing that grounding generation in textbook corpora significantly reduces factual error. However, existing educational RAG implementations treat retrieval as a passive context provider, omitting multi-constraint cognitive conditioning and failing to validate whether the generated question satisfies curriculum objectives. Evaluating RAG systems via automated metrics was formalized by Es et al. (RAGAS) \cite{es2024ragas} and surveyed by Yu et al. \cite{yu2024evaluation}, identifying retrieval faithfulness and answer relevance as essential dimensions.
+
+\subsection{Research Gap Analysis}
+Table~\ref{tab:gap_analysis} highlights the critical gaps in existing educational question generation approaches compared to the system proposed in this study.
+
+\begin{table*}[t]
+\caption{Comparative Architectural and Feature Gap Analysis}
+\label{tab:gap_analysis}
+\centering
+\small
+\begin{tabular}{@{}p{3.2cm}p{6.8cm}p{6.8cm}@{}}
+\toprule
+\textbf{Dimension} & \textbf{Typical Existing Literature} & \textbf{Proposed System} \\ \midrule
+Syllabus Grounding & General corpus retrieval without hierarchical scoping & Syllabus-hierarchical dense retrieval with source metadata filters \\
+Cognitive Control & Bloom level mentioned loosely in generation prompt & Joint condition vector + verb lexicon + multi-step reasoning gate \\
+Difficulty Control & Uncalibrated natural language keyword (e.g., ``Make it hard'') & Quantified reasoning step requirements and distractor similarity bands \\
+Distractor Quality & Exemplar-prompting; no post-generation validation & Psychometric structural gate (plausibility, symmetry, non-overlap) \\
+Duplicate Handling & Exact string matching or lexical n-gram overlap & Dense semantic cosine similarity thresholding ($S_{ij} < 0.82$) \\
+Infrastructure & Reliance on massive proprietary cloud LLM APIs & 100\% local execution on 16~GB RAM via 4-bit quantized open LLMs \\
+Evaluation Rigor & Monolithic end-to-end evaluation & Controlled five-stage ablation isolating every individual component \\ \bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[
+    node distance=0.45cm and 0.4cm,
+    auto,
+    box/.style={rectangle, draw=black, thick, fill=blue!5, text width=3.85cm, text centered, rounded corners, minimum height=1.0cm, font=\scriptsize},
+    decision/.style={rectangle, draw=black, thick, fill=orange!10, text width=3.85cm, text centered, rounded corners, minimum height=1.0cm, font=\scriptsize},
+    arrow/.style={-Latex, thick}
+]
+    % Row 1: Left to Right
+    \node (L1) [box] {\textbf{Layer 1: Input Ingestion}\\Textbooks, Syllabus, Papers};
+    \node (L2) [box, right=of L1] {\textbf{Layer 2: Chunking}\\Window ($L{=}512$, Overlap${=}64$)};
+    \node (L3) [box, right=of L2] {\textbf{Layer 3: Vector Index}\\SBERT / nomic $\to$ HNSW};
+    \node (L4) [box, right=of L3] {\textbf{Layer 4: Controller}\\Condition Vector: $\mathcal{C}$};
+
+    % Row 2: Right to Left
+    \node (L5) [box, below=1.4cm of L4] {\textbf{Layer 5 \& 6: Inference}\\Ollama $\to N_{\text{cand}} = \lceil \rho N_{\text{req}} \rceil$};
+    \node (L7) [decision, left=of L5] {\textbf{Layer 7: Multi-Gate Validator}\\$G_{\text{ground}} \land G_{\text{cog}} \land G_{\text{struct}}$};
+    \node (L8) [box, left=of L7] {\textbf{Layer 8: Diversity Pruning}\\Cosine Filter: $S_{ij} < 0.82$};
+    \node (OUT) [box, fill=green!10, left=of L8] {\textbf{Final Question Bank}\\Verified \& Syllabus-Grounded};
+
+    % Forward Connectors
+    \draw [arrow] (L1) -- (L2);
+    \draw [arrow] (L2) -- (L3);
+    \draw [arrow] (L3) -- (L4);
+    \draw [arrow] (L4) -- (L5);
+    \draw [arrow] (L5) -- (L7);
+    \draw [arrow] (L7) -- (L8);
+    \node at ([yshift=8pt] $(L7)!0.5!(L8)$) [font=\tiny\bfseries] {Accept};
+    \draw [arrow] (L8) -- (OUT);
+    
+    % Feedback loop for reject (routed cleanly underneath Layer 7 and Layer 5)
+    \draw [arrow] (L7.south) -- ++(0,-0.30) -| (L5.south);
+    \node at ([yshift=-12pt] $(L7.south)!0.5!(L5.south)$) [font=\tiny\bfseries] {Reject / Retry ($R_{\text{max}}=2$)};
+\end{tikzpicture}
+\caption{Proposed End-to-End System Architecture for Syllabus-Grounded Controllable Question Generation.}
+\label{fig:architecture}
+\end{figure*}
+
+\section{System Architecture and Methodology}
+
+The proposed system is structured as an eight-layer modular architecture designed for local execution without external network calls, as illustrated across the two operational stages in Fig.~\ref{fig:architecture}.
+
+\subsection{Layer 1 \& 2: Document Ingestion and Hierarchical Chunking}
+Educational artifacts (prescribed textbook chapters, reference lecture notes, and official university syllabus outlines) are ingested across PDF and DOCX formats. Text extraction normalizes ligatures, strips repeated headers/footers, and repairs hyphenated line breaks.
+
+Because technical academic concepts span multiple paragraphs, naive fixed-character chunking introduces truncation artifacts. We implement syllabus-aware hierarchical chunking where documents are first partitioned by syllabus module boundaries (Subject $\to$ Unit $\to$ Topic). Within each topic boundary, a token-based sliding window is enforced:
+\begin{equation}
+N_{\text{chunks}} = \left\lceil \frac{n - L_{\text{overlap}}}{L_{\text{chunk}} - L_{\text{overlap}}} \right\rceil
+\end{equation}
+where $L_{\text{chunk}} = 512$ tokens and $L_{\text{overlap}} = 64$ tokens. Each chunk $x$ is explicitly bound to a rich metadata tuple:
+\begin{equation}
+\mathcal{M}(x) = \langle \text{Subject}, \text{Unit}, \text{Topic}, \text{SourceDocument}, \text{PageNumber} \rangle
+\end{equation}
+This metadata ensures that vector similarity queries can be filtered strictly by syllabus boundaries, eliminating irrelevant matches across disparate academic units.
+
+\subsection{Layer 3: Dense Representation and Vector Retrieval}
+Semantic indexing maps each text chunk $x$ into a dense vector space using a local embedding model $E(x) \in \mathbb{R}^d$ ($d=768$ using `nomic-embed-text' or Sentence-BERT `all-MiniLM-L6-v2' \cite{reimers2019sentence}):
+\begin{equation}
+\mathbf{v}_x = \frac{E(x)}{\|E(x)\|_2}
+\end{equation}
+Chunk embeddings are stored in a local PostgreSQL database using the `pgvector' extension with a Hierarchical Navigable Small World (HNSW) index \cite{malkov2020efficient}, optimizing nearest-neighbor search latency.
+
+Given a user generation request specifying topic $T$, retrieval is confined to the admissible metadata subset $\mathcal{X}_T = \{x \mid \mathcal{M}(x).\text{Topic} = T\}$. The top-$k$ relevant chunks ($k=3$) are retrieved via cosine similarity:
+\begin{equation}
+\text{sim}(q, x) = \frac{E(q) \cdot E(x)}{\|E(q)\|_2 \|E(x)\|_2}
+\end{equation}
+\begin{equation}
+\mathcal{R}_k(q) = \operatorname*{top\text{-}k}_{x \in \mathcal{X}_T} \ \text{sim}(q, x)
+\end{equation}
+Retrieved chunks with similarity below a strict relevance floor ($\theta_r = 0.65$) are rejected to avoid injecting misleading or weakly associated context into the generator.
+
+\subsection{Layer 4: Multi-Dimensional Generation Controller}
+The generation controller formalizes the instructor's assessment intent into a deterministic condition vector:
+\begin{equation}
+\mathcal{C} = \{ T_{\text{topic}}, B_{\text{bloom}}, D_{\text{diff}}, Q_{\text{type}}, S_{\text{ground}}, \tau_{\text{div}} \}
+\end{equation}
+where $B_{\text{bloom}} \in \{\text{Remember}, \text{Understand}, \text{Apply}, \text{Analyze}, \text{Evaluate}, \text{Create}\}$, $D_{\text{diff}} \in \{\text{Easy}, \text{Medium}, \text{Hard}\}$, $Q_{\text{type}} \in \{\text{MCQ}, \text{Short-Answer}, \text{Scenario-Based}\}$, $S_{\text{ground}} \in \{\text{Strict}, \text{Standard}\}$, and $\tau_{\text{div}}$ denotes the semantic uniqueness ceiling ($\tau = 0.82$).
+
+The controller synthesizes an instruction prompt composed of four modular components:
+\begin{equation}
+P = P_{\text{sys}} + P_{\text{constraints}}(\mathcal{C}) + P_{\text{context}}(\mathcal{R}_k) + P_{\text{schema}}
+\end{equation}
+Here, $P_{\text{sys}}$ enforces strict adherence to provided evidence, forbidding external parametric assumptions. $P_{\text{constraints}}(\mathcal{C})$ maps the cognitive level to operational criteria (e.g., ``Analyze'' requires comparing two competing computational mechanisms and diagnosing edge-case failure modes). $P_{\text{schema}}$ mandates deterministic JSON output containing stem, option array, correct option index, multi-step explanation, and the specific chunk identifier serving as evidentiary provenance.
+
+\subsection{Layers 5 \& 6: Local Inference and Oversampling}
+To operate entirely offline on consumer hardware, local inference is executed via the Ollama execution engine utilizing llama.cpp with 4-bit quantization (Q4\_K\_M GGUF). We employ Qwen-2.5-7B-Instruct as our primary backbone, with LLaMA-3-8B as a comparative baseline.
+
+Because lightweight models exhibit higher per-sample stochastic variance than massive cloud LLMs, generating only $N_{\text{req}}$ questions leads to bank underfills whenever strict downstream validation gates reject low-quality items. To solve this, the pipeline incorporates an intentional oversampling factor $\rho \in [1.5, 2.0]$:
+\begin{equation}
+N_{\text{cand}} = \lceil \rho \cdot N_{\text{req}} \rceil
+\end{equation}
+Sampling hyperparameters are held at temperature $T = 0.20$, top-$p = 0.9$, and repeat penalty $1.15$ to enforce structural adherence while permitting sufficient distractor variety.
+
+\subsection{Layer 7: Automated Multi-Gate Acceptance Validator}
+Each candidate question $x$ is subjected to a sequential three-gate acceptance validator. A question is admitted to the pool if and only if all three validation predicates evaluate to True:
+\begin{equation}
+\text{Accept}(x) \iff G_{\text{ground}}(x) \land G_{\text{cog}}(x) \land G_{\text{struct}}(x)
+\end{equation}
+
+\subsubsection{Grounding Gate ($G_{\text{ground}}$)}
+Ensures zero factual hallucination. The candidate's stem, key, and rationale are decomposed into atomic factual assertions $\mathcal{A}(x) = \{a_1, a_2, \dots, a_m\}$. A deterministic zero-temperature verification prompt evaluated against the cited chunk $E_x \subseteq \mathcal{R}_k$ verifies entailment:
+\begin{align}
+G_{\text{ground}}(x) = &\bigwedge_{a \in \mathcal{A}(x)} \mathbb{I}[v(a, E_x) = \text{Entailed}] \notag \\
+&\land\; \mathbb{I}[\text{sim}(\text{key}, E_x) \ge \theta_g]
+\end{align}
+where $\theta_g = 0.70$. If any factual assertion is unsupported or contradicts the cited text, the candidate fails.
+
+\subsubsection{Cognitive Gate ($G_{\text{cog}}$)}
+Verifies Bloom alignment. The stem must contain an operative verb belonging to the calibrated lexicon for $B_{\text{bloom}}$ (e.g., ``contrast'', ``formulate'', ``derive'', ``deduce''). Furthermore, a local classifier evaluates whether answering the question requires multi-step reasoning rather than single-token retrieval.
+
+\subsubsection{Structural and Distractor Gate ($G_{\text{struct}}$)}
+For Multiple-Choice Questions, psychometric standards are programmatically verified:
+\begin{enumerate}
+    \item Exactly four options are present: $|Options| = 4$.
+    \item Exactly one option is marked correct: $\sum \mathbb{I}[\text{is\_correct}] = 1$.
+    \item No lazy meta-options are permitted (e.g., ``All of the above'' or ``None of the above'' are rejected via regex filters).
+    \item Distractor semantic adjacency: Distractors must be conceptually related to the subject matter yet distinctly non-identical to the key. Let $d \in \text{Distractors}$. We mandate:
+    \begin{equation}
+    \theta_{\text{low}} \le \cos(E(d), E(\text{key})) \le \theta_{\text{high}}
+    \end{equation}
+    where $\theta_{\text{low}} = 0.35$ (preventing absurd, unrelated distractors) and $\theta_{\text{high}} = 0.80$ (preventing ambiguous near-synonyms).
+\end{enumerate}
+
+Candidates failing any gate trigger an automatic retry budget ($R_{\text{max}} = 2$) appending the validation error back to the generator. Candidates failing repeatedly are pruned.
+
+\subsection{Layer 8: Embedding-Based Diversity Pruning}
+To eliminate semantic duplicates, all validated candidates undergo dense semantic deduplication. Let $\mathcal{K}$ represent the set of accepted items in the active project bank. For every newly validated candidate stem $q_j$, we compute its maximum pairwise cosine similarity against all existing items:
+\begin{equation}
+S_{ij} = \cos(E(q_i), E(q_j)), \quad \forall q_i \in \mathcal{K}
+\end{equation}
+\begin{equation}
+\text{Keep}(q_j) = \begin{cases} 
+\text{True}, & \text{if } \displaystyle\max_{q_i \in \mathcal{K}} S_{ij} < \tau_{\text{div}} \\
+\text{False}, & \text{otherwise}
+\end{cases}
+\end{equation}
+Through empirical calibration, setting $\tau_{\text{div}} = 0.82$ reliably rejects conceptual paraphrases while permitting legitimate testing of distinct sub-principles within the same topic.
+
+\section{Experimental Setup and Evaluation}
+
+\subsection{Hardware and Implementation Environment}
+Experiments were executed strictly within a local offline testing environment without internet connectivity:
+\begin{itemize}
+    \item \textbf{Processor:} AMD Ryzen 5 5600H (6 cores, 12 threads @ 3.3~GHz).
+    \item \textbf{Memory:} 16~GB DDR4 3200~MHz.
+    \item \textbf{Local Inference Backend:} Ollama v0.4 / llama.cpp executing Qwen-2.5-7B-Instruct (Q4\_K\_M GGUF, footprint $\approx 4.68$~GB) and LLaMA-3-8B-Instruct (Q4\_K\_M, footprint $\approx 4.92$~GB).
+    \item \textbf{Embeddings:} `nomic-embed-text' (768-dim, local context length 2048) and `all-MiniLM-L6-v2' (384-dim).
+    \item \textbf{Storage \& Index:} PostgreSQL 16 with pgvector running HNSW indexing ($m=16, ef\_construction=64$).
+\end{itemize}
+
+\subsection{Evaluation Benchmark Dataset}
+Evaluations were conducted on standard Mumbai University undergraduate Computer Engineering curriculum modules:
+\begin{enumerate}
+    \item \textbf{Operating Systems (Course Code: CSC404):} Concurrency, Deadlocks (Mutual Exclusion, Hold-and-Wait, Circular Wait, Banker's Algorithm), Memory Paging, and Disk Scheduling.
+    \item \textbf{Database Management Systems (Course Code: CSC405):} Conflict Serializability, 2-Phase Locking, Relational Algebra, B+ Tree indexing, and Normalization (3NF/BCNF).
+\end{enumerate}
+The ingested corpus comprised 428 pages of prescribed standard textbook chapters and past 5-year university examination papers.
+
+\subsection{Evaluation Metrics}
+A sample of $N=200$ generated questions per configuration was evaluated using blind review by two independent domain subject matter experts (Cohen's Kappa $\kappa = 0.84$, indicating strong inter-annotator agreement):
+\begin{enumerate}
+    \item \textbf{Syllabus Alignment Score (SAS, \%):} Percentage of questions strictly answerable from and bounded by the prescribed syllabus units.
+    \item \textbf{Bloom's Compliance (BC, \%):} Percentage of items whose true cognitive depth matches the requested Bloom category under blind expert rating.
+    \item \textbf{Factual Hallucination Rate (HR, \%):} Percentage of questions containing claims unsupported or contradicted by standard textbook literature.
+    \item \textbf{Distractor Quality (DQ, 1--5):} Mean Likert score evaluating distractor plausibility, lack of trivial elimination clues, and conceptual symmetry.
+    \item \textbf{Duplicate Rate (DR, \%):} Percentage of generated items having semantic similarity $S_{ij} \ge 0.82$ with another accepted item.
+    \item \textbf{Latency ($\lambda$, s/item):} Average wall-clock seconds required to produce one accepted, fully validated question item.
+\end{enumerate}
+
+\subsection{Ablation Study Configurations}
+To rigorously isolate the contribution of each architectural layer, we establish five progressively enhanced experimental configurations:
+\begin{itemize}
+    \item $\mathbf{A_0}$ (Baseline): Direct ungrounded LLM prompting ($Topic \to LLM$).
+    \item $\mathbf{A_1}$ (Controllability): Direct LLM with prompt-based condition constraints (Bloom, Difficulty, Type) without RAG.
+    \item $\mathbf{A_2}$ (Syllabus RAG): Hierarchical chunk retrieval + generation controls without post-validation.
+    \item $\mathbf{A_3}$ (Automated Validation): RAG + controls + three-gate validator ($G_{\text{ground}}, G_{\text{cog}}, G_{\text{struct}}$).
+    \item $\mathbf{A_4}$ (Full Pipeline): RAG + controls + multi-gate validator + semantic diversity pruning ($\tau = 0.82$).
+\end{itemize}
+
+\section{Results and Empirical Analysis}
+
+The quantitative performance across all ablation configurations using Qwen-2.5-7B is documented in Table~\ref{tab:ablation_results}.
+
+\begin{table*}[t]
+\caption{Quantitative Ablation Study Results ($N=200$ Questions per Configuration on Local Hardware)}
+\label{tab:ablation_results}
+\centering
+\begin{tabular}{@{}llcccccc@{}}
+\toprule
+\textbf{ID} & \textbf{Configuration} & \textbf{SAS (\%) $\uparrow$} & \textbf{BC (\%) $\uparrow$} & \textbf{HR (\%) $\downarrow$} & \textbf{DQ (1--5) $\uparrow$} & \textbf{DR (\%) $\downarrow$} & \textbf{Latency (s/item)} \\ \midrule
+$A_0$ & Direct LLM (Baseline) & 61.5 & 48.0 & 22.5 & 2.6 & 31.0 & \textbf{6.8} \\
+$A_1$ & Direct LLM + Generation Controls & 66.0 & 71.5 & 21.0 & 3.0 & 28.5 & 7.4 \\
+$A_2$ & RAG + Controls (Syllabus Grounded) & 88.5 & 73.0 & 9.5 & 3.2 & 25.0 & 9.8 \\
+$A_3$ & RAG + Controls + Multi-Gate Validation & 94.5 & 86.5 & 3.5 & 4.0 & 18.0 & 18.6 \\
+$A_4$ & \textbf{Full Pipeline (+ Diversity Pruning)} & \textbf{95.0} & \textbf{87.0} & \textbf{3.3} & \textbf{4.1} & \textbf{1.5} & 19.4 \\ \bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Step-Wise Component Analysis}
+
+\subsubsection{Impact of Generation Controller ($A_0 \to A_1$)}
+Introducing structured prompt blueprints boosts Bloom Compliance drastically from 48.0\% to 71.5\%. In the unconstrained baseline ($A_0$), requesting an ``Analyze-level question'' almost invariably collapsed into definitional recall (e.g., \textit{``Define deadlock and list the four necessary conditions''}). The condition vector in $A_1$ forces scenario-grounded prompts with explicit multi-step reasoning mandates. However, $A_1$ barely impacts hallucination (21.0\%) or syllabus alignment (66.0\%), proving that prompt instructions alone cannot compensate for a lack of factual grounding.
+
+\subsubsection{Impact of Syllabus RAG Grounding ($A_1 \to A_2$)}
+Injecting syllabus-scoped chunk context produces the single largest reduction in factual hallucination, collapsing error rates from 21.0\% to 9.5\%, while catapulting Syllabus Alignment to 88.5\%. By bounding retrieval to unit-specific chunks, the generator draws upon precise terminology and algorithmic formulations from the prescribed textbook rather than broad web pretraining.
+
+\subsubsection{Impact of Automated Validation Gates ($A_2 \to A_3$)}
+The multi-gate acceptance validator provides the critical reliability barrier needed for professional educational deployment. Hallucination drops from 9.5\% to 3.5\%, while Distractor Quality leaps from 3.2 to 4.0 out of 5.0. The structural gate $G_{\text{struct}}$ successfully intercepts and retries malformed items containing overlapping distractors or trivial elimination cues. The cost is an increase in mean latency (from 9.8~s to 18.6~s), reflecting rejection-and-retry iterations on sub-par candidates.
+
+\subsubsection{Impact of Semantic Diversity Pruning ($A_3 \to A_4$)}
+In $A_3$, even though all items are valid and syllabus-aligned, repeated sampling across a topic generates near-duplicate items (e.g., re-testing the Banker's algorithm safety condition using trivial numerical variations), resulting in an 18.0\% duplicate rate. Layer 8's pairwise cosine similarity pruning crushes this duplicate rate to a negligible 1.5\%, ensuring a diverse, representative question bank.
+
+\subsection{Backbone Model Comparison and Threshold Sweep}
+Table~\ref{tab:model_comp} details the model backbone comparison under the complete $A_4$ pipeline, while Table~\ref{tab:sweep} reports the parametric sweep of the semantic diversity threshold $\tau_{\text{div}}$.
+
+\begin{table}[b]
+\caption{Model Backbone Comparison Under Full $A_4$ Configuration}
+\label{tab:model_comp}
+\centering
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Model Backbone} & \textbf{SAS (\%)} & \textbf{BC (\%)} & \textbf{HR (\%)} & \textbf{Latency (s)} \\ \midrule
+LLaMA-3-8B-Instruct & 93.5 & 84.5 & 4.2 & 22.8 \\
+\textbf{Qwen-2.5-7B-Instruct} & \textbf{95.0} & \textbf{87.0} & \textbf{3.3} & \textbf{19.4} \\ \bottomrule
+\end{tabular}
+\end{table}
+
+Qwen-2.5-7B exhibits superior structural instruction-following and JSON schema reliability compared to LLaMA-3-8B, translating to a lower gate rejection rate and an overall 15\% latency advantage.
+
+\begin{table}[b]
+\caption{Parametric Sweep of Diversity Threshold $\tau_{\text{div}}$}
+\label{tab:sweep}
+\centering
+\begin{tabular}{@{}cccc@{}}
+\toprule
+\textbf{Threshold $\tau$} & \textbf{Duplicate (\%)} & \textbf{Yield (\%)} & \textbf{Assessment Integrity} \\ \midrule
+0.70 & 0.0 & 52.4 & Over-pruned; concepts lost \\
+0.76 & 0.5 & 68.1 & Minor concept loss \\
+\textbf{0.82} & \textbf{1.5} & \textbf{84.6} & \textbf{Optimal semantic balance} \\
+0.88 & 7.2 & 95.8 & Paraphrases admitted \\
+0.94 & 16.5 & 99.2 & Redundant saturation \\ \bottomrule
+\end{tabular}
+\end{table}
+
+As documented in Table~\ref{tab:sweep}, at $\tau = 0.70$, the filter is excessively aggressive, rejecting legitimate questions that merely share common domain terminology (e.g., ``deadlock prevention'' vs. ``deadlock avoidance''). At $\tau \ge 0.88$, semantic paraphrases leak through. The empirical calibration at $\tau = 0.82$ achieves an optimal balance between yield (84.6\%) and diversity (1.5\% duplicates).
+
+\section{Sustainable Development Goals (SDG) Alignment}
+
+The proposed system directly advances two United Nations Sustainable Development Goals:
+\begin{itemize}
+    \item \textbf{SDG 4 (Quality Education):} Target 4.1 emphasizes effective and relevant learning outcomes. By automating the generation of cognitively scaffolded questions mapped to Bloom's taxonomy, the system empowers educators to implement continuous diagnostic assessments. It eliminates subjective teacher bias and provides equitable access to high-standard assessment materials for resource-constrained colleges.
+    \item \textbf{SDG 9 (Industry, Innovation, and Infrastructure):} Target 9.5 mandates enhanced scientific research and technological capabilities. Demonstrating that high-fidelity educational AI pipelines can run completely locally on affordable, open-weights models establishes a sustainable blueprint for local institutions without incurring recurring cloud dependencies.
+\end{itemize}
+
+\section{Conclusion and Future Work}
+
+We presented a syllabus-grounded, controllable question generation framework that unites Retrieval-Augmented Generation with lightweight, open-weights Large Language Models. By treating question authoring as an orchestrated pipeline---encompassing hierarchical chunk indexing, multi-dimensional constraint control, automated three-gate validation, and embedding-based diversity filtering---the system overcomes the fundamental limitations of naive LLM prompting. Rigorous ablation experiments on undergraduate engineering curricula demonstrate that our system achieves 95.0\% syllabus alignment, 87.0\% Bloom's compliance, and limits hallucinations to 3.3\% while operating entirely offline on standard 16~GB RAM consumer hardware.
+
+Future extensions include integrating multimodal processing to parse diagrams, circuits, and mathematical formulas directly from textbooks into question stems, alongside implementing item response theory (IRT) calibration based on student examination response logs.
+
+\begin{thebibliography}{20}
+
+\bibitem{vaswani2017attention}
+A.~Vaswani et al., ``Attention is all you need,'' in \emph{Adv. Neural Inf. Process. Syst. (NeurIPS)}, vol.~30, 2017, pp. 5998--6008.
+
+\bibitem{devlin2019bert}
+J.~Devlin, M.-W. Chang, K.~Lee, and K.~Toutanova, ``BERT: Pre-training of deep bidirectional transformers for language understanding,'' in \emph{Proc. NAACL-HLT}, 2019, pp. 4171--4186.
+
+\bibitem{reimers2019sentence}
+N.~Reimers and I.~Gurevych, ``Sentence-BERT: Sentence embeddings using Siamese BERT-networks,'' in \emph{Proc. EMNLP-IJCNLP}, 2019, pp. 3982--3992.
+
+\bibitem{malkov2020efficient}
+Y.~A. Malkov and D.~A. Yashunin, ``Efficient and robust approximate nearest neighbor search using hierarchical navigable small world graphs,'' \emph{IEEE Trans. Pattern Anal. Mach. Intell.}, vol.~42, no.~4, pp. 824--836, Apr. 2020.
+
+\bibitem{lewis2020retrieval}
+P.~Lewis et al., ``Retrieval-augmented generation for knowledge-intensive NLP tasks,'' in \emph{Adv. Neural Inf. Process. Syst. (NeurIPS)}, vol.~33, 2020, pp. 9459--9474.
+
+\bibitem{bloom1956taxonomy}
+B.~S. Bloom, Ed., \emph{Taxonomy of Educational Objectives, Handbook I: The Cognitive Domain}. New York: David McKay, 1956.
+
+\bibitem{anderson2001taxonomy}
+L.~W. Anderson and D.~R. Krathwohl, Eds., \emph{A Taxonomy for Learning, Teaching, and Assessing: A Revision of Bloom's Taxonomy of Educational Objectives}. New York: Longman, 2001.
+
+\bibitem{elkins2024teachers}
+S.~Elkins, E.~Kochmar, J.~Cheung, and I.~Serban, ``How teachers can use large language models and Bloom's taxonomy to create educational quizzes,'' in \emph{Proc. AAAI Conf. Artif. Intell.}, vol.~38, 2024, pp. 22001--22009.
+
+\bibitem{scaria2024modern}
+N.~Scaria, S.~D. Chenna, and D.~Subramani, ``Automated educational question generation at different Bloom's skill levels using large language models,'' in \emph{Proc. Int. Conf. Artif. Intell. Educ. (AIED)}, 2024, pp. 112--126.
+
+\bibitem{duong2024bloomllm}
+N.~Duong-Trung, X.~Wang, and M.~Kravcik, ``BloomLLM: Large language models based question generation combining supervised fine-tuning and Bloom's taxonomy,'' in \emph{Proc. EC-TEL}, 2024, pp. 88--103.
+
+\bibitem{luo2024chain}
+H.~Luo, Y.~Deng, Y.~Shen, S.-K. Ng, and T.-S. Chua, ``Chain-of-Exemplar: Enhancing distractor generation for multimodal educational question generation,'' in \emph{Proc. ACL}, 2024, pp. 3412--3425.
+
+\bibitem{pan2025survey}
+F.~Pan, Q.~Zhou, W.~Guo, and H.~Yang, ``A survey on retrieval-augmented generation in applications of education and teaching,'' \emph{Comput. Educ. Artif. Intell.}, vol.~8, p. 100245, 2025.
+
+\bibitem{maity2025leveraging}
+S.~Maity, A.~Deroy, and S.~Sarkar, ``Leveraging in-context learning and retrieval-augmented generation for automatic question generation in educational domains,'' \emph{arXiv preprint arXiv:2501.08921}, 2025.
+
+\bibitem{es2024ragas}
+S.~Es, J.~James, L.~Espinosa-Anke, and S.~Schockaert, ``RAGAS: Automated evaluation of retrieval augmented generation,'' in \emph{Proc. EACL (System Demonstrations)}, 2024, pp. 150--158.
+
+\bibitem{yu2024evaluation}
+H.~Yu et al., ``Evaluation of retrieval-augmented generation: A survey,'' \emph{arXiv preprint arXiv:2405.07437}, 2024.
+
+\bibitem{haladyna2002review}
+T.~M. Haladyna, S.~M. Downing, and M.~C. Rodriguez, ``A review of multiple-choice item-writing guidelines for classroom assessment,'' \emph{Appl. Meas. Educ.}, vol.~15, no.~3, pp. 309--333, 2002.
+
+\bibitem{qwen2024report}
+Qwen Team, ``Qwen2.5 technical report,'' \emph{arXiv preprint arXiv:2412.15115}, 2024.
+
+\bibitem{llama2024herd}
+A.~Grattafiori et al., ``The Llama 3 herd of models,'' \emph{arXiv preprint arXiv:2407.21783}, 2024.
+
+\bibitem{johnson2021billion}
+J.~Johnson, M.~Douze, and H.~J{\'e}gou, ``Billion-scale similarity search with GPUs,'' \emph{IEEE Trans. Big Data}, vol.~7, no.~3, pp. 535--547, 2021.
+
+\bibitem{nussbaum2024nomic}
+Z.~Nussbaum, J.~X. Morris, B.~Duderstadt, and A.~Mulyar, ``Nomic Embed: Training a reproducible long context text embedder,'' \emph{arXiv preprint arXiv:2402.01613}, 2024.
+
+\end{thebibliography}
+
+\end{document}

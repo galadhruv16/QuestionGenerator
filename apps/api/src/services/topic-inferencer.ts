@@ -58,7 +58,7 @@ export async function inferTopicsFromChunks(
       ? env.GEMINI_MODEL || 'gemini-flash-lite-latest'
       : chosenProvider === 'groq'
         ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
-        : env.OLLAMA_MODEL || 'qwen2.5:7b');
+        : env.OLLAMA_MODEL || 'mistral:latest');
 
   if (chunks.length === 0) {
     return {

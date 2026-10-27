@@ -653,13 +653,15 @@ export function ProjectQuestionsPage({
   const [tweakBloom, setTweakBloom] = useState('analyze');
   const [tweakDifficulty, setTweakDifficulty] = useState('HARD');
   const [tweakGuidance, setTweakGuidance] = useState('');
-  const [tweakEngine, setTweakEngine] = useState<'gemini' | 'ollama'>('gemini');
+  const [tweakEngine, setTweakEngine] = useState<'gemini' | 'ollama'>('ollama');
+  const [tweakError, setTweakError] = useState<string | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Bulk Regeneration Modal State
   const [isBulkRegenModalOpen, setIsBulkRegenModalOpen] = useState(false);
   const [bulkRegenGuidance, setBulkRegenGuidance] = useState('');
-  const [bulkRegenEngine, setBulkRegenEngine] = useState<'gemini' | 'ollama'>('gemini');
+  const [bulkRegenEngine, setBulkRegenEngine] = useState<'gemini' | 'ollama'>('ollama');
+  const [bulkRegenError, setBulkRegenError] = useState<string | null>(null);
   const [isBulkRegenerating, setIsBulkRegenerating] = useState(false);
 
   const showToast = (msg: string) => {
@@ -1077,6 +1079,8 @@ export function ProjectQuestionsPage({
     setTweakBloom(q.current_version?.bloom_levels?.slug?.toLowerCase() || 'analyze');
     setTweakDifficulty(q.current_version?.difficulty_levels?.slug?.toUpperCase() || 'HARD');
     setTweakGuidance('');
+    setTweakEngine('ollama');
+    setTweakError(null);
     setIsTweakDrawerOpen(true);
   };
 
@@ -1084,6 +1088,7 @@ export function ProjectQuestionsPage({
   const handleExecuteRegenerate = async () => {
     if (!tweakQuestion) return;
     setIsRegenerating(true);
+    setTweakError(null);
     try {
       if (projectId && !tweakQuestion.id.startsWith('qst-842-')) {
         const res = await apiRequest(
@@ -1096,7 +1101,7 @@ export function ProjectQuestionsPage({
               model_name:
                 tweakEngine === 'gemini'
                   ? 'gemini-flash-lite-latest'
-                  : 'qwen2.5:7b',
+                  : 'mistral:latest',
               model_provider: tweakEngine,
             }),
             method: 'POST',
@@ -1154,6 +1159,7 @@ export function ProjectQuestionsPage({
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : 'Regeneration failed';
+      setTweakError(msg);
       showToast(msg);
     } finally {
       setIsRegenerating(false);
@@ -1175,6 +1181,7 @@ export function ProjectQuestionsPage({
     }
 
     setIsBulkRegenerating(true);
+    setBulkRegenError(null);
     try {
       const realIds = eligible
         .map((q) => q.id)
@@ -1189,7 +1196,7 @@ export function ProjectQuestionsPage({
               model_name:
                 bulkRegenEngine === 'gemini'
                   ? 'gemini-flash-lite-latest'
-                  : 'qwen2.5:7b',
+                  : 'mistral:latest',
               model_provider: bulkRegenEngine,
               question_ids: realIds,
             }),
@@ -1241,6 +1248,7 @@ export function ProjectQuestionsPage({
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : 'Bulk regeneration failed';
+      setBulkRegenError(msg);
       showToast(msg);
     } finally {
       setIsBulkRegenerating(false);
@@ -2795,6 +2803,23 @@ export function ProjectQuestionsPage({
                 </div>
               </div>
 
+              {/* Error Alert inside Drawer */}
+              {tweakError && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-mono flex items-start space-x-2 animate-in fade-in duration-150">
+                  <div className="shrink-0 mt-0.5">
+                    <Icon name="alert" size={14} />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <div className="font-semibold uppercase tracking-wider text-[10px]">
+                      Regeneration Error
+                    </div>
+                    <p className="font-sans leading-relaxed text-[#334155]">
+                      {tweakError}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* AI Inference Engine */}
               <div className="space-y-2">
                 <label className="block text-xs font-mono font-semibold uppercase tracking-wider text-[#64748b]">
@@ -2802,16 +2827,17 @@ export function ProjectQuestionsPage({
                 </label>
                 <select
                   className="w-full bg-white border border-[#cbd5e1] rounded-lg p-2.5 text-xs text-[#0f172a] font-sans focus:border-[#3157d5] focus:outline-none shadow-sm"
-                  onChange={(e) =>
-                    setTweakEngine(e.target.value as 'gemini' | 'ollama')
-                  }
+                  onChange={(e) => {
+                    setTweakEngine(e.target.value as 'gemini' | 'ollama');
+                    setTweakError(null);
+                  }}
                   value={tweakEngine}
                 >
                   <option value="gemini">
-                    Google Gemini Cloud Turbo (sub-2s latency, high fidelity)
+                    ⚡ Google Gemini Cloud Turbo (sub-2s latency, high fidelity)
                   </option>
                   <option value="ollama">
-                    Localhost Ollama Qwen 2.5 (100% offline, on-device)
+                    🖥️ Localhost Ollama (Requires local LLM pulled on port 11434)
                   </option>
                 </select>
               </div>
@@ -2907,6 +2933,23 @@ export function ProjectQuestionsPage({
             </div>
 
             <div className="space-y-4 text-xs">
+              {/* Bulk Error Alert */}
+              {bulkRegenError && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-mono flex items-start space-x-2 animate-in fade-in duration-150">
+                  <div className="shrink-0 mt-0.5">
+                    <Icon name="alert" size={14} />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <div className="font-semibold uppercase tracking-wider text-[10px]">
+                      Bulk Regeneration Error
+                    </div>
+                    <p className="font-sans leading-relaxed text-[#334155]">
+                      {bulkRegenError}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="p-3 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg space-y-1.5 font-mono text-[11px] text-[#475569]">
                 <div>
                   • Selected items:{' '}
@@ -2931,16 +2974,17 @@ export function ProjectQuestionsPage({
                 </label>
                 <select
                   className="w-full bg-white border border-[#cbd5e1] rounded-lg p-2.5 text-xs text-[#0f172a] font-sans focus:border-[#3157d5] focus:outline-none"
-                  onChange={(e) =>
-                    setBulkRegenEngine(e.target.value as 'gemini' | 'ollama')
-                  }
+                  onChange={(e) => {
+                    setBulkRegenEngine(e.target.value as 'gemini' | 'ollama');
+                    setBulkRegenError(null);
+                  }}
                   value={bulkRegenEngine}
                 >
                   <option value="gemini">
-                    Google Gemini Cloud Turbo (sub-2s latency, high fidelity)
+                    ⚡ Google Gemini Cloud Turbo (sub-2s latency, high fidelity)
                   </option>
                   <option value="ollama">
-                    Localhost Ollama Qwen 2.5 (100% offline, on-device)
+                    🖥️ Localhost Ollama (Requires local LLM pulled on port 11434)
                   </option>
                 </select>
               </div>

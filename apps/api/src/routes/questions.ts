@@ -679,6 +679,7 @@ questionsRouter.post('/:questionId/regenerate', async (request, response, next) 
       data: fullQuestion,
     });
   } catch (error: unknown) {
+    console.error('[RegenerateQuestionInPlace Error]:', error);
     if ((error as { code?: string })?.code === 'QUESTION_LOCKED') {
       return response.status(400).json({
         error: {
@@ -688,7 +689,14 @@ questionsRouter.post('/:questionId/regenerate', async (request, response, next) 
         },
       });
     }
-    return next(error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return response.status(500).json({
+      error: {
+        code: 'REGENERATION_FAILED',
+        details: {},
+        message,
+      },
+    });
   }
 });
 

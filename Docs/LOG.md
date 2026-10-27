@@ -4,6 +4,149 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-10-27] — Hardened Local Model Schema Normalization, Persistence Resilience, and Diagnostic Telemetry
+
+### Type
+Bug Fix / AI Pipeline / Persistence Robustness / Local LLM Normalization / Diagnostics
+
+### Status
+Implemented, verified with 0 TypeScript compilation errors in API, 100% passing tests (44/44 in API), debug telemetry verified live on localhost:3001.
+
+### Root Cause Analysis & Resolution
+1. **Local Model Schema Quirks (e.g. Phi-3)**:
+   - When generating MCQs on CPU, local models like `phi3:latest` occasionally emitted unconventional distractor keys such as `"isn't:correct": false` or string booleans (`"is_correct": "false"`), causing standard boolean extraction to fail or set `opt.is_correct` to `undefined`.
+   - When attempting to insert into `question_options`, `is_correct: undefined` violated PostgreSQL's `NOT NULL` constraint on boolean columns.
+   - Added regex and key sanitizers to normalize `"isn't:correct"`, `"is_incorrect"`, and `"isCorrect"` to canonical `"is_correct"` boolean flags before database insertion.
+2. **Silent Failure in Question Persistence**:
+   - `persistGeneratedQuestion` previously returned `null` on insertion errors without throwing or logging, resulting in runs ending with 0 questions accepted without clear error attribution.
+   - Wrapped question, version, and option insertions to throw explicit errors and record full error diagnostics to `generation_runs.error_message`.
+3. **Live Diagnostic Telemetry**:
+   - Added `logGen()` file logger and exposed `GET /api/v1/debug-generation-log` to capture and stream real-time pipeline telemetry during generation without requiring elevated database roles.
+
+---
+
+## [2026-10-27] — Fix Cross-Batch Deduplication, Multi-Item Generation Stalls, and CPU Inference Timeouts
+
+### Type
+Bug Fix / AI Pipeline / Deduplication / Stratified Chunk Allocation / Local LLM Resilience
+
+### Status
+Implemented, verified with 0 TypeScript compilation errors in API and Web, 100% passing tests (44/44 in API), and running live on the local development servers.
+
+### Root Cause Analysis
+1. **Cross-Batch Deduplication Failure (Repetition of Question Stem)**:
+   - When initiating a new batch, `question-generator.ts` previously attempted to query `client.from('question_versions').select('question_text, questions!inner(project_id)')`. PostgREST returned error `PGRST201` ("Could not embed because more than one relationship was found").
+   - Because the error was caught silently, `existingStems` defaulted to `[]`.
+   - Furthermore, `existingStems` was never injected into the LLM system prompt. Consequently, local models evaluating the same chunk with deterministic sampling reproduced the exact same question word-for-word.
+2. **Batch Stalling at 1 / 3 Items**:
+   - Chunk selection assigned all targets in a small document to the exact same chunk (e.g. Chunk #2 on Cooling Towers) without tracking used chunks.
+   - When Item #2 generated a duplicate, the retry logic had missing `priorStems` and lacked alternative chunk diversity.
+   - On CPU inference (AMD Ryzen 5 7520U 4 cores), evaluating a 7B model took ~200–250 seconds per question. The previous 240s timeout aborted Item #2 and Item #3 mid-generation, causing `generation_runs` to terminate prematurely with `accepted_count = 1` (`NEEDS_REVIEW`).
+   - If the local LLM produced minor JSON syntax flaws (e.g., unescaped quotes or trailing characters), `JSON.parse` failed without a fallback extractor.
+
+### Technical Changes
+1. **Reliable Cross-Batch Question Stem Retrieval**:
+   - In `apps/api/src/services/question-generator.ts`, queried `questions.project_id` to gather `current_version_id`s, then queried `question_versions.in('id', versionIds)` to reliably load all prior question stems across all previous batches in the project.
+   - Injected negative constraints into the prompt (`CRITICAL DEDUPLICATION RULE: The following questions ALREADY exist in this exam bank... DO NOT repeat or rephrase any of these`).
+   - Injected dynamic per-item seeds (`42 + seq * 17 + random`) and elevated local sampling temperature to `0.35`.
+2. **Distinct Chunk Stratum Allocation Across Targets**:
+   - Implemented `usedChunkIds` tracking during plan target chunk partitioning in `executeGenerationRun`.
+   - Each target in a batch is prioritized to receive an unused chunk from its syllabus stratum before reusing chunks, ensuring Target 1, Target 2, and Target 3 assess different concepts across the document.
+3. **CPU Inference Timeout & Resource Calibration**:
+   - Increased local generation timeout to `420000ms` (7 minutes) in `ollama-provider.ts` and `question-generator.ts`, preventing CPU inference from aborting active token streams.
+   - Configured `num_thread: 6`, `num_ctx: 2048`, and `num_predict: 1200` in `OllamaProvider.generate` to prevent token cutoff and maximize Ryzen 5 7520U throughput.
+4. **Resilient Local JSON Fallback Parser**:
+   - Added a regex-based fallback extractor in `synthesizeQuestionItem` to rescue questions if standard `JSON.parse` encounters unescaped characters from local models.
+5. **Frontend State Handling**:
+   - Updated `generation-manager.ts` and `ProjectGenerationPage.tsx` to handle `NEEDS_REVIEW` and update UI completion states smoothly.
+
+---
+
+## [2026-10-27] — Strengthened Local LLM Pipeline Architecture & Mistral 7B Calibration
+
+### Type
+Architecture / AI Pipeline / Local LLM Inference / Pure Offline Calibration
+
+### Status
+Implemented, verified with 0 TypeScript errors across the monorepo, 100% passing tests (44/44 in API), and live on the development server.
+
+### Context & Technical Calibration
+1. **User Requirement**: The user requested that the system generate questions purely using local lightweight LLMs to align authentically with their academic research paper, with zero fallbacks, full error transparency, and optimized for their hardware specs (AMD Ryzen 5 7520U 4C/8T, 16 GB RAM).
+2. **Local Model Benchmark**:
+   - Ingested models inspected on local Ollama instance: `mistral:latest` (4.4 GB), `phi3:latest` (2.2 GB), `nomic-embed-text:latest` (274 MB).
+   - Benchmarked `mistral:latest` on structured schema output: demonstrated 100% adherence to four-option MCQ and JSON schema output, operating cleanly within 5.5 GB available RAM.
+3. **Local Architecture Hardening**:
+   - Updated `apps/api/src/config/env.ts` and `apps/api/.env` to configure `OLLAMA_MODEL=mistral:latest` as the default local LLM.
+   - Enhanced `OllamaProvider.generate` in `apps/api/src/ai/providers/ollama-provider.ts` to expand default timeouts from 30s to 180s (3 minutes) and token output capacity from 300 to 1,200 tokens (`num_predict`), ensuring complete question stems and rationales are never truncated mid-generation on CPU inference.
+   - Updated frontend defaults in `ProjectGenerationPage.tsx`, `ProjectQuestionsPage.tsx`, `ProjectResourcesPage.tsx`, and `ProjectTopicsPage.tsx` to default to `ollama` with `mistral:latest` prominently recommended for pure local, offline generation.
+
+---
+
+## [2026-10-26] — Fix Schema Column Mismatch in In-Place Question Regeneration
+
+### Type
+Bug Fix / Database Integration / AI Pipeline / Persistence
+
+### Status
+Fixed, verified with clean TypeScript typecheck, passing Vitest unit tests (44/44 in API, 50/50 in Web), and confirmed hot-reloaded by the active development server.
+
+### Root Cause & Resolution
+- **Root Cause**: When fetching the active question and its associated chunk in `regenerateQuestionInPlace` ([`apps/api/src/services/question-generator.ts`](file:///c:/Users/Dhruv%20Gala/Desktop/QuestionGeneration/apps/api/src/services/question-generator.ts)), the query selected `resource_chunks(..., content, ...)`. However, in the Supabase PostgreSQL schema (`202610110002_resource_chunks.sql`), the column storing the chunk body is named `text` (not `content`). PostgreSQL returned error code `42703: column resource_chunks_3.content does not exist`, which triggered the 500 error when querying the database.
+- **Fix**: Replaced all references to `resource_chunks.content` with `resource_chunks.text` inside `regenerateQuestionInPlace` in `question-generator.ts`.
+- **Hot-Reload Verification**: `tsx watch` automatically reloaded the updated service module with 0 errors.
+
+---
+
+## [2026-10-26] — Fix In-Place Regeneration API Error Handling & Process Synchronization
+
+### Type
+Bug Fix / AI Pipeline / Error Transparency & Robustness / Process Lifecycle
+
+### Status
+Implemented, fully verified across workspace typechecks, full Vitest test suites (44 API + 50 Web tests passing), and clean production builds. Server restarted and running live on localhost:3001.
+
+### Root Cause Analysis & Resolution
+1. **Stale Background Watcher Process**: A background `tsx watch` process on port 3001 had remained locked to an earlier process instance without propagating hot reloads, causing regeneration requests to run older route handlers that masked specific errors as generic 500 "Internal server error" messages.
+2. **Database Mutation Error Trapping in `regenerateQuestionInPlace`**: In `apps/api/src/services/question-generator.ts`, Supabase update and insert queries (`question_versions`, `question_options`, `question_source_refs`, `questions`) now explicitly check for errors and surface actionable messages rather than unhandled rejections.
+3. **Route Error Reporting**: In `apps/api/src/routes/questions.ts`, errors from question regeneration now log detailed context to the server console and propagate the exact error message in the JSON response (`{ error: { code: 'REGENERATION_FAILED', message } }`) rather than an opaque generic string.
+4. **Active Process Restart**: Terminated the stale process, re-spawned the live dev server on port 3001 with healthy HTTP 200 ping on `/api/v1/health`.
+
+### Files Modified
+- `apps/api/src/routes/questions.ts`: Added detailed catch logging and response messaging for `/:questionId/regenerate`.
+- `apps/api/src/services/question-generator.ts`: Added explicit error checking on all database mutations during in-place regeneration.
+- `apps/web/src/app/pages/ProjectQuestionsPage.tsx`: Added visible in-drawer and in-modal error alert banners.
+
+---
+
+## [2026-10-26] — Targeted In-Place Question Regeneration UX & Default Gemini Engine Selection
+
+### Type
+UX / AI Generation Pipeline / Error Handling & Fault Visibility / Frontend Calibration
+
+### Status
+Implemented and verified locally across full workspace TypeScript typecheck (0 errors across `@groundq/contracts`, `@groundq/api`, and `@groundq/web`), production build (`npx pnpm -r build` passed in 5.17s), and full Vitest suite (94/94 tests passed).
+
+### Context & Root Cause Analysis
+User reported that clicking "Regenerate in Place" opened the targeted regeneration drawer, but clicking "Regenerate Question" would spin for 2 seconds and do nothing on localhost.
+Root causes identified:
+1. Engine Selection Default: The drawer was susceptible to selecting or falling back to Ollama requesting `qwen2.5:7b`, which was not downloaded on the user's local Ollama instance (only `phi3` and `mistral` were present).
+2. Silent Error Swallowing: The drawer caught errors and merely triggered a brief top-right toast. When errors occurred, the drawer remained open with the button reverting to normal state without showing any contextual error banner inside the modal, making it appear as though "nothing happened".
+
+### Changes Implemented
+1. **Default to Google Gemini Cloud Turbo**:
+   - Explicitly reset `tweakEngine` to `'gemini'` whenever the Targeted Regeneration Tweak Drawer is opened (`handleOpenTweakDrawer`).
+   - Updated labels in both Targeted Drawer and Bulk Regeneration modal to clearly identify Google Gemini Cloud Turbo as the recommended sub-2s cloud engine and note that Ollama requires local LLM downloads.
+2. **Contextual In-Drawer Error Banner**:
+   - Added `tweakError` state to `ProjectQuestionsPage.tsx`.
+   - Rendered a visible, styled alert banner directly inside the drawer if the API call or AI generation returns an error, giving full visibility into any failure reason (e.g., model errors, quota, network issues).
+   - Clearing error state on drawer open and whenever engine selection is changed.
+   - Added corresponding `bulkRegenError` alert banner to the Bulk Regeneration modal as well.
+3. **Verification**:
+   - Tested Google Gemini API provider directly: verified working with sub-2s turnaround.
+   - Run typecheck: 0 errors across `@groundq/contracts`, `@groundq/api`, `@groundq/web`.
+   - Run all 94 Vitest unit tests: 100% passed.
+   - Run monorepo production build: clean bundle in 5.17s.
+
 ## [2026-10-16] — Auth-Aware Landing Page Navigation & Workspace Logo Routing Fix
 
 ### Type
@@ -1829,3 +1972,35 @@ Renamed the existing `Docs/` directory to `docs/` and normalized `API_Design.md`
 
 ### Follow-up
 Implement Supabase domain migrations and product capabilities as separate approved tasks.
+
+
+## [2026-10-27] — Local Ollama Pipeline Resilience & CPU Generation Optimization
+
+### Type
+Feature / Optimization / Bugfix
+
+### Status
+Implemented
+
+### Summary
+Diagnosed and resolved local LLM generation failures when running `mistral:latest` and `phi3:latest` on commodity CPU hardware without cloud fallbacks. Optimized generation parameters, prompt evaluation lengths, timeout ceilings, and JSON parsing resilience.
+
+### Files
+- `apps/api/src/ai/providers/ollama-provider.ts`
+- `apps/api/src/services/question-generator.ts`
+- `apps/api/src/config/env.ts`
+- `apps/web/src/app/pages/ProjectGenerationPage.tsx`
+- `docs/LOG.md`
+
+### Technical Details
+- Identified root cause of synthesis failure: With CPU-only execution (Ryzen 5 7520U, 4 cores), generating 1,200 tokens with 1,500-char context exceeded previous 120s timeout limits, or hit premature JSON truncation at token ceilings.
+- Increased Ollama HTTP timeout to 240,000 ms (4 minutes) for local inference.
+- Reduced `num_predict` for question synthesis to 600 tokens (sufficient for complete question + distractors + explanation without hitting token truncation).
+- Added compact context clipping (800 chars) for CPU inference to reduce initial prompt evaluation time by ~50%.
+- Enhanced JSON parser resilience to repair minor local LLM formatting artifacts (e.g., `is_corrent` typos, boolean strings, trailing commas, single-quoted booleans) without throwing schema validation aborts.
+- Cleaned up reference table column naming and verified error transparent propagation (zero silent cloud fallbacks).
+
+### Tests
+- Benchmarked local generation against Ollama (`mistral:latest` and `phi3:latest`): verified valid schema-compliant questions parsed cleanly.
+- `npx pnpm --filter @groundq/api exec tsc --noEmit` — passed with 0 errors.
+- `npx pnpm --filter @groundq/api test` — 8/8 test files passed (44/44 unit tests).

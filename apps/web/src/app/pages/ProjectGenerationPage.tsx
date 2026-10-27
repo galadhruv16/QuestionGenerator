@@ -131,8 +131,8 @@ export function ProjectGenerationPage() {
   // Quality invariants
   const [strictDeduplication, setStrictDeduplication] = useState(true);
   const [requireCitationAnchors, setRequireCitationAnchors] = useState(true);
-  const [targetProvider, setTargetProvider] = useState<'gemini' | 'ollama' | 'groq'>('gemini');
-  const [targetModel, setTargetModel] = useState('gemini-flash-lite-latest');
+  const [targetProvider, setTargetProvider] = useState<'gemini' | 'ollama' | 'groq'>('ollama');
+  const [targetModel, setTargetModel] = useState('mistral:latest');
 
   // Generation execution state
   const [isGenerating, setIsGenerating] = useState(isCurrentlyActive);
@@ -297,7 +297,9 @@ export function ProjectGenerationPage() {
 
     const unsubscribe = generationManager.subscribe(projectId, async (state) => {
       const active =
-        state.status !== 'COMPLETED' && state.status !== 'FAILED';
+        state.status !== 'COMPLETED' &&
+        state.status !== 'FAILED' &&
+        state.status !== 'NEEDS_REVIEW';
       setIsGenerating(active);
       setExecutionStep(state.step);
       setCurrentRun((prev) => ({
@@ -311,7 +313,11 @@ export function ProjectGenerationPage() {
         setQuestionCount(state.targetCount);
       }
 
-      if (state.status === 'COMPLETED' || state.status === 'FAILED') {
+      if (
+        state.status === 'COMPLETED' ||
+        state.status === 'FAILED' ||
+        state.status === 'NEEDS_REVIEW'
+      ) {
         try {
           const [runsRes, qRes] = await Promise.all([
             apiRequest(`/projects/${projectId}/generation-runs`),
@@ -1852,11 +1858,11 @@ export function ProjectGenerationPage() {
                           setTargetModel(mod);
                         }}
                       >
-                        <option value="gemini:gemini-flash-lite-latest">⚡ Gemini Flash Lite (500 RPD Cloud Turbo ~1s)</option>
-                        <option value="gemini:gemini-flash-latest">⚡ Gemini Flash (Cloud Turbo ~2s)</option>
-                        <option value="groq:llama-3.3-70b-versatile">🚀 Groq Llama 3.3 70B (14.4k RPD Free Cloud ~0.5s)</option>
-                        <option value="ollama:qwen2.5:7b">🖥️ Qwen 2.5 7B (Localhost Offline ~60s)</option>
-                        <option value="ollama:qwen2.5:3b">🖥️ Qwen 2.5 3B (Localhost Offline Light)</option>
+                        <option value="ollama:mistral:latest">🖥️ Mistral 7B (Localhost Offline Recommended)</option>
+                        <option value="ollama:phi3:latest">🖥️ Phi-3 3.8B (Localhost Offline Lightweight)</option>
+                        <option value="gemini:gemini-flash-lite-latest">⚡ Gemini Flash Lite (Cloud Fast ~1s)</option>
+                        <option value="gemini:gemini-flash-latest">⚡ Gemini Flash (Cloud ~2s)</option>
+                        <option value="groq:llama-3.3-70b-versatile">🚀 Groq Llama 3.3 70B (Cloud ~0.5s)</option>
                       </select>
                     </div>
                   </div>

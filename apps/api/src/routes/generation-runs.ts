@@ -101,7 +101,7 @@ generationRunsRouter.post('/', async (request, response, next) => {
             ? env.GEMINI_MODEL || 'gemini-flash-lite-latest'
             : env.GROQ_API_KEY
               ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
-              : env.OLLAMA_MODEL || 'qwen2.5:7b'),
+              : env.OLLAMA_MODEL || 'mistral:latest'),
         model_provider:
           parsedBody.data.model_provider ||
           (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama'),
@@ -135,7 +135,7 @@ generationRunsRouter.post('/', async (request, response, next) => {
             ? env.GEMINI_MODEL || 'gemini-flash-lite-latest'
             : effectiveProvider === 'groq'
               ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
-              : env.OLLAMA_MODEL || 'qwen2.5:7b';
+              : env.OLLAMA_MODEL || 'mistral:latest';
 
     config.model_provider = effectiveProvider;
     config.model_name = effectiveModel;

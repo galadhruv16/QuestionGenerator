@@ -192,8 +192,8 @@ export function ProjectResourcesPage({
 
   // Dual-Engine Topic Inference State
   const [isInferModalOpen, setIsInferModalOpen] = useState(false);
-  const [inferProvider, setInferProvider] = useState<'gemini' | 'ollama' | 'groq'>('gemini');
-  const [inferModel, setInferModel] = useState('gemini-flash-lite-latest');
+  const [inferProvider, setInferProvider] = useState<'gemini' | 'ollama' | 'groq'>('ollama');
+  const [inferModel, setInferModel] = useState('mistral:latest');
   const [isInferringTopics, setIsInferringTopics] = useState(false);
 
   // PYQ Pattern Analysis State
@@ -2216,7 +2216,7 @@ export function ProjectResourcesPage({
                 </p>
               </div>
 
-              {/* Option 3: Qwen 2.5 Local */}
+              {/* Option 3: Mistral 7B Local */}
               <div
                 className={`p-3.5 sm:p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col gap-2 ${
                   inferProvider === 'ollama'
@@ -2225,18 +2225,18 @@ export function ProjectResourcesPage({
                 }`}
                 onClick={() => {
                   setInferProvider('ollama');
-                  setInferModel('qwen2.5:7b');
+                  setInferModel('mistral:latest');
                 }}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xl shrink-0">🖥️</span>
                     <span className="font-headline-sm text-headline-sm font-semibold text-on-surface">
-                      Qwen 2.5 7B (Localhost Offline)
+                      Mistral 7B (Localhost Offline)
                     </span>
                   </div>
                   <span className="self-start sm:self-auto px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-bold shrink-0">
-                    100% PRIVATE · ~60s
+                    100% PRIVATE · LOCAL
                   </span>
                 </div>
                 <p className="font-body-sm text-body-sm text-on-surface-variant">

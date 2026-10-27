@@ -8,17 +8,19 @@ export class OllamaProvider implements AIProvider {
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
-      options.timeoutMs ?? 30000,
+      options.timeoutMs ?? 420000,
     );
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         body: JSON.stringify({
           format: options.format,
-          model: options.model || env.OLLAMA_MODEL || 'phi3:latest',
+          model: options.model || env.OLLAMA_MODEL || 'mistral:latest',
           options: {
-            num_predict: 300,
+            num_ctx: 2048,
+            num_predict: 1200,
+            num_thread: 6,
             seed: options.seed ?? 42,
-            temperature: options.temperature ?? 0.2,
+            temperature: options.temperature ?? 0.35,
           },
           prompt: options.prompt,
           stream: false,
