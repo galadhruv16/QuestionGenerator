@@ -153,12 +153,12 @@ Evaluation Rigor & Monolithic end-to-end evaluation & Controlled five-stage abla
     \draw [arrow] (L4) -- (L5);
     \draw [arrow] (L5) -- (L7);
     \draw [arrow] (L7) -- (L8);
-    \node at ([yshift=8pt] $(L7)!0.5!(L8)$) [font=\tiny\bfseries] {Accept};
+    
     \draw [arrow] (L8) -- (OUT);
     
     % Feedback loop for reject (routed cleanly underneath Layer 7 and Layer 5)
     \draw [arrow] (L7.south) -- ++(0,-0.30) -| (L5.south);
-    \node at ([yshift=-12pt] $(L7.south)!0.5!(L5.south)$) [font=\tiny\bfseries] {Reject / Retry ($R_{\text{max}}=2$)};
+ 
 \end{tikzpicture}
 \caption{Proposed End-to-End System Architecture for Syllabus-Grounded Controllable Question Generation.}
 \label{fig:architecture}
