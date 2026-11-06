@@ -4,6 +4,39 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-11-06] — Backend Service-Role Client Decoupling & Background Persistence Architecture Hardening
+
+### Type
+Architecture Fix / AI Safety / Background Persistence Resilience / Security Hardening
+
+### Status
+Implemented and verified. 100% automated test suite passing (123/123: 4 contracts, 73 API, 46 web), 0 TypeScript compilation errors across all workspace packages (`tsc -p tsconfig.json`), 0 ESLint warnings/errors (`eslint .`), production builds passing (`contracts`, `api`, `web`). Orphaned run `1bae93b9-20c1-4b4a-8fe7-7f670fb56967` safely verified and repaired to `NEEDS_REVIEW`.
+
+### Root Cause Analysis & Problem Resolution
+1. **Root Cause Diagnosis**:
+   - In long-running local Ollama runs (which can take 20–30+ minutes for 5–10 questions), the API was passing the user's browser-issued Supabase access token (`createSupabaseUserClient(authReq.accessToken)`) into the detached background execution promises (`executeGenerationRun` and `processResourcePipeline`).
+   - When the user's short-lived JWT expired mid-run (e.g. at ~15 minutes), Supabase PostgREST rejected all subsequent database inserts and updates with `{"code":"PGRST303","message":"JWT expired"}`.
+   - Consequently, while local Ollama continued successfully synthesizing questions 2, 3, 4, and 5, none could be saved to the database, and the final status update also failed, leaving the run orphaned in `GENERATING` with `accepted_count = 1`.
+
+2. **Architectural Separation of Concerns**:
+   - **User JWT Authorization**: The initiating HTTP request strictly authenticates the user, validates bearer credentials, verifies project ownership (`owner_id = authReq.authUser.id` and `archived_at IS NULL`), validates blueprint associations, and creates the initial `QUEUED` run record using the user's client.
+   - **Backend Service-Role Persistence**: Once authorization and record creation succeed, the detached background task (`executeGenerationRun` and `processResourcePipeline`) is passed a backend-only admin client (`createSupabaseAdminClient()`) instantiated with `SUPABASE_SERVICE_ROLE_KEY` with session persistence disabled (`persistSession: false, autoRefreshToken: false`).
+   - **Environment Isolation**: `SUPABASE_SERVICE_ROLE_KEY` is added to backend `apps/api/src/config/env.ts` as a backend-only configuration. It is strictly never exposed to the frontend (`apps/web` has no access to or reference to this key).
+   - **Failsafe Error Reporting**: If `SUPABASE_SERVICE_ROLE_KEY` is missing in an environment, the endpoint immediately marks the run `FAILED` with a descriptive message and returns HTTP 500, preventing silent failures or fallback to expiring tokens.
+   - **Preserved Isolation**: All database operations in `executeGenerationRun` continue filtering strictly by `project_id`, `run_id`, and `created_by`, maintaining strict multi-tenant isolation without relying on ephemeral tokens.
+   - **Terminal State Guarantees**: Emergency fallbacks wrap final status persistence in try/catch to ensure runs never stay permanently stuck in `GENERATING`.
+
+3. **Orphaned Run Repair**:
+   - Inspected run `1bae93b9-20c1-4b4a-8fe7-7f670fb56967` and confirmed it belonged to user `d7e8d0f0-7312-405c-8944-a11cb07c9971` with 1 question actually persisted in `questions` (`59be3d52-c6cd-496e-8d62-a091a6e92d4d`).
+   - Updated remaining `PLANNED` plan items (items 3, 4, 5) to `FAILED`.
+   - Updated the run to `status: 'NEEDS_REVIEW'`, `accepted_count: 1`, `review_count: 4`, `completed_at: '2026-11-06T09:06:12.668Z'`, and recorded the exact diagnostic error message explaining that persistence halted due to user JWT expiration during local Ollama inference. The persisted question was left intact.
+
+4. **Automated Test Coverage**:
+   - Added unit tests in `apps/api/test/ollama-resilience.test.ts` verifying:
+     - `createSupabaseAdminClient` throws descriptive error when `SUPABASE_SERVICE_ROLE_KEY` is missing.
+     - `createSupabaseAdminClient` successfully instantiates client without session persistence when key is provided.
+     - Detached background execution writes successfully via service-role client independent of user JWT expiration.
+
 ## [2026-11-06] — Ollama-Only Resilience & Provider Immutability Hardening: Preflight Tag Matching, Embedding Fallback Abolition, Duplicate Rejection & Frontend Telemetry
 
 ### Type

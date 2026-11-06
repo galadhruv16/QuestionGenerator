@@ -8,7 +8,10 @@ import {
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { env } from '../config/env.js';
-import { createSupabaseUserClient } from '../lib/supabase.js';
+import {
+  createSupabaseAdminClient,
+  createSupabaseUserClient,
+} from '../lib/supabase.js';
 import {
   requireAuth,
   type AuthenticatedRequest,
@@ -629,9 +632,50 @@ const handleProcess = async (
 
     if (runError) throw runError;
 
-    // Trigger in-process pipeline execution asynchronously
+    // Obtain backend-only service-role client for detached background processing.
+    // This decouples long-running resource parsing & embedding (e.g. multi-page PDFs)
+    // from the user's ephemeral browser access token (JWT), preventing PGRST303 expiration.
+    let backgroundClient;
+    try {
+      backgroundClient = createSupabaseAdminClient();
+    } catch (adminClientErr) {
+      const configErrMsg =
+        adminClientErr instanceof Error
+          ? adminClientErr.message
+          : 'Backend service-role client configuration failed.';
+      console.error(
+        `[ResourceProcess] Cannot initialize background admin client for run ${newRun.id}:`,
+        configErrMsg,
+      );
+      await client
+        .from('resource_processing_runs')
+        .update({
+          completed_at: new Date().toISOString(),
+          error_message: configErrMsg,
+          status: 'FAILED',
+        })
+        .eq('id', newRun.id);
+
+      await client
+        .from('resources')
+        .update({
+          status: 'FAILED',
+        })
+        .eq('id', parsedResourceId.data);
+
+      return response.status(500).json({
+        error: {
+          code: 'CONFIGURATION_ERROR',
+          message:
+            'Background resource processing cannot be initialized: SUPABASE_SERVICE_ROLE_KEY is missing or invalid on the server.',
+          details: {},
+        },
+      });
+    }
+
+    // Trigger in-process pipeline execution asynchronously using the backend client
     void processResourcePipeline({
-      client,
+      client: backgroundClient,
       projectId: parsedProjectId.data,
       resourceId: parsedResourceId.data,
       runId: newRun.id,

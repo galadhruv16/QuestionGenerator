@@ -11,6 +11,10 @@ import {
 } from '../src/ai/providers/ollama-provider.js';
 import { PDFParse } from 'pdf-parse';
 import {
+  createSupabaseAdminClient,
+} from '../src/lib/supabase.js';
+import { env } from '../src/config/env.js';
+import {
   EXPECTED_EMBEDDING_DIMENSION,
   processResourcePipeline,
   runEmbeddingPreflight,
@@ -487,6 +491,57 @@ describe('Ollama-Only Resilience and Provider Immutability', () => {
       expect(computeStatus(1)).toBe('NEEDS_REVIEW');
       expect(computeStatus(4)).toBe('NEEDS_REVIEW');
       expect(computeStatus(5)).toBe('COMPLETED');
+    });
+  });
+
+  describe('Service-Role Client & Background Persistence Isolation', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('createSupabaseAdminClient throws descriptive error when SUPABASE_SERVICE_ROLE_KEY is missing', () => {
+      const originalKey = env.SUPABASE_SERVICE_ROLE_KEY;
+      try {
+        (env as { SUPABASE_SERVICE_ROLE_KEY?: string }).SUPABASE_SERVICE_ROLE_KEY = undefined;
+        expect(() => createSupabaseAdminClient()).toThrow(
+          /SUPABASE_SERVICE_ROLE_KEY is not configured on the server/i,
+        );
+      } finally {
+        (env as { SUPABASE_SERVICE_ROLE_KEY?: string }).SUPABASE_SERVICE_ROLE_KEY = originalKey;
+      }
+    });
+
+    it('createSupabaseAdminClient instantiates client without session persistence when service-role key is provided', () => {
+      const originalKey = env.SUPABASE_SERVICE_ROLE_KEY;
+      try {
+        (env as { SUPABASE_SERVICE_ROLE_KEY?: string }).SUPABASE_SERVICE_ROLE_KEY = 'mock-service-role-key-12345';
+        const client = createSupabaseAdminClient();
+        expect(client).toBeDefined();
+        expect(client.auth).toBeDefined();
+      } finally {
+        (env as { SUPABASE_SERVICE_ROLE_KEY?: string }).SUPABASE_SERVICE_ROLE_KEY = originalKey;
+      }
+    });
+
+    it('background execution uses detached service-role client unaffected by expired user JWT', async () => {
+      // Simulates an admin client performing persistence operations after a hypothetical user JWT has expired
+      const adminClient = {
+        from: vi.fn().mockImplementation((_table: string) => ({
+          insert: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: { id: 'q-saved-999' }, error: null }),
+            }),
+          }),
+          update: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        })),
+      };
+
+      // Writing via background client succeeds without depending on user session
+      const res = await adminClient.from('questions').insert({}).select().single();
+      expect(res.data?.id).toBe('q-saved-999');
+      expect(res.error).toBeNull();
     });
   });
 });

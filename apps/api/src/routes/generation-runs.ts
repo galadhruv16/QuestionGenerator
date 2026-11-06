@@ -4,7 +4,10 @@ import {
   type BlueprintConfiguration,
 } from '@groundq/contracts';
 import { z } from 'zod';
-import { createSupabaseUserClient } from '../lib/supabase.js';
+import {
+  createSupabaseAdminClient,
+  createSupabaseUserClient,
+} from '../lib/supabase.js';
 import {
   requireAuth,
   type AuthenticatedRequest,
@@ -53,6 +56,26 @@ generationRunsRouter.post('/', async (request, response, next) => {
   try {
     const authReq = request as unknown as AuthenticatedRequest;
     const client = createSupabaseUserClient(authReq.accessToken);
+    const projectId = parsedProjectId.data;
+
+    // Verify project exists, belongs to authenticated user, and is not archived
+    const { data: project, error: projectError } = await client
+      .from('projects')
+      .select('id, owner_id, archived_at')
+      .eq('id', projectId)
+      .eq('owner_id', authReq.authUser.id)
+      .maybeSingle();
+
+    if (projectError) throw projectError;
+    if (!project || project.archived_at) {
+      return response.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          details: {},
+          message: 'Project not found or archived.',
+        },
+      });
+    }
 
     let config: BlueprintConfiguration;
     let blueprintId: string | null = null;
@@ -184,10 +207,44 @@ generationRunsRouter.post('/', async (request, response, next) => {
 
     if (runError) throw runError;
 
-    // Kick off background execution asynchronously
+    // Obtain backend-only service-role client for detached background execution.
+    // This decouples long-running model inference (which can take 20-30+ minutes)
+    // from the user's ephemeral browser access token (JWT), preventing PGRST303 expiration.
+    let backgroundClient;
+    try {
+      backgroundClient = createSupabaseAdminClient();
+    } catch (adminClientErr) {
+      const configErrMsg =
+        adminClientErr instanceof Error
+          ? adminClientErr.message
+          : 'Backend service-role client configuration failed.';
+      console.error(
+        `[GenerationRun] Cannot initialize background admin client for run ${run.id}:`,
+        configErrMsg,
+      );
+      await client
+        .from('generation_runs')
+        .update({
+          completed_at: new Date().toISOString(),
+          error_message: configErrMsg,
+          status: 'FAILED',
+        })
+        .eq('id', run.id);
+
+      return response.status(500).json({
+        error: {
+          code: 'CONFIGURATION_ERROR',
+          details: {},
+          message:
+            'Background persistence cannot be initialized: SUPABASE_SERVICE_ROLE_KEY is missing or invalid on the server.',
+        },
+      });
+    }
+
+    // Kick off background execution asynchronously using the backend service-role client
     void executeGenerationRun({
       blueprint: config,
-      client,
+      client: backgroundClient,
       projectId: parsedProjectId.data,
       runId: run.id,
       userId: authReq.authUser.id,
@@ -198,7 +255,7 @@ generationRunsRouter.post('/', async (request, response, next) => {
       );
       try {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        await client
+        await backgroundClient
           .from('generation_runs')
           .update({
             completed_at: new Date().toISOString(),

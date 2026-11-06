@@ -969,7 +969,7 @@ export async function executeGenerationRun(
 
     if (finalErr) {
       console.error(`[QuestionGenerator] Failed to finalize generation run status:`, finalErr.message);
-      throw new Error(`Failed to finalize generation run: ${finalErr.message}`);
+      throw new DatabasePersistenceError(`Failed to finalize generation run: ${finalErr.message}`, finalErr);
     }
 
     return {
@@ -981,16 +981,23 @@ export async function executeGenerationRun(
       err instanceof Error ? err.message : 'Unknown generation error';
     const catchStatus = generatedQuestions.length > 0 ? 'NEEDS_REVIEW' : 'FAILED';
     const reviewCount = Math.max(0, planTargets.length - generatedQuestions.length);
-    await client
-      .from('generation_runs')
-      .update({
-        accepted_count: generatedQuestions.length,
-        completed_at: new Date().toISOString(),
-        error_message: errorMsg,
-        review_count: reviewCount,
-        status: catchStatus,
-      })
-      .eq('id', runId);
+    try {
+      await client
+        .from('generation_runs')
+        .update({
+          accepted_count: generatedQuestions.length,
+          completed_at: new Date().toISOString(),
+          error_message: errorMsg,
+          review_count: reviewCount,
+          status: catchStatus,
+        })
+        .eq('id', runId);
+    } catch (catchUpdateErr) {
+      console.error(
+        `[QuestionGenerator] Emergency fallback failed to persist terminal status for run ${runId}:`,
+        catchUpdateErr,
+      );
+    }
 
     throw err;
   }
