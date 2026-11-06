@@ -97,14 +97,11 @@ generationRunsRouter.post('/', async (request, response, next) => {
         duplicate_policy: 'PREVENT',
         model_name:
           parsedBody.data.model_name ||
-          (env.GEMINI_API_KEY
+          (parsedBody.data.model_provider === 'gemini'
             ? env.GEMINI_MODEL || 'gemini-flash-lite-latest'
-            : env.GROQ_API_KEY
-              ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
-              : env.OLLAMA_MODEL || 'mistral:latest'),
+            : env.OLLAMA_MODEL || 'mistral:latest'),
         model_provider:
-          parsedBody.data.model_provider ||
-          (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama'),
+          parsedBody.data.model_provider || 'ollama',
         question_count: 10,
         styles: {
           analytical: 40,
@@ -124,7 +121,29 @@ generationRunsRouter.post('/', async (request, response, next) => {
     const effectiveProvider =
       parsedBody.data.model_provider ||
       config.model_provider ||
-      (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
+      'ollama';
+
+    if (effectiveProvider === 'gemini' && !env.GEMINI_API_KEY) {
+      return response.status(400).json({
+        error: {
+          code: 'CONFIGURATION_ERROR',
+          details: {},
+          message:
+            'Gemini provider requested but GEMINI_API_KEY is not configured on the server.',
+        },
+      });
+    }
+
+    if (effectiveProvider === 'groq' && !env.GROQ_API_KEY) {
+      return response.status(400).json({
+        error: {
+          code: 'CONFIGURATION_ERROR',
+          details: {},
+          message:
+            'Groq provider requested but GROQ_API_KEY is not configured on the server.',
+        },
+      });
+    }
 
     const effectiveModel =
       parsedBody.data.model_name && parsedBody.data.model_name !== 'llama3'
@@ -168,11 +187,27 @@ generationRunsRouter.post('/', async (request, response, next) => {
       projectId: parsedProjectId.data,
       runId: run.id,
       userId: authReq.authUser.id,
-    }).catch((err) => {
+    }).catch(async (err) => {
       console.error(
         `[GenerationRun] Background run ${run.id} encountered error:`,
         err,
       );
+      try {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        await client
+          .from('generation_runs')
+          .update({
+            completed_at: new Date().toISOString(),
+            error_message: errorMsg,
+            status: 'FAILED',
+          })
+          .eq('id', run.id);
+      } catch (dbErr) {
+        console.error(
+          `[GenerationRun] Failed to persist fatal run error for ${run.id}:`,
+          dbErr,
+        );
+      }
     });
 
     return response.status(202).json({

@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import cors from 'cors';
 import express from 'express';
 import { env } from './config/env.js';
@@ -18,31 +16,18 @@ export const createApp = () => {
           : (origin, callback) => {
               if (!origin) return callback(null, true);
               if (
+                !origin ||
                 origin === allowedOrigin ||
                 origin.endsWith('.vercel.app') ||
                 origin.includes('localhost')
               ) {
                 return callback(null, true);
               }
-              return callback(null, true);
+              return callback(new Error('CORS request rejected: unauthorized origin'));
             },
     }),
   );
   app.use(express.json({ limit: '10mb' }));
-
-  app.get('/api/v1/debug-generation-log', (_req, res) => {
-    try {
-      const logPath = path.resolve(process.cwd(), 'generation_debug.log');
-      if (!fs.existsSync(logPath)) {
-        return res.json({ lines: ['No generation events logged yet.'] });
-      }
-      const content = fs.readFileSync(logPath, 'utf8');
-      const lines = content.split('\n').filter(Boolean).slice(-200);
-      return res.json({ lines });
-    } catch (e) {
-      return res.status(500).json({ error: String(e) });
-    }
-  });
 
   app.use('/api/v1', apiRouter);
   app.use(errorHandler);

@@ -11,6 +11,7 @@ export interface GenerateOptions {
   temperature?: number;
   seed?: number;
   timeoutMs?: number;
+  maxTokens?: number;
 }
 
 export interface AIProvider {
@@ -23,10 +24,12 @@ export function getAIProvider(
   provider?: 'gemini' | 'ollama' | 'groq',
   model?: string,
 ): AIProvider {
-  const chosenProvider =
-    provider || (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
+  const chosenProvider = provider || 'ollama';
 
   if (chosenProvider === 'gemini') {
+    if (!env.GEMINI_API_KEY) {
+      throw new Error('Gemini provider requested but GEMINI_API_KEY is not configured');
+    }
     if (model) {
       return new GeminiProvider(env.GEMINI_API_KEY, model);
     }
@@ -34,6 +37,9 @@ export function getAIProvider(
   }
 
   if (chosenProvider === 'groq') {
+    if (!env.GROQ_API_KEY) {
+      throw new Error('Groq provider requested but GROQ_API_KEY is not configured');
+    }
     if (model) {
       return new GroqProvider(env.GROQ_API_KEY, model);
     }

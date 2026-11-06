@@ -26,6 +26,13 @@ export function logGen(msg: string, data?: unknown) {
   }
 }
 
+export class DatabasePersistenceError extends Error {
+  constructor(message: string, public override readonly cause?: unknown) {
+    super(message);
+    this.name = 'DatabasePersistenceError';
+  }
+}
+
 interface ReferenceTables {
   bloom: Map<string, string>; // slug -> id
   difficulty: Map<string, string>; // slug -> id
@@ -212,19 +219,26 @@ export async function executeGenerationRun(
       questionsRequested: blueprint.question_count,
       runId,
     });
-    await client
+    const { error: startErr } = await client
       .from('generation_runs')
       .update({ started_at: new Date().toISOString(), status: 'PLANNING' })
       .eq('id', runId);
+    if (startErr) {
+      throw new Error(`Failed to update run status to PLANNING: ${startErr.message}`);
+    }
 
     const refs = await loadReferences(client);
 
     // 2. Fetch topics in project
-    const { data: dbTopics } = await client
+    const { data: dbTopics, error: topicsErr } = await client
       .from('topics')
       .select('id, name')
       .eq('project_id', projectId)
       .is('archived_at', null);
+
+    if (topicsErr) {
+      throw new Error(`Failed to fetch project topics: ${topicsErr.message}`);
+    }
 
     const topicMap = new Map<string, string>();
     for (const t of dbTopics ?? []) {
@@ -284,13 +298,16 @@ export async function executeGenerationRun(
     }
 
     // 5. Update run to RETRIEVING then GENERATING
-    await client
+    const { error: retErr } = await client
       .from('generation_runs')
       .update({ status: 'RETRIEVING' })
       .eq('id', runId);
+    if (retErr) {
+      throw new Error(`Failed to update run status to RETRIEVING: ${retErr.message}`);
+    }
 
     // Query max existing sort_order in project for monotonic numbering across runs
-    const { data: maxOrderData } = await client
+    const { data: maxOrderData, error: maxOrderErr } = await client
       .from('questions')
       .select('sort_order')
       .eq('project_id', projectId)
@@ -298,26 +315,38 @@ export async function executeGenerationRun(
       .limit(1)
       .maybeSingle();
 
+    if (maxOrderErr) {
+      console.warn(`[QuestionGenerator] Could not fetch max sort_order:`, maxOrderErr.message);
+    }
+
     const baseSortOrder =
       (maxOrderData as { sort_order?: number } | null)?.sort_order ?? 0;
 
     // Fetch non-PYQ resource IDs so generated questions are grounded strictly in syllabus study material (PRD §11 & §25)
-    const { data: studyResources } = await client
+    const { data: studyResources, error: resErr } = await client
       .from('resources')
       .select('id')
       .eq('project_id', projectId)
       .neq('resource_kind', 'PYQ')
       .is('archived_at', null);
 
+    if (resErr) {
+      throw new Error(`Failed to fetch study resources: ${resErr.message}`);
+    }
+
     const studyResourceIds = new Set((studyResources ?? []).map((r) => r.id));
 
     // Fetch all resource chunks for context across the full document syllabus without artificial limits
-    const { data: rawChunks } = await client
+    const { data: rawChunks, error: chunksErr } = await client
       .from('resource_chunks')
       .select('id, resource_id, text, page_number, chunk_index')
       .eq('project_id', projectId)
       .order('chunk_index', { ascending: true })
       .range(0, 9999);
+
+    if (chunksErr) {
+      throw new Error(`Failed to fetch resource chunks: ${chunksErr.message}`);
+    }
 
     // Prioritize non-PYQ study materials to prevent paraphrasing of past exam questions
     const filteredByStudy =
@@ -336,8 +365,14 @@ export async function executeGenerationRun(
     const poolChunks =
       validContentChunks.length > 0 ? validContentChunks : chunks ?? [];
 
+    if (poolChunks.length === 0) {
+      throw new Error(
+        'No syllabus document content found for this project. Please upload and parse course materials before generating questions.',
+      );
+    }
+
     // Query chunk_topics evidence links for mapped topics
-    const { data: chunkTopicLinks } = await client
+    const { data: chunkTopicLinks, error: linksErr } = await client
       .from('chunk_topics')
       .select('chunk_id, topic_id')
       .in(
@@ -347,6 +382,10 @@ export async function executeGenerationRun(
           : ['00000000-0000-0000-0000-000000000000'],
       )
       .range(0, 9999);
+
+    if (linksErr) {
+      console.warn(`[QuestionGenerator] Could not fetch chunk_topics links:`, linksErr.message);
+    }
 
     const topicToChunkIds = new Map<string, string[]>();
     for (const link of chunkTopicLinks ?? []) {
@@ -360,10 +399,13 @@ export async function executeGenerationRun(
       chunkById.set(c.id, c);
     }
 
-    await client
+    const { error: genStatusErr } = await client
       .from('generation_runs')
       .update({ status: 'GENERATING' })
       .eq('id', runId);
+    if (genStatusErr) {
+      throw new Error(`Failed to update run status to GENERATING: ${genStatusErr.message}`);
+    }
 
     // Fetch existing question stems in the project for cross-batch and in-run deduplication
     // Query both questions table and question_versions table reliably
@@ -400,10 +442,9 @@ export async function executeGenerationRun(
     const generatedQuestions: GeneratedQuestionItem[] = [];
 
     // 6. Generate for plan targets (Batched on Cloud providers, single on local CPU)
-    const chosenProvider =
-      blueprint.model_provider ||
-      (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
+    const chosenProvider = blueprint.model_provider || 'ollama';
     const isCloud = chosenProvider === 'gemini' || chosenProvider === 'groq';
+    const isLocal = chosenProvider === 'ollama';
     const BATCH_SIZE = isCloud ? 3 : 1;
 
     // Ensure chunks are sorted monotonically by resource and page number for strictly proportional coverage
@@ -568,6 +609,9 @@ export async function executeGenerationRun(
     }
 
     let lastTargetError: string | null = null;
+    const runStartTime = Date.now();
+    const MAX_RUN_BUDGET_MS = 15 * 60 * 1000; // 15 minute ceiling
+
     for (let bIdx = 0; bIdx < batchList.length; bIdx++) {
       const batch = batchList[bIdx]!;
       // Safe RPM throttle for cloud providers (15 RPM free tier on Gemini)
@@ -584,135 +628,243 @@ export async function executeGenerationRun(
             runId,
           });
         } catch (batchErr) {
+          const errMsg = batchErr instanceof Error ? batchErr.message : String(batchErr);
+          if (/401|403|429|quota|unauthorized|forbidden|api.?key/i.test(errMsg)) {
+            console.error(`[QuestionGenerator] Fatal provider error in batch synthesis: ${errMsg}`);
+            throw batchErr;
+          }
           console.warn(
-            `[QuestionGenerator] Batch synthesis failed (${batchErr instanceof Error ? batchErr.message : String(batchErr)}). Falling back to individual generation...`,
+            `[QuestionGenerator] Batch synthesis failed (${errMsg}). Falling back to individual generation...`,
           );
         }
       }
 
       for (const itemParam of batch) {
+        if (Date.now() - runStartTime > MAX_RUN_BUDGET_MS) {
+          console.warn(
+            `[QuestionGenerator] Run ${runId} reached 15-minute execution ceiling. Finalizing generated items.`,
+          );
+          break;
+        }
+
         const { chunk: selectedChunk, planItemId, target, topicName } = itemParam;
         try {
-          let item = batchResults.get(target.sequenceNumber);
+          let item: RawSynthesizedQuestion | null = batchResults.get(target.sequenceNumber) ?? null;
+          let lastItemError: string | null = null;
+
           if (!item) {
-            item = await synthesizeQuestionItem({
-              blueprint,
-              chunk: selectedChunk,
+            const maxRetries = isLocal ? 2 : 2;
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+              try {
+                logGen(
+                  `Synthesizing Item #${target.sequenceNumber} (Attempt ${attempt}/${maxRetries}, Topic: "${topicName.slice(0, 35)}", Type: ${target.typeSlug})`,
+                );
+                const maxExcerptChars = isLocal
+                  ? attempt === 1
+                    ? 550
+                    : 280
+                  : 1500;
+                const effectiveTemperature = isLocal
+                  ? attempt === 1
+                    ? 0.35
+                    : 0.20
+                  : (blueprint.temperature ?? 0.15);
+
+                item = await synthesizeQuestionItem({
+                  attempt,
+                  blueprint: { ...blueprint, temperature: effectiveTemperature },
+                  chunk: selectedChunk,
+                  maxExcerptChars,
+                  planItemId,
+                  priorStems: [...existingStems, ...inRunStems],
+                  refs,
+                  runId,
+                  target,
+                  topicName,
+                });
+
+                if (item) {
+                  break;
+                }
+              } catch (attemptErr) {
+                lastItemError =
+                  attemptErr instanceof Error ? attemptErr.message : String(attemptErr);
+                console.warn(
+                  `[QuestionGenerator] Item #${target.sequenceNumber} attempt ${attempt} failed: ${lastItemError}`,
+                );
+                if (attempt < maxRetries) {
+                  await new Promise((r) => setTimeout(r, isLocal ? 1500 : 800));
+                }
+              }
+            }
+          }
+
+          if (item) {
+            // Evaluate similarity against existing questions in this project and current run
+            const allPriorStems = [...existingStems, ...inRunStems];
+            let maxSim = 0;
+            let mostSimilarStem = '';
+            for (const prior of allPriorStems) {
+              const sim = computeStemSimilarity(item.stem, prior);
+              if (sim > maxSim) {
+                maxSim = sim;
+                mostSimilarStem = prior;
+              }
+            }
+
+            if (blueprint.duplicate_policy === 'PREVENT' && maxSim > 0.82) {
+              console.warn(
+                `[QuestionGenerator] Item #${target.sequenceNumber} duplicate detected (${(maxSim * 100).toFixed(1)}% similar to "${mostSimilarStem.slice(0, 40)}..."). Retrying with alternative chunk and varied temperature...`,
+              );
+              // Select an alternative chunk from another section of the document that has not been used yet
+              const altChunk =
+                sortedPoolChunks.find((c) => !usedChunkIds.has(c.id) && c.id !== selectedChunk?.id) ||
+                poolChunks[(target.sequenceNumber * 3) % poolChunks.length] ||
+                selectedChunk;
+
+              try {
+                const retryItem = await synthesizeQuestionItem({
+                  blueprint: { ...blueprint, temperature: 0.35 },
+                  chunk: altChunk,
+                  maxExcerptChars: isLocal ? 500 : 1200,
+                  planItemId,
+                  priorStems: allPriorStems,
+                  refs,
+                  runId,
+                  target,
+                  topicName,
+                });
+                let retrySim = 0;
+                for (const prior of allPriorStems) {
+                  const sim = computeStemSimilarity(retryItem.stem, prior);
+                  if (sim > retrySim) retrySim = sim;
+                }
+                // Accept retryItem
+                item = retryItem;
+                maxSim = retrySim;
+              } catch (retryErr) {
+                console.warn(
+                  `[QuestionGenerator] Retry after duplicate detection failed:`,
+                  retryErr instanceof Error ? retryErr.message : String(retryErr),
+                );
+              }
+            }
+
+            // Persist to database with strictly contiguous monotonic ordering (no numbering gaps)
+            const savedQuestion = await persistGeneratedQuestion({
+              baseSortOrder,
+              client,
+              dedupScore: maxSim,
+              item,
+              persistedIndex: generatedQuestions.length + 1,
               planItemId,
-              priorStems: [...existingStems, ...inRunStems],
+              projectId,
               refs,
               runId,
+              selectedChunkId: selectedChunk?.id,
               target,
-              topicName,
             });
-          }
 
-          // Evaluate similarity against existing questions in this project and current run
-          const allPriorStems = [...existingStems, ...inRunStems];
-          let maxSim = 0;
-          let mostSimilarStem = '';
-          for (const prior of allPriorStems) {
-            const sim = computeStemSimilarity(item.stem, prior);
-            if (sim > maxSim) {
-              maxSim = sim;
-              mostSimilarStem = prior;
-            }
-          }
-
-          if (blueprint.duplicate_policy === 'PREVENT' && maxSim > 0.82) {
-            console.warn(
-              `[QuestionGenerator] Item #${target.sequenceNumber} duplicate detected (${(maxSim * 100).toFixed(1)}% similar to "${mostSimilarStem.slice(0, 40)}..."). Retrying with alternative chunk and varied temperature...`,
-            );
-            // Select an alternative chunk from another section of the document that has not been used yet
-            const altChunk =
-              sortedPoolChunks.find((c) => !usedChunkIds.has(c.id) && c.id !== selectedChunk?.id) ||
-              poolChunks[(target.sequenceNumber * 3) % poolChunks.length] ||
-              selectedChunk;
-
-            try {
-              const retryItem = await synthesizeQuestionItem({
-                blueprint: { ...blueprint, temperature: 0.35 },
-                chunk: altChunk,
-                planItemId,
-                priorStems: allPriorStems,
-                refs,
-                runId,
-                target,
-                topicName,
-              });
-              let retrySim = 0;
-              for (const prior of allPriorStems) {
-                const sim = computeStemSimilarity(retryItem.stem, prior);
-                if (sim > retrySim) retrySim = sim;
-              }
-              // Accept retryItem
-              item = retryItem;
-              maxSim = retrySim;
-            } catch (retryErr) {
-              console.warn(
-                `[QuestionGenerator] Retry after duplicate detection failed:`,
-                retryErr instanceof Error ? retryErr.message : String(retryErr),
+            if (savedQuestion) {
+              inRunStems.push(item.stem);
+              generatedQuestions.push(savedQuestion);
+              logGen(
+                `Item #${target.sequenceNumber} generated and saved successfully: "${item.stem.slice(0, 70)}..."`,
               );
+
+              const { error: planCompErr } = await client
+                .from('generation_plan_items')
+                .update({ status: 'COMPLETED' })
+                .eq('id', planItemId);
+              if (planCompErr) {
+                console.warn(`[QuestionGenerator] Failed to mark plan item ${planItemId} as COMPLETED:`, planCompErr.message);
+              }
+
+              const { error: runAcceptedErr } = await client
+                .from('generation_runs')
+                .update({ accepted_count: generatedQuestions.length })
+                .eq('id', runId);
+              if (runAcceptedErr) {
+                console.warn(`[QuestionGenerator] Failed to update accepted_count on run ${runId}:`, runAcceptedErr.message);
+              }
             }
-          }
-
-          // Persist to database with strictly contiguous monotonic ordering (no numbering gaps)
-          const savedQuestion = await persistGeneratedQuestion({
-            baseSortOrder,
-            client,
-            dedupScore: maxSim,
-            item,
-            persistedIndex: generatedQuestions.length + 1,
-            planItemId,
-            projectId,
-            refs,
-            runId,
-            selectedChunkId: selectedChunk?.id,
-            target,
-          });
-
-          if (savedQuestion) {
-            inRunStems.push(item.stem);
-            generatedQuestions.push(savedQuestion);
-            logGen(
-              `Item #${target.sequenceNumber} generated and saved successfully: "${item.stem.slice(0, 70)}..."`,
+          } else {
+            lastTargetError = lastItemError || 'Failed to generate schema-compliant question';
+            logGen(`Item #${target.sequenceNumber} generation failed: ${lastTargetError}`);
+            console.error(
+              `[QuestionGenerator] Item #${target.sequenceNumber} generation failed:`,
+              lastTargetError,
             );
-
-            await client
+            const { error: planFailErr } = await client
               .from('generation_plan_items')
-              .update({ status: 'COMPLETED' })
+              .update({ status: 'FAILED' })
               .eq('id', planItemId);
+            if (planFailErr) {
+              console.warn(`[QuestionGenerator] Failed to mark plan item ${planItemId} as FAILED:`, planFailErr.message);
+            }
 
-            await client
+            const { error: runReviewErr } = await client
               .from('generation_runs')
-              .update({ accepted_count: generatedQuestions.length })
+              .update({
+                review_count: planTargets.length - generatedQuestions.length,
+              })
               .eq('id', runId);
+            if (runReviewErr) {
+              console.warn(`[QuestionGenerator] Failed to update review_count on run ${runId}:`, runReviewErr.message);
+            }
           }
         } catch (genErr) {
+          if (genErr instanceof DatabasePersistenceError) {
+            lastTargetError = `Database persistence failure on item #${target.sequenceNumber}: ${genErr.message}`;
+            logGen(lastTargetError);
+            console.error(`[QuestionGenerator] ${lastTargetError}`);
+            const { error: planFailErr } = await client
+              .from('generation_plan_items')
+              .update({ status: 'FAILED' })
+              .eq('id', planItemId);
+            if (planFailErr) {
+              console.warn(
+                `[QuestionGenerator] Failed to mark plan item ${planItemId} as FAILED:`,
+                planFailErr.message,
+              );
+            }
+            // Halt further synthesis on database failure, preserving already persisted questions!
+            break;
+          }
           lastTargetError =
             genErr instanceof Error ? genErr.message : String(genErr);
-          logGen(`Item #${target.sequenceNumber} generation failed: ${lastTargetError}`);
+          logGen(`Item #${target.sequenceNumber} unexpected error: ${lastTargetError}`);
           console.error(
-            `[QuestionGenerator] Item #${target.sequenceNumber} generation failed:`,
+            `[QuestionGenerator] Item #${target.sequenceNumber} unexpected error:`,
             lastTargetError,
           );
-          await client
+          const { error: planFailErr } = await client
             .from('generation_plan_items')
-            .update({
-              error_message: lastTargetError,
-              status: 'FAILED',
-            })
+            .update({ status: 'FAILED' })
             .eq('id', planItemId);
+          if (planFailErr) {
+            console.warn(`[QuestionGenerator] Failed to mark plan item ${planItemId} as FAILED:`, planFailErr.message);
+          }
 
-          await client
+          const { error: runReviewErr } = await client
             .from('generation_runs')
             .update({
               review_count: planTargets.length - generatedQuestions.length,
             })
             .eq('id', runId);
+          if (runReviewErr) {
+            console.warn(`[QuestionGenerator] Failed to update review_count on run ${runId}:`, runReviewErr.message);
+          }
         }
       }
     }
+
+    // Mark any remaining unprocessed plan items (e.g. from early break, persistence error, or budget ceiling) as FAILED
+    await client
+      .from('generation_plan_items')
+      .update({ status: 'FAILED' })
+      .eq('generation_run_id', runId)
+      .eq('status', 'PLANNED');
 
     const finalStatus =
       generatedQuestions.length === planTargets.length
@@ -734,7 +886,7 @@ export async function executeGenerationRun(
     });
 
     // 7. Mark run completed
-    await client
+    const { error: finalErr } = await client
       .from('generation_runs')
       .update({
         accepted_count: generatedQuestions.length,
@@ -744,6 +896,11 @@ export async function executeGenerationRun(
         status: finalStatus,
       })
       .eq('id', runId);
+
+    if (finalErr) {
+      console.error(`[QuestionGenerator] Failed to finalize generation run status:`, finalErr.message);
+      throw new Error(`Failed to finalize generation run: ${finalErr.message}`);
+    }
 
     return {
       acceptedCount: generatedQuestions.length,
@@ -766,6 +923,7 @@ export async function executeGenerationRun(
 }
 
 interface SynthesizeParams {
+  attempt?: number;
   priorStems?: string[];
   blueprint: Partial<BlueprintConfiguration> & {
     model_name?: string;
@@ -779,6 +937,7 @@ interface SynthesizeParams {
     text: string;
   };
   instructorGuidance?: string;
+  maxExcerptChars?: number;
   planItemId?: string;
   refs: ReferenceTables;
   runId?: string;
@@ -822,9 +981,7 @@ async function synthesizeQuestionBatch(params: {
   const resultMap = new Map<number, RawSynthesizedQuestion>();
   if (batch.length === 0) return resultMap;
 
-  const chosenProvider =
-    blueprint.model_provider ||
-    (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
+  const chosenProvider = blueprint.model_provider || 'ollama';
   const chosenModel =
     blueprint.model_name ||
     (chosenProvider === 'gemini'
@@ -887,7 +1044,8 @@ Source Excerpt:
   const timeoutMs =
     chosenProvider === 'gemini' || chosenProvider === 'groq' ? 35000 : 180000;
   const isLocal = chosenProvider === 'ollama';
-  const dynamicSeed = 42 + (batch[0]?.target.sequenceNumber ?? 1) * 17 + Math.floor(Math.random() * 50);
+  const baseSeed = (blueprint as { seed?: number }).seed ?? 42;
+  const dynamicSeed = baseSeed + (batch[0]?.target.sequenceNumber ?? 1) * 37 + batch.length * 101;
   const rawOutput = await aiProvider.generate({
     format: 'json',
     model: chosenModel,
@@ -943,6 +1101,185 @@ Source Excerpt:
   return resultMap;
 }
 
+function extractJsonPayload(rawOutput: string): string {
+  let cleaned = (rawOutput || '').trim();
+  const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (codeBlockMatch && codeBlockMatch[1]) {
+    cleaned = codeBlockMatch[1].trim();
+  }
+
+  // Sanitize common local LLM JSON typos (e.g. is_corrent -> is_correct, trailing commas)
+  cleaned = cleaned
+    .replace(/"is_corrent"\s*:/gi, '"is_correct":')
+    .replace(/"isn't:correct"\s*:\s*false/gi, '"is_correct": false')
+    .replace(/"isn't:correct"\s*:\s*true/gi, '"is_correct": true')
+    .replace(/"is_incorrect"\s*:\s*false/gi, '"is_correct": true')
+    .replace(/"is_incorrect"\s*:\s*true/gi, '"is_correct": false')
+    .replace(/"isCorrect"\s*:/gi, '"is_correct":')
+    .replace(/"correct"\s*:/gi, '"is_correct":')
+    .replace(/,\s*([}\]])/g, '$1');
+
+  return cleaned;
+}
+
+function safeParseJson(jsonStr: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(jsonStr) as Record<string, unknown>;
+  } catch {
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      const sliced = jsonStr.slice(firstBrace, lastBrace + 1).replace(/,\s*([}\]])/g, '$1');
+      try {
+        return JSON.parse(sliced) as Record<string, unknown>;
+      } catch {
+        // Fix unescaped newlines inside JSON string literals
+        try {
+          const sanitizedNewlines = sliced.replace(
+            /(?<=:\s*"[^"]*)\n(?=[^"]*")/g,
+            '\\n',
+          );
+          return JSON.parse(sanitizedNewlines) as Record<string, unknown>;
+        } catch {
+          // Fall through
+        }
+      }
+    }
+    return null;
+  }
+}
+
+function normalizeSynthesizedQuestion(
+  raw: Record<string, unknown> | null,
+  target: PlanTarget,
+): RawSynthesizedQuestion | null {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const stem = String(raw.stem || raw.question || raw.prompt || '').trim();
+  if (stem.length < 8) return null;
+
+  let options: Array<{
+    explanation?: string;
+    is_correct: boolean;
+    option_index: number;
+    option_text: string;
+  }> | undefined;
+
+  if (target.typeSlug === 'MCQ') {
+    const rawOptions = raw.options || raw.choices || raw.alternatives;
+    let optionList: Array<{ text: string; isCorrect: boolean; explanation: string }> = [];
+
+    if (Array.isArray(rawOptions)) {
+      optionList = rawOptions.map((opt, idx) => {
+        if (typeof opt === 'string') {
+          return { text: opt.trim(), isCorrect: false, explanation: '' };
+        }
+        if (opt && typeof opt === 'object') {
+          const optObj = opt as Record<string, unknown>;
+          const text = String(
+            optObj.option_text || optObj.text || optObj.choice || optObj.label || `Option ${idx + 1}`,
+          ).trim();
+          const rawCorrect = optObj.is_correct ?? optObj.isCorrect ?? optObj.correct;
+          const isCorrect = typeof rawCorrect === 'string' ? rawCorrect.toLowerCase() === 'true' : Boolean(rawCorrect);
+          const explanation = String(optObj.explanation || optObj.reason || '').trim();
+          return { text, isCorrect, explanation };
+        }
+        return { text: `Option ${idx + 1}`, isCorrect: false, explanation: '' };
+      });
+    } else if (rawOptions && typeof rawOptions === 'object') {
+      const entries = Object.entries(rawOptions as Record<string, unknown>);
+      optionList = entries.map(([key, val]) => {
+        if (typeof val === 'string') {
+          return { text: val.trim(), isCorrect: false, explanation: '' };
+        }
+        if (val && typeof val === 'object') {
+          const vObj = val as Record<string, unknown>;
+          const text = String(vObj.option_text || vObj.text || vObj.choice || key).trim();
+          const rawCorrect = vObj.is_correct ?? vObj.isCorrect ?? vObj.correct;
+          const isCorrect = typeof rawCorrect === 'string' ? rawCorrect.toLowerCase() === 'true' : Boolean(rawCorrect);
+          const explanation = String(vObj.explanation || '').trim();
+          return { text, isCorrect, explanation };
+        }
+        return { text: String(val), isCorrect: false, explanation: '' };
+      });
+    }
+
+    const rootAnswer = String(raw.answer || raw.correct_answer || raw.model_answer || '').trim();
+    if (rootAnswer) {
+      const matchIdx = rootAnswer.match(/^[A-Da-d]$/)
+        ? rootAnswer.toUpperCase().charCodeAt(0) - 65
+        : rootAnswer.match(/^\d+$/)
+          ? parseInt(rootAnswer, 10)
+          : -1;
+
+      if (matchIdx >= 0 && matchIdx < optionList.length) {
+        optionList.forEach((o, i) => {
+          o.isCorrect = i === matchIdx;
+        });
+      } else {
+        const found = optionList.findIndex(
+          (o) =>
+            rootAnswer.toLowerCase().includes(o.text.toLowerCase()) ||
+            o.text.toLowerCase().includes(rootAnswer.toLowerCase()),
+        );
+        if (found >= 0) {
+          optionList.forEach((o, i) => {
+            o.isCorrect = i === found;
+          });
+        }
+      }
+    }
+
+    if (optionList.length >= 2 && !optionList.some((o) => o.isCorrect)) {
+      if (optionList[0]) optionList[0].isCorrect = true;
+    }
+
+    if (optionList.length >= 2) {
+      options = optionList.map((opt, idx) => ({
+        explanation: opt.explanation,
+        is_correct: opt.isCorrect,
+        option_index: idx,
+        option_text: opt.text,
+      }));
+    }
+  }
+
+  const model_answer =
+    typeof raw.model_answer === 'string'
+      ? raw.model_answer
+      : typeof raw.answer === 'string'
+        ? raw.answer
+        : undefined;
+
+  const explanation =
+    typeof raw.explanation === 'string'
+      ? raw.explanation
+      : typeof raw.rationale === 'string'
+        ? raw.rationale
+        : undefined;
+
+  const citation_anchor =
+    typeof raw.citation_anchor === 'string'
+      ? raw.citation_anchor
+      : typeof raw.source_reference === 'string'
+        ? raw.source_reference
+        : undefined;
+
+  const rubric_criteria = Array.isArray(raw.rubric_criteria)
+    ? (raw.rubric_criteria as unknown[]).map(String)
+    : undefined;
+
+  return {
+    citation_anchor,
+    explanation,
+    model_answer,
+    options,
+    question_type: target.typeSlug,
+    rubric_criteria,
+    stem,
+  };
+}
+
 async function synthesizeQuestionItem(
   params: SynthesizeParams,
 ): Promise<RawSynthesizedQuestion> {
@@ -957,6 +1294,29 @@ async function synthesizeQuestionItem(
   const guidanceNotice = params.instructorGuidance?.trim()
     ? `\n\nINSTRUCTOR PEDAGOGICAL GUIDANCE (CRITICAL DIRECTION):\n"${params.instructorGuidance.trim()}"\nYou must strictly incorporate this specific guidance into the question stem, distractors, and explanation.`
     : '';
+
+  const chosenProvider = blueprint.model_provider || 'ollama';
+  const chosenModel =
+    blueprint.model_name ||
+    (chosenProvider === 'gemini'
+      ? env.GEMINI_MODEL || 'gemini-flash-lite-latest'
+      : chosenProvider === 'groq'
+        ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+        : env.OLLAMA_MODEL || 'mistral:latest');
+
+  const aiProvider = getAIProvider(chosenProvider, chosenModel);
+  const isLocal = chosenProvider === 'ollama';
+  const timeoutMs = isLocal ? 180000 : 25000;
+  const maxTokens = isLocal ? 650 : undefined;
+
+  const priorStemsNotice =
+    params.priorStems && params.priorStems.length > 0
+      ? `\n\nCRITICAL DEDUPLICATION RULE: The following questions ALREADY exist in this exam bank. You MUST create a question on a COMPLETELY DIFFERENT principle, concept, formula, or relationship. DO NOT repeat or rephrase any of these:\n` +
+        params.priorStems
+          .slice(isLocal ? -2 : -5)
+          .map((s) => `- ${s.slice(0, isLocal ? 80 : 100)}`)
+          .join('\n')
+      : '';
 
   const promptSystem = `You are an expert assessment item designer creating curriculum-grounded university exam questions.
 Generate a single rigorous question strictly adhering to:
@@ -977,25 +1337,10 @@ CRITICAL RULES:
 4. For SHORT_ANSWER and LONG_ANSWER questions:
    - Provide an exemplary model_answer demonstrating complete conceptual mastery.
    - Provide an array of rubric_criteria detailing point distribution.
-5. Provide a citation_anchor representing the source fact or concept supporting the question.${params.priorStems && params.priorStems.length > 0 ? `\n\nCRITICAL DEDUPLICATION RULE: The following questions ALREADY exist in this exam bank. You MUST create a question on a COMPLETELY DIFFERENT principle, concept, formula, or relationship. DO NOT repeat or rephrase any of these:\n` + params.priorStems.slice(-5).map((s) => `- ${s.slice(0, 100)}`).join(`\n`) : ""}`;
+5. Provide a citation_anchor representing the source fact or concept supporting the question.${priorStemsNotice}`;
 
-  const chosenProvider =
-    blueprint.model_provider ||
-    (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
-  const chosenModel =
-    blueprint.model_name ||
-    (chosenProvider === 'gemini'
-      ? env.GEMINI_MODEL || 'gemini-flash-lite-latest'
-      : chosenProvider === 'groq'
-        ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
-        : env.OLLAMA_MODEL || 'mistral:latest');
-
-  const aiProvider = getAIProvider(chosenProvider, chosenModel);
-  const isLocal = chosenProvider === 'ollama';
-  const timeoutMs = isLocal ? 420000 : 25000;
-
-  // For local CPU LLMs, truncate chunk excerpt to 800 characters to accelerate prompt evaluation
-  const excerpt = isLocal ? chunkText.slice(0, 800) : chunkText.slice(0, 1500);
+  const charLimit = params.maxExcerptChars ?? (isLocal ? 650 : 1500);
+  const excerpt = chunkText.slice(0, charLimit);
 
   const promptUser = `Source Excerpt:
 "${excerpt}"
@@ -1016,141 +1361,38 @@ Return JSON schema:
   "citation_anchor": "Brief source sentence or concept anchoring this question..."
 } `;
 
-  const dynamicSeed = 42 + target.sequenceNumber * 17 + Math.floor(Math.random() * 50);
+  const baseSeed = (blueprint as { seed?: number }).seed ?? 42;
+  const dynamicSeed = baseSeed + target.sequenceNumber * 37 + (params.attempt ?? 1) * 101;
   const rawOutput = await aiProvider.generate({
     format: 'json',
+    maxTokens,
     model: chosenModel,
     prompt: `${promptSystem}\n\n${promptUser}`,
     seed: dynamicSeed,
-    temperature: isLocal ? 0.35 : (blueprint.temperature ?? 0.15),
+    temperature: isLocal ? (blueprint.temperature ?? 0.35) : (blueprint.temperature ?? 0.15),
     timeoutMs,
   });
 
-  let cleaned = (rawOutput || '').trim();
-  if (cleaned.startsWith('```')) {
-    cleaned = cleaned
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/```\s*$/, '')
-      .trim();
-  }
-
-  // Sanitize common local LLM JSON typos (e.g. is_corrent -> is_correct, trailing commas)
-  cleaned = cleaned
-    .replace(/"is_corrent"\s*:/gi, '"is_correct":')
-    .replace(/"isn't:correct"\s*:\s*false/gi, '"is_correct": false')
-    .replace(/"isn't:correct"\s*:\s*true/gi, '"is_correct": true')
-    .replace(/"is_incorrect"\s*:\s*false/gi, '"is_correct": true')
-    .replace(/"is_incorrect"\s*:\s*true/gi, '"is_correct": false')
-    .replace(/"isCorrect"\s*:/gi, '"is_correct":')
-    .replace(/"correct"\s*:/gi, '"is_correct":')
-    .replace(/,\s*([}\]])/g, '$1');
-
-  let parsed: RawSynthesizedQuestion | null = null;
-  try {
-    parsed = JSON.parse(cleaned) as RawSynthesizedQuestion;
-  } catch {
-    const firstBrace = cleaned.indexOf('{');
-    const lastBrace = cleaned.lastIndexOf('}');
-    if (firstBrace >= 0 && lastBrace > firstBrace) {
-      try {
-        const sliced = cleaned.slice(firstBrace, lastBrace + 1).replace(/,\s*([}\]])/g, '$1');
-        parsed = JSON.parse(sliced) as RawSynthesizedQuestion;
-      } catch {
-        // parsing failed
-      }
-    }
-  }
+  const cleaned = extractJsonPayload(rawOutput || '');
+  const parsed: Record<string, unknown> | null = safeParseJson(cleaned);
 
   if (!parsed || !parsed.stem) {
-    // Regex-based robust fallback extractor for local LLMs
-    try {
-      const stemMatch = cleaned.match(/"stem"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
-      if (stemMatch && stemMatch[1]) {
-        const extractedStem = stemMatch[1].replace(/\\"/g, '"').trim();
-        const optionMatches = [
-          ...cleaned.matchAll(
-            /"option_text"\s*:\s*"((?:[^"\\]|\\.)*)".*?"is_correct"\s*:\s*(true|false)/gs,
-          ),
-        ];
-        const extractedOptions = optionMatches.map((m, idx) => ({
-          explanation: '',
-          is_correct: m[2] === 'true',
-          option_index: idx,
-          option_text: m[1]?.replace(/\\"/g, '"') || `Option ${idx + 1}`,
-        }));
-
-        const modelAnsMatch = cleaned.match(
-          /"model_answer"\s*:\s*"((?:[^"\\]|\\.)*)"/s,
-        );
-        const expMatch = cleaned.match(
-          /"explanation"\s*:\s*"((?:[^"\\]|\\.)*)"/s,
-        );
-        const citeMatch = cleaned.match(
-          /"citation_anchor"\s*:\s*"((?:[^"\\]|\\.)*)"/s,
-        );
-
-        if (extractedStem.length > 10) {
-          parsed = {
-            citation_anchor: citeMatch?.[1]?.replace(/\\"/g, '"') || undefined,
-            explanation: expMatch?.[1]?.replace(/\\"/g, '"') || undefined,
-            model_answer: modelAnsMatch?.[1]?.replace(/\\"/g, '"') || undefined,
-            options: extractedOptions.length >= 2 ? extractedOptions : undefined,
-            question_type: target.typeSlug as
-              | 'MCQ'
-              | 'SHORT_ANSWER'
-              | 'LONG_ANSWER',
-            stem: extractedStem,
-          };
-        }
-      }
-    } catch {
-      // ignore regex fallback failure
-    }
+    throw new Error(
+      `AI generation returned malformed or unparseable JSON for topic "${cleanTopic}". Raw snippet: ${cleaned.slice(0, 140)}`,
+    );
   }
 
-  // If local LLM produced options with boolean strings e.g. "true" or "false"
-  if (parsed && Array.isArray(parsed.options)) {
-    parsed.options.forEach((opt, idx) => {
-      const rawCorrect =
-        (opt as Record<string, unknown>).is_correct ??
-        (opt as Record<string, unknown>).isCorrect ??
-        (opt as Record<string, unknown>).correct;
-      if (typeof rawCorrect === 'string') {
-        opt.is_correct = rawCorrect.toLowerCase() === 'true';
-      } else {
-        opt.is_correct = Boolean(rawCorrect);
-      }
-      opt.option_index = idx;
-      opt.option_text = String(
-        opt.option_text || (opt as Record<string, unknown>).text || `Option ${idx + 1}`,
-      ).trim();
-      opt.explanation = String(opt.explanation || '').trim();
-    });
-    // Ensure at least one option is marked correct if LLM forgot or defaulted all to false
-    if (parsed.options.length >= 2 && !parsed.options.some((o) => o.is_correct)) {
-      if (parsed.options[0]) {
-        parsed.options[0].is_correct = true;
-      }
-    }
-  }
+  const normalized = normalizeSynthesizedQuestion(parsed, target);
 
-  if (parsed && parsed.stem && parsed.stem.trim().length > 10) {
-    if (target.typeSlug === 'MCQ') {
-      if (
-        Array.isArray(parsed.options) &&
-        parsed.options.length >= 2 &&
-        parsed.options.some((o) => o.is_correct)
-      ) {
-        const shuffled = shuffleOptions(parsed.options, target.sequenceNumber);
-        shuffled.forEach((opt, idx) => {
-          opt.option_index = idx;
-        });
-        parsed.options = shuffled;
-        return parsed;
-      }
-    } else {
-      return parsed;
+  if (normalized && normalized.stem.length > 10) {
+    if (target.typeSlug === 'MCQ' && normalized.options && normalized.options.length >= 2) {
+      const shuffled = shuffleOptions(normalized.options, target.sequenceNumber);
+      shuffled.forEach((opt, idx) => {
+        opt.option_index = idx;
+      });
+      normalized.options = shuffled;
     }
+    return normalized;
   }
 
   throw new Error(
@@ -1201,7 +1443,7 @@ async function persistGeneratedQuestion(params: {
   if (qErr || !qData) {
     const errText = `Failed to persist question shell: ${qErr?.message || 'No data returned'}`;
     logGen(errText, qErr);
-    throw new Error(errText);
+    throw new DatabasePersistenceError(errText, qErr);
   }
   const questionId = qData.id;
 
@@ -1230,7 +1472,7 @@ async function persistGeneratedQuestion(params: {
   if (vErr || !vData) {
     const errText = `Failed to persist question version: ${vErr?.message || 'No data returned'}`;
     logGen(errText, vErr);
-    throw new Error(errText);
+    throw new DatabasePersistenceError(errText, vErr);
   }
   const versionId = vData.id;
 
@@ -1258,7 +1500,7 @@ async function persistGeneratedQuestion(params: {
     if (optErr) {
       const errText = `Failed to insert question options: ${optErr.message}`;
       logGen(errText, optErr);
-      throw new Error(errText);
+      throw new DatabasePersistenceError(errText, optErr);
     }
   }
 
@@ -1547,8 +1789,7 @@ export async function regenerateQuestionInPlace(
   };
 
   const resolvedProvider: 'gemini' | 'groq' | 'ollama' =
-    (modelProvider as 'gemini' | 'groq' | 'ollama') ||
-    (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
+    (modelProvider as 'gemini' | 'groq' | 'ollama') || 'ollama';
   const resolvedModel: string =
     modelName ||
     (resolvedProvider === 'gemini'

@@ -4,7 +4,6 @@ import {
   type PyqAnalysisPattern,
 } from '@groundq/contracts';
 import { getAIProvider } from '../ai/providers/ai-provider.js';
-import { env } from '../config/env.js';
 
 // In-memory pattern cache to accelerate repeated requests and Generation Studio preset lookups
 const pyqPatternCache = new Map<string, PyqAnalysisPattern>();
@@ -389,8 +388,7 @@ export async function analyzePyqPattern(
   );
 
   // 4. Execute AI Extraction via configured provider
-  const chosenProvider =
-    provider || (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
+  const chosenProvider = provider || 'ollama';
 
   const systemPrompt = `You are a university academic dean and psychometrician specializing in Bloom's Revised Taxonomy (Remember, Understand, Apply, Analyze, Evaluate, Create) and exam blueprint analysis.
 Analyze the provided previous-year question (PYQ) paper and extract its exact structural, cognitive, and difficulty blueprint.

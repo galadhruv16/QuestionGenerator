@@ -50,8 +50,7 @@ export async function inferTopicsFromChunks(
   timeoutMs?: number,
   provider?: 'gemini' | 'ollama' | 'groq',
 ): Promise<InferenceResult> {
-  const chosenProvider =
-    provider || (env.GEMINI_API_KEY ? 'gemini' : env.GROQ_API_KEY ? 'groq' : 'ollama');
+  const chosenProvider = provider || 'ollama';
   const chosenModel =
     model ||
     (chosenProvider === 'gemini'

@@ -168,7 +168,7 @@ class GenerationManager {
         let step = 2;
         if (run.status === 'PLANNING') step = 2;
         else if (run.status === 'RETRIEVING' || run.status === 'GENERATING') step = 3;
-        else if (run.status === 'VALIDATING' || run.status === 'COMPLETED' || run.status === 'FAILED') step = 4;
+        else if (run.status === 'VALIDATING' || run.status === 'COMPLETED' || run.status === 'FAILED' || run.status === 'NEEDS_REVIEW') step = 4;
 
         // Fetch questions count for this run
         let genCount = run.accepted_count ?? 0;
