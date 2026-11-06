@@ -54,6 +54,18 @@ const getErrorResponse = (error: SupabaseError) => {
         },
       };
     default:
+      if (error.message && error.message.includes('CORS')) {
+        return {
+          status: 403,
+          body: {
+            error: {
+              code: 'FORBIDDEN',
+              details: {},
+              message: error.message,
+            },
+          },
+        };
+      }
       return {
         status: error.status && error.status >= 400 ? error.status : 500,
         body: {

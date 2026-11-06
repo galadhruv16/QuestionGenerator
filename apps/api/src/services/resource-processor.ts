@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { PDFParse } from 'pdf-parse';
 import { env } from '../config/env.js';
 import { extractPagesFromDocx, extractPagesFromPptx } from './office-extractor.js';
+import { matchExactModel } from '../ai/providers/ollama-provider.js';
 
 export interface ExtractedPage {
   pageNumber: number;
@@ -86,7 +87,8 @@ export function chunkPages(
   return chunks;
 }
 
-/**
+export const EXPECTED_EMBEDDING_DIMENSION = 768;
+
 /**
  * Computes 768-dimensional embedding vector strictly using local Ollama (nomic-embed-text).
  * Enforces local-first data privacy: never calls external cloud embedding APIs.
@@ -112,7 +114,10 @@ export async function getEmbedding(text: string): Promise<number[] | null> {
 
     if (response.ok) {
       const payload = (await response.json()) as { embedding?: number[] };
-      if (payload.embedding && payload.embedding.length === 768) {
+      if (
+        payload.embedding &&
+        payload.embedding.length === EXPECTED_EMBEDDING_DIMENSION
+      ) {
         return payload.embedding;
       }
     }
@@ -124,6 +129,99 @@ export async function getEmbedding(text: string): Promise<number[] | null> {
     );
     return null;
   }
+}
+
+/**
+ * Validates Ollama embedding reachability, exact model tag presence, and expected dimension probe.
+ */
+export async function runEmbeddingPreflight(
+  baseUrl = env.OLLAMA_BASE_URL,
+  embeddingModel = env.EMBEDDING_MODEL,
+): Promise<{ dimension: number; success: boolean }> {
+  // 1. Verify Ollama service reachability
+  let tagsResponse: Response;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  try {
+    tagsResponse = await fetch(`${baseUrl}/api/tags`, {
+      headers: { 'Content-Type': 'application/json' },
+      method: 'GET',
+      signal: controller.signal,
+    });
+  } catch (netErr) {
+    throw new Error(
+      `Ollama embedding preflight failed: Ollama service is not reachable at ${baseUrl}. Ensure Ollama is running ('ollama serve') before processing resources. (${netErr instanceof Error ? netErr.message : String(netErr)})`,
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!tagsResponse.ok) {
+    throw new Error(
+      `Ollama embedding preflight failed: Ollama service at ${baseUrl} returned HTTP ${tagsResponse.status}.`,
+    );
+  }
+
+  // 2. Verify exact embedding model installed
+  const payload = (await tagsResponse.json()) as {
+    models?: Array<{ name?: string }>;
+  };
+  const installedModels = (payload.models ?? [])
+    .map((m) => m.name || '')
+    .filter(Boolean);
+
+  if (!matchExactModel(embeddingModel, installedModels)) {
+    throw new Error(
+      `Ollama embedding preflight failed: Required embedding model "${embeddingModel}" is not installed locally in Ollama. Installed models: [${installedModels.join(', ') || 'none'}]. Please run 'ollama pull ${embeddingModel}' in your terminal.`,
+    );
+  }
+
+  // 3. Probe embedding dimension directly via Ollama endpoint to verify schema compatibility
+  const probeController = new AbortController();
+  const probeTimeout = setTimeout(
+    () => probeController.abort(),
+    env.OLLAMA_EMBEDDING_TIMEOUT_MS,
+  );
+  let embedRes: Response;
+  try {
+    embedRes = await fetch(`${baseUrl}/api/embeddings`, {
+      body: JSON.stringify({
+        keep_alive: '30m',
+        model: embeddingModel,
+        prompt: 'groundq preflight probe',
+      }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      signal: probeController.signal,
+    });
+  } catch (probeErr) {
+    throw new Error(
+      `Ollama embedding preflight failed: Embedding model "${embeddingModel}" probe timed out or failed (${probeErr instanceof Error ? probeErr.message : String(probeErr)}).`,
+    );
+  } finally {
+    clearTimeout(probeTimeout);
+  }
+
+  if (!embedRes.ok) {
+    throw new Error(
+      `Ollama embedding preflight failed: Embedding model "${embeddingModel}" returned HTTP ${embedRes.status}.`,
+    );
+  }
+
+  const embedPayload = (await embedRes.json()) as { embedding?: number[] };
+  if (!embedPayload.embedding || !Array.isArray(embedPayload.embedding)) {
+    throw new Error(
+      `Ollama embedding preflight failed: Model "${embeddingModel}" returned empty or invalid embedding payload.`,
+    );
+  }
+
+  if (embedPayload.embedding.length !== EXPECTED_EMBEDDING_DIMENSION) {
+    throw new Error(
+      `Ollama embedding preflight failed: Model "${embeddingModel}" produced vector of dimension ${embedPayload.embedding.length}, but GroundQ schema requires exactly ${EXPECTED_EMBEDDING_DIMENSION} dimensions.`,
+    );
+  }
+
+  return { dimension: embedPayload.embedding.length, success: true };
 }
 
 interface ProcessResourceOptions {
@@ -313,7 +411,11 @@ export async function processResourcePipeline(
       `[resource-processor] Generated ${chunks.length} page-bounded chunks`,
     );
 
-    // 4. Generate embeddings with bounded concurrency (concurrency = 4)
+    // 3b. Ollama Embedding Preflight Check (verifies reachability, exact model tag, and dimension probe)
+    await updateRun({ metadata: { stage: 'EMBEDDING_PREFLIGHT' } });
+    await runEmbeddingPreflight();
+
+    // 4. Generate embeddings with bounded concurrency (concurrency = 1)
     await updateRun({
       metadata: {
         embedded_chunks: 0,

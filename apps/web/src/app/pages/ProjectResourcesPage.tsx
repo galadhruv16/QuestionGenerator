@@ -955,8 +955,7 @@ export function ProjectResourcesPage({
                               r.failure_reason?.includes('extractable')),
                         )?.original_filename ?? 'Uploaded Document'}
                       </code>{' '}
-                      contains scanned images or handwritten text that could not be parsed.
-                      Ensure <code className="font-mono font-bold text-primary">GEMINI_API_KEY</code> is configured in your backend environment (<code className="font-mono text-outline">.env</code>) to automatically transcribe scanned pages, whiteboard captures, and handwritten notes with Gemini Multimodal Vision OCR.
+                      contains scanned images or handwritten text. Local OCR is not available in GroundQ. Please upload a selectable digital text document (PDF with selectable text, DOCX, or PPTX).
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-2 font-body-sm text-body-sm">
                       <button
@@ -1654,7 +1653,7 @@ export function ProjectResourcesPage({
                     'Document extraction could not be completed.'}
                 </p>
                 <div className="mt-1 pt-1.5 border-t border-error/20 text-label-sm text-outline">
-                  GroundQ automatically uses Gemini Multimodal Vision OCR for scanned PDFs, diagrams, and handwritten notes. Ensure GEMINI_API_KEY is configured in your backend environment (.env).
+                  Local OCR is not available in GroundQ. Please upload selectable digital text documents (PDF with selectable text, DOCX, or PPTX).
                 </div>
               </div>
             )}
@@ -2042,7 +2041,7 @@ export function ProjectResourcesPage({
                   PDF (selectable & scanned), PPTX Presentations, DOCX, PNG/JPG/WEBP (Max 100 MB)
                 </span>
                 <span className="font-label-sm text-[11px] text-primary font-medium mt-1">
-                  ✦ Multimodal Vision OCR automatically transcribes scanned pages, diagrams & handwritten notes
+                  ✦ In local-only mode, upload selectable digital text documents (PDF, DOCX, PPTX). Scanned images require selectable digital text.
                 </span>
               </div>
 

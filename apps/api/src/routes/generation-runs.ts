@@ -10,6 +10,7 @@ import {
   type AuthenticatedRequest,
 } from '../middleware/require-auth.js';
 import { executeGenerationRun } from '../services/question-generator.js';
+import { normalizeModelTag } from '../ai/providers/ollama-provider.js';
 import { env } from '../config/env.js';
 
 const uuidSchema = z.string().uuid();
@@ -145,7 +146,7 @@ generationRunsRouter.post('/', async (request, response, next) => {
       });
     }
 
-    const effectiveModel =
+    const rawModel =
       parsedBody.data.model_name && parsedBody.data.model_name !== 'llama3'
         ? parsedBody.data.model_name
         : config.model_name && config.model_name !== 'llama3'
@@ -155,6 +156,9 @@ generationRunsRouter.post('/', async (request, response, next) => {
             : effectiveProvider === 'groq'
               ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
               : env.OLLAMA_MODEL || 'mistral:latest';
+
+    const effectiveModel =
+      effectiveProvider === 'ollama' ? normalizeModelTag(rawModel) : rawModel;
 
     config.model_provider = effectiveProvider;
     config.model_name = effectiveModel;

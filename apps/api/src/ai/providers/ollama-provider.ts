@@ -26,6 +26,8 @@ export interface PreflightResult {
 }
 
 export class OllamaProvider implements AIProvider {
+  readonly name = 'ollama' as const;
+
   constructor(private readonly baseUrl = env.OLLAMA_BASE_URL) {}
 
   async generate(options: GenerateOptions): Promise<string> {

@@ -10,16 +10,17 @@ Agents must read this file before making changes.
 Feature / AI Safety / Provider Immutability / Resilience Hardening / UI Refinement
 
 ### Status
-Implemented and verified. 100% automated test suite passing (105/105: 4 contracts, 55 API, 46 web), 0 TypeScript compilation errors across all workspace packages (`tsc -p tsconfig.json`), 0 ESLint warnings/errors (`eslint .`), production web bundle built successfully (`vite build`).
+Implemented and verified. 100% automated test suite passing (120/120: 4 contracts, 70 API, 46 web), 0 TypeScript compilation errors across all workspace packages (`tsc -p tsconfig.json`), 0 ESLint warnings/errors (`eslint .`), production web bundle built successfully (`vite build`).
 
 ### Changes Implemented & Verified
 1. **Provider Immutability & Zero Cloud Fallback**:
    - `apps/api/src/ai/providers/ai-provider.ts`: Added strict provider verification in `getAIProvider` rejecting unsupported providers (`openai`, `anthropic`, etc.) and asserting server-side that Ollama requests instantiate an `OllamaProvider`.
    - `apps/api/src/ai/providers/gemini-provider.ts` & `groq-provider.ts`: Removed all delegation to `defaultAIProvider.embed()`. Cloud providers throw provider-specific errors on embedding failures rather than falling back to local Ollama.
-   - `apps/api/src/services/resource-processor.ts`: Uses local Ollama (`nomic-embed-text:latest`) exclusively for embeddings with strict 768-dimension checking and timeout handling. Concurrency is locked to 1. All chunks must have valid vectors before insertion; missing or malformed vectors fail both resource and run cleanly. Removed broken dead-code blocks for vision transcription; non-selectable/scanned documents immediately fail with an informative local-only message.
+   - `apps/api/src/services/resource-processor.ts`: Uses local Ollama (`nomic-embed-text:latest`) exclusively for embeddings with strict 768-dimension checking and timeout handling. Concurrency is locked to 1. All chunks must have valid vectors before insertion; missing or malformed vectors fail both resource and run cleanly. Removed broken dead-code blocks for vision transcription; non-selectable/scanned documents immediately fail with an informative local-only message without calling any cloud vision APIs.
 2. **Exact Model Tag Preflight Verification**:
    - `apps/api/src/ai/providers/ollama-provider.ts`: Exported `normalizeModelTag` and `matchExactModel` ensuring model tags are matched exactly (e.g., `mistral:7b` does NOT match `mistral:latest`).
    - Added `checkPreflight(generationModel, embeddingModel)` verifying both that the Ollama service is reachable and that both exact models are pulled locally before any generation or ingestion begins.
+   - `runEmbeddingPreflight`: Probes both Ollama service reachability, exact embedding tag match, and verifies returned vector dimension matches GroundQ schema requirement (exactly 768 dimensions).
 3. **Environment & Latency Configuration**:
    - `apps/api/src/config/env.ts`: Added `OLLAMA_EMBEDDING_TIMEOUT_MS` (default 30000ms), `OLLAMA_STALL_TIMEOUT_MS` (default 120000ms), and `OLLAMA_RUN_BUDGET_MS` (default 3600000ms / 60 minutes).
    - `apps/api/src/services/question-generator.ts`: Dynamic run budget ceiling consumes `env.OLLAMA_RUN_BUDGET_MS` for local runs, allowing long CPU inference runs to execute question-by-question without hitting artificial process aborts.
@@ -33,8 +34,21 @@ Implemented and verified. 100% automated test suite passing (105/105: 4 contract
    - `packages/contracts/src/generation/index.ts`: Added `REGENERATING` and `NEEDS_REVIEW` to `generationRunStatusValues`, matching `Docs/DATABASE_DESIGN.md`. Added `groq` to `startGenerationRunSchema.model_provider`. Updated default `model_provider` in `blueprintConfigurationSchema` to `'ollama'`.
 7. **Frontend Status Telemetry & Guidance**:
    - `apps/web/src/app/pages/ProjectGenerationPage.tsx`: Preserves `error_message` from generation manager state. Added visual telemetry banners for `FAILED` and `NEEDS_REVIEW` runs. Added local CPU generation guidance for Ollama explaining sequential 1-by-1 inference expectations.
-8. **Automated Resilience Test Suite**:
-   - Added `apps/api/test/ollama-resilience.test.ts` covering 11 dedicated test cases for tag normalization, exact tag matching, preflight failure modes (service down, missing generation model, missing embedding model, successful check), provider factory assertion, cloud embedding isolation, and duplicate threshold computation.
+   - `apps/web/src/app/pages/ProjectResourcesPage.tsx`: Clarified upload instructions and error callouts for local mode: non-selectable scanned PDFs and image files are flagged as requiring digital text formats (PDF, DOCX, PPTX), with all references to Gemini OCR removed.
+8. **Security & Route Protection**:
+   - Removed unauthenticated debug endpoints.
+   - `apps/api/src/middleware/error-handler.ts`: Rejects unauthorized CORS origins with 403 Forbidden.
+9. **Automated Resilience Test Suite**:
+   - Added `apps/api/test/ollama-resilience.test.ts` with 26 dedicated test cases covering:
+     - Exact tag matching and normalization (`mistral` -> `mistral:latest`, `mistral:7b` != `mistral:latest`).
+     - Generation preflight verification (unreachable daemon, missing generation model, missing embedding model, successful check).
+     - Resource processing embedding preflight verification (unreachable, missing model, wrong dimension 512 vs 768, valid 768).
+     - Provider factory and immutability assertions (Ollama defaults, unsupported provider rejection, cloud embedding isolation).
+     - Scanned document and image rejection without calling external Vision/OCR APIs.
+     - Local candidate generation and malformed JSON handling (no regex fallback slot-filling).
+     - Duplicate replacement rejection under PREVENT policy.
+     - Final run status calculation and persistence resilience (`FAILED` on 0 questions, `NEEDS_REVIEW` on partial generation with exact `accepted_count` and `review_count`, preserving generated items).
+     - Security (CORS 403 rejection, debug route absent).
 
 ## [2026-11-06] — Pipeline Resilience & Presentation Readiness: Complete Removal of Synthetic Fallbacks, Bounded Local Latency, Orphan Cleanup, Seed Determinism & Local-First Security
 

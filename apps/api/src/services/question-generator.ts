@@ -6,7 +6,10 @@ import type {
   GeneratedQuestionItem,
 } from '@groundq/contracts';
 import { getAIProvider } from '../ai/providers/ai-provider.js';
-import { OllamaProvider } from '../ai/providers/ollama-provider.js';
+import {
+  OllamaProvider,
+  normalizeModelTag,
+} from '../ai/providers/ollama-provider.js';
 import { env } from '../config/env.js';
 import { STOPWORDS } from './topic-inferencer.js';
 
@@ -210,6 +213,8 @@ export async function executeGenerationRun(
   questions: GeneratedQuestionItem[];
 }> {
   const { blueprint, client, projectId, runId } = options;
+  const generatedQuestions: GeneratedQuestionItem[] = [];
+  let planTargets: PlanTarget[] = [];
 
   try {
     // 1. Update run to PLANNING
@@ -235,9 +240,12 @@ export async function executeGenerationRun(
     if (isLocal) {
       const chosenModel =
         blueprint.model_name || env.OLLAMA_MODEL || 'mistral:latest';
+      const resolvedModel = normalizeModelTag(chosenModel);
+      blueprint.model_name = resolvedModel;
+
       const ollama = new OllamaProvider();
       const preflight = await ollama.checkPreflight(
-        chosenModel,
+        resolvedModel,
         env.EMBEDDING_MODEL,
       );
       if (!preflight.available) {
@@ -274,7 +282,7 @@ export async function executeGenerationRun(
     const availableTopicIds = (dbTopics ?? []).map((t) => t.id);
 
     // 3. Plan targets
-    const planTargets = buildGenerationPlan(blueprint, availableTopicIds);
+    planTargets = buildGenerationPlan(blueprint, availableTopicIds);
 
     const isUuid = (val: unknown): val is string =>
       typeof val === 'string' &&
@@ -362,11 +370,16 @@ export async function executeGenerationRun(
     }
 
     const studyResourceIds = new Set((studyResources ?? []).map((r) => r.id));
+    if (studyResourceIds.size === 0) {
+      throw new Error(
+        'No processed study material resources found for this project. Past exam questions (PYQs) cannot be used as study grounding.',
+      );
+    }
 
     // Fetch all resource chunks for context across the full document syllabus without artificial limits
     const { data: rawChunks, error: chunksErr } = await client
       .from('resource_chunks')
-      .select('id, resource_id, text, page_number, chunk_index')
+      .select('id, resource_id, text, page_number, chunk_index, embedding')
       .eq('project_id', projectId)
       .order('chunk_index', { ascending: true })
       .range(0, 9999);
@@ -375,26 +388,26 @@ export async function executeGenerationRun(
       throw new Error(`Failed to fetch resource chunks: ${chunksErr.message}`);
     }
 
-    // Prioritize non-PYQ study materials to prevent paraphrasing of past exam questions
-    const filteredByStudy =
-      studyResourceIds.size > 0
-        ? (rawChunks ?? []).filter((c) => studyResourceIds.has(c.resource_id))
-        : rawChunks ?? [];
-    const chunks =
-      filteredByStudy.length > 0 ? filteredByStudy : rawChunks ?? [];
+    // Prioritize non-PYQ study materials to prevent paraphrasing of past exam questions; ensure chunks have text and valid embeddings
+    const studyChunks = (rawChunks ?? []).filter(
+      (c) =>
+        studyResourceIds.has(c.resource_id) &&
+        c.embedding !== null &&
+        Boolean(c.text && c.text.trim().length > 0),
+    );
 
     // Filter out front-matter and Table of Contents chunks
-    const validContentChunks = (chunks ?? []).filter((c) => {
+    const validContentChunks = studyChunks.filter((c) => {
       const dotCount = (c.text.match(/\.{3,}/g) || []).length;
       return dotCount < 3 && c.text.trim().length > 80;
     });
 
     const poolChunks =
-      validContentChunks.length > 0 ? validContentChunks : chunks ?? [];
+      validContentChunks.length > 0 ? validContentChunks : studyChunks;
 
     if (poolChunks.length === 0) {
       throw new Error(
-        'No syllabus document content found for this project. Please upload and parse course materials before generating questions.',
+        'No usable embedded study resource chunks found for this project. Please upload and parse course materials before generating questions.',
       );
     }
 
@@ -465,8 +478,6 @@ export async function executeGenerationRun(
       );
     }
     const inRunStems: string[] = [];
-
-    const generatedQuestions: GeneratedQuestionItem[] = [];
 
     // 6. Generate for plan targets (Batched on Cloud providers, single on local CPU)
     const isCloud = chosenProvider === 'gemini' || chosenProvider === 'groq';
@@ -669,7 +680,8 @@ export async function executeGenerationRun(
       for (const itemParam of batch) {
         if (Date.now() - runStartTime > MAX_RUN_BUDGET_MS) {
           const budgetMins = Math.round(MAX_RUN_BUDGET_MS / 60000);
-          lastTargetError = `Local Ollama run reached the configured ${budgetMins}-minute execution budget. Generated ${generatedQuestions.length} of ${totalTargets} requested questions.`;
+          const unresolved = totalTargets - generatedQuestions.length;
+          lastTargetError = `[RUN_TIME_BUDGET_EXCEEDED] Execution budget of ${budgetMins} minutes reached. Generated ${generatedQuestions.length} of ${totalTargets} requested questions (${unresolved} unresolved).`;
           console.warn(`[QuestionGenerator] ${lastTargetError}`);
           budgetExceeded = true;
           break;
@@ -926,11 +938,16 @@ export async function executeGenerationRun(
           ? 'NEEDS_REVIEW'
           : 'FAILED';
 
-    const runError =
+    let runError =
       generatedQuestions.length < planTargets.length
         ? lastTargetError ||
           `Generated ${generatedQuestions.length} of ${planTargets.length} requested items.`
         : null;
+
+    if (remainingPlanErr) {
+      const diag = `(Plan item cleanup diagnostic: ${remainingPlanErr.message})`;
+      runError = runError ? `${runError} ${diag}` : diag;
+    }
 
     logGen(`Generation run ${runId} finalized`, {
       accepted: generatedQuestions.length,
@@ -962,12 +979,16 @@ export async function executeGenerationRun(
   } catch (err: unknown) {
     const errorMsg =
       err instanceof Error ? err.message : 'Unknown generation error';
+    const catchStatus = generatedQuestions.length > 0 ? 'NEEDS_REVIEW' : 'FAILED';
+    const reviewCount = Math.max(0, planTargets.length - generatedQuestions.length);
     await client
       .from('generation_runs')
       .update({
+        accepted_count: generatedQuestions.length,
         completed_at: new Date().toISOString(),
         error_message: errorMsg,
-        status: 'FAILED',
+        review_count: reviewCount,
+        status: catchStatus,
       })
       .eq('id', runId);
 
@@ -1094,9 +1115,16 @@ Source Excerpt:
   const promptUser = `${targetDescriptions}\n\nGenerate JSON containing the array of ${batch.length} questions:`;
 
   const aiProvider = getAIProvider(chosenProvider, chosenModel);
+  const isLocal = chosenProvider === 'ollama';
+
+  if (isLocal && !(aiProvider instanceof OllamaProvider)) {
+    throw new Error(
+      `Execution constraint violation: Expected OllamaProvider instance for local batch generation, received ${aiProvider.constructor.name}`,
+    );
+  }
+
   const timeoutMs =
     chosenProvider === 'gemini' || chosenProvider === 'groq' ? 35000 : 180000;
-  const isLocal = chosenProvider === 'ollama';
   const baseSeed = (blueprint as { seed?: number }).seed ?? 42;
   const dynamicSeed = baseSeed + (batch[0]?.target.sequenceNumber ?? 1) * 37 + batch.length * 101;
   const rawOutput = await aiProvider.generate({
@@ -1154,7 +1182,7 @@ Source Excerpt:
   return resultMap;
 }
 
-function extractJsonPayload(rawOutput: string): string {
+export function extractJsonPayload(rawOutput: string): string {
   let cleaned = (rawOutput || '').trim();
   const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   if (codeBlockMatch && codeBlockMatch[1]) {
@@ -1175,7 +1203,7 @@ function extractJsonPayload(rawOutput: string): string {
   return cleaned;
 }
 
-function safeParseJson(jsonStr: string): Record<string, unknown> | null {
+export function safeParseJson(jsonStr: string): Record<string, unknown> | null {
   try {
     return JSON.parse(jsonStr) as Record<string, unknown>;
   } catch {
@@ -1202,7 +1230,7 @@ function safeParseJson(jsonStr: string): Record<string, unknown> | null {
   }
 }
 
-function normalizeSynthesizedQuestion(
+export function normalizeSynthesizedQuestion(
   raw: Record<string, unknown> | null,
   target: PlanTarget,
 ): RawSynthesizedQuestion | null {
@@ -1849,15 +1877,37 @@ export async function regenerateQuestionInPlace(
     typeSlug: activeTypeSlug,
   };
 
+  let origProvider: 'gemini' | 'groq' | 'ollama' | undefined;
+  let origModel: string | undefined;
+
+  if (existingQ.generation_run_id) {
+    const { data: runData } = await client
+      .from('generation_runs')
+      .select('model_provider, model_name')
+      .eq('id', existingQ.generation_run_id)
+      .maybeSingle();
+    if (runData) {
+      origProvider = runData.model_provider as 'gemini' | 'groq' | 'ollama';
+      origModel = runData.model_name;
+    }
+  }
+
   const resolvedProvider: 'gemini' | 'groq' | 'ollama' =
-    (modelProvider as 'gemini' | 'groq' | 'ollama') || 'ollama';
-  const resolvedModel: string =
+    (modelProvider as 'gemini' | 'groq' | 'ollama') ||
+    origProvider ||
+    'ollama';
+
+  const rawModel: string =
     modelName ||
+    origModel ||
     (resolvedProvider === 'gemini'
       ? env.GEMINI_MODEL || 'gemini-flash-lite-latest'
       : resolvedProvider === 'groq'
         ? env.GROQ_MODEL || 'llama-3.3-70b-versatile'
         : env.OLLAMA_MODEL || 'mistral:latest');
+
+  const resolvedModel: string =
+    resolvedProvider === 'ollama' ? normalizeModelTag(rawModel) : rawModel;
 
   const blueprint = {
     model_name: resolvedModel,
