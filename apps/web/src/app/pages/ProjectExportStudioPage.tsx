@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import { getSupabaseClient } from '../../lib/supabase';
 import { Icon, Logo } from '../components/ui';
 import { getCachedProject } from '../services/session-store';
 import type { QuestionItem } from './ProjectQuestionsPage';
 import { demoQuestions } from './ProjectQuestionsPage';
+
+const apiBaseUrl =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.MODE === 'production' ? '' : 'http://localhost:3001');
 
 export function ProjectExportStudioPage({
   initialQuestions,
@@ -11,7 +16,6 @@ export function ProjectExportStudioPage({
   initialQuestions?: QuestionItem[];
 } = {}) {
   const { projectId } = useParams<{ projectId: string }>();
-  const navigate = useNavigate();
 
   const cached = projectId ? getCachedProject(projectId) : null;
   const initialData: QuestionItem[] =
@@ -98,9 +102,17 @@ export function ProjectExportStudioPage({
 
     async function loadData() {
       try {
-        const res = await fetch(`/api/v1/projects/${projectId}/questions?limit=1000`, {
-          headers: { 'Content-Type': 'application/json' },
-        });
+        const { data: sessionData } = await getSupabaseClient().auth.getSession();
+        const token = sessionData.session?.access_token;
+        const authHeaders = {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
+
+        const res = await fetch(
+          `${apiBaseUrl}/api/v1/projects/${projectId}/questions?limit=1000`,
+          { headers: authHeaders },
+        );
         if (res.ok) {
           const json = await res.json();
           if (Array.isArray(json.data) && json.data.length > 0) {
@@ -133,6 +145,24 @@ export function ProjectExportStudioPage({
               }
               return updated;
             });
+          }
+        }
+
+        // Hydrate project metadata if not in session cache
+        if (token) {
+          try {
+            const pRes = await fetch(`${apiBaseUrl}/api/v1/projects/${projectId}`, {
+              headers: authHeaders,
+            });
+            if (pRes.ok) {
+              const pJson = await pRes.json();
+              if (pJson.data?.name) {
+                setProjectTitle(pJson.data.name);
+                setCourseCode(pJson.data.name);
+              }
+            }
+          } catch {
+            // Ignore
           }
         }
       } catch (e) {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { getSupabaseClient } from '../../lib/supabase';
 import { Icon, Logo } from '../components/ui';
 import {
   getCachedProject,
@@ -191,6 +192,10 @@ const FALLBACK_PRACTICE_QUESTIONS: QuestionItem[] = [
   },
 ];
 
+const apiBaseUrl =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.MODE === 'production' ? '' : 'http://localhost:3001');
+
 interface ProjectPracticeStudioPageProps {
   initialQuestions?: QuestionItem[];
 }
@@ -278,9 +283,17 @@ export function ProjectPracticeStudioPage({
 
     async function loadData() {
       try {
-        const res = await fetch(`/api/v1/projects/${projectId}/questions?limit=1000`, {
-          headers: { 'Content-Type': 'application/json' },
-        });
+        const { data: sessionData } = await getSupabaseClient().auth.getSession();
+        const token = sessionData.session?.access_token;
+        const res = await fetch(
+          `${apiBaseUrl}/api/v1/projects/${projectId}/questions?limit=1000`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          },
+        );
         if (res.ok) {
           const json = await res.json();
           if (Array.isArray(json.data) && json.data.length > 0) {
@@ -497,7 +510,6 @@ export function ProjectPracticeStudioPage({
           .replace(/÷/g, '/')
           .replace(/\^/g, '**');
         // Simple safe arithmetic evaluation
-        // eslint-disable-next-line no-eval
         const result = Function(`"use strict"; return (${cleanExpr || calcDisplay})`)();
         setCalcDisplay(String(result));
         setCalcExpression('');

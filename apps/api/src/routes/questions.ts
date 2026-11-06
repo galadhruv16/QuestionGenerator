@@ -620,7 +620,7 @@ questionsRouter.post('/:questionId/versions', async (request, response, next) =>
  * POST /api/v1/projects/:projectId/questions/:questionId/regenerate
  * Regenerates an existing unaccepted question in place, updating its content and resetting to AVAILABLE
  */
-questionsRouter.post('/:questionId/regenerate', async (request, response, next) => {
+questionsRouter.post('/:questionId/regenerate', async (request, response, _next) => {
   const { projectId, questionId } = getParams(request);
   const parsedProjectId = uuidSchema.safeParse(projectId);
   const parsedQuestionId = uuidSchema.safeParse(questionId);

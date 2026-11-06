@@ -752,7 +752,7 @@ resourcesRouter.get('/pyq-patterns', async (request, response, next) => {
 // Analyze blueprint patterns from a specific PYQ resource
 resourcesRouter.post(
   '/:resourceId/analyze-pyq',
-  async (request, response, next) => {
+  async (request, response, _next) => {
     const { projectId, resourceId } = getParams(request);
     const parsedProjectId = uuidSchema.safeParse(projectId);
     const parsedResourceId = uuidSchema.safeParse(resourceId);
@@ -796,11 +796,11 @@ resourcesRouter.post(
       });
 
       return response.json({ data: pattern });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return response.status(400).json({
         error: {
           code: 'ANALYSIS_ERROR',
-          message: error?.message || 'Failed to analyze PYQ pattern.',
+          message: error instanceof Error ? error.message : 'Failed to analyze PYQ pattern.',
         },
       });
     }

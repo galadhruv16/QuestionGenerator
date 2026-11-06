@@ -251,7 +251,7 @@ export const STOPWORDS = new Set([
 function cleanTextString(str: string): string {
   return str
     .replace(/[\u2300-\u23FF\u25A0-\u25FF\u2600-\u26FF\u2700-\u27BF\uF000-\uFFFF]/g, ' ')
-    .replace(/^[•\-\*–—\s\d.:)]+/, '')
+    .replace(/^[•\-*–—\s\d.:)]+/, '')
     .replace(/[.;,:\s]+$/, '')
     .trim();
 }
@@ -262,7 +262,7 @@ function isValidTitle(str: string): boolean {
   if (clean.length < 4 || clean.length > 55) return false;
   if (DISALLOWED_BRANDS.has(clean.toLowerCase())) return false;
   // Disqualify code, math, or TOC lines
-  if (/[\(\)=\/{}\[\];<>\\`"']/.test(clean)) return false;
+  if (/[()=/{}[\];<>\\`"']/.test(clean)) return false;
   if (/\.{2,}|…/.test(clean)) return false;
   if (/^(?:please|try again|note:|warning:|key points)/i.test(clean)) return false;
   const words = clean.split(/\s+/);

@@ -1,14 +1,6 @@
 import zlib from 'node:zlib';
 import type { ExtractedPage } from './resource-processor.js';
 
-interface ZipEntry {
-  compressionMethod: number;
-  compressedSize: number;
-  uncompressedSize: number;
-  filename: string;
-  localHeaderOffset: number;
-}
-
 /**
  * Parses a ZIP buffer (PPTX/DOCX) using standard Central Directory parsing with node:zlib.
  */
@@ -43,7 +35,6 @@ export function readZipEntries(buffer: Buffer): Map<string, Buffer> {
 
     const compressionMethod = buffer.readUInt16LE(currentOffset + 10);
     const compressedSize = buffer.readUInt32LE(currentOffset + 20);
-    const uncompressedSize = buffer.readUInt32LE(currentOffset + 24);
     const filenameLen = buffer.readUInt16LE(currentOffset + 28);
     const extraLen = buffer.readUInt16LE(currentOffset + 30);
     const commentLen = buffer.readUInt16LE(currentOffset + 32);

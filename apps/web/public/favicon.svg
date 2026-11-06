@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="100%" height="100%">
+  <style>
+    :root {
+      --brand-frame: #18181b;
+      --brand-blue: #3157d5;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --brand-frame: #f4f4f5;
+        --brand-blue: #4f75ff;
+      }
+    }
+    .frame {
+      stroke: var(--brand-frame);
+    }
+    .bar {
+      fill: var(--brand-blue);
+    }
+  </style>
+  <g transform="rotate(-10 16 16)">
+    <rect class="frame" x="5" y="5" width="22" height="22" rx="4" fill="none" stroke="#18181b" stroke-width="1.75" />
+    <rect class="bar" x="9.5" y="14.5" width="3" height="8" rx="1" fill="#3157d5" transform="translate(11 18.5) skewX(-18) translate(-11 -18.5)" />
+    <rect class="bar" x="14.5" y="9.5" width="3" height="13" rx="1" fill="#3157d5" transform="translate(16 16) skewX(-18) translate(-16 -16)" />
+    <rect class="bar" x="19.5" y="5.5" width="3" height="17" rx="1" fill="#3157d5" transform="translate(21 14) skewX(-18) translate(-21 -14)" />
+  </g>
+</svg>

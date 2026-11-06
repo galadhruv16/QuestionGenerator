@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach } from 'vitest';
 import { ProjectPracticeStudioPage } from '../src/app/pages/ProjectPracticeStudioPage';
 import { demoQuestions } from '../src/app/pages/ProjectQuestionsPage';
 import { getPracticeSession, clearPracticeSession } from '../src/app/services/session-store';

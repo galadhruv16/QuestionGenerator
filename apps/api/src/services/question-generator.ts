@@ -621,7 +621,7 @@ export async function executeGenerationRun(
 
           if (blueprint.duplicate_policy === 'PREVENT' && maxSim > 0.82) {
             console.warn(
-              `[QuestionGenerator] Item #${target.sequenceNumber} duplicate detected (${(maxSim * 100).toFixed(1)}%). Retrying with alternative chunk and varied temperature...`,
+              `[QuestionGenerator] Item #${target.sequenceNumber} duplicate detected (${(maxSim * 100).toFixed(1)}% similar to "${mostSimilarStem.slice(0, 40)}..."). Retrying with alternative chunk and varied temperature...`,
             );
             // Select an alternative chunk from another section of the document that has not been used yet
             const altChunk =

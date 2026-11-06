@@ -4,6 +4,60 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-11-06] — Presentation Hardening: Auth Token Injection in Export/Practice Studios, Engine Tag Parsing, Scratch Cleanup & Zero-Lint State
+
+### Type
+Bug Fix / Presentation Hardening / Security & Auth / UI Polish / Code Quality & Repository Hygiene
+
+### Status
+Implemented and verified. 100% automated test suite passing (94/94: 4 contracts, 44 API, 46 web), 0 TypeScript compilation errors across all workspace packages, 0 ESLint warnings/errors across entire repository, production web bundle built successfully (7.16s).
+
+### Root Cause Analysis & Resolution
+1. **Missing Authorization in Export and Practice Studios**:
+   - `ProjectExportStudioPage.tsx` and `ProjectPracticeStudioPage.tsx` previously called `fetch('/api/v1/projects/:projectId/questions?limit=1000')` without an `Authorization: Bearer <token>` header and using relative paths.
+   - When navigating directly to `/app/projects/:projectId/export` or `/app/projects/:projectId/practice`, backend route `questionsRouter.use(requireAuth)` rejected the request with HTTP 401 Unauthorized, leaving both studios with 0 questions loaded.
+   - Injected `getSupabaseClient().auth.getSession()` bearer tokens and `${apiBaseUrl}` into `loadData()` across both pages, and added project metadata hydration for paper header formatting.
+2. **Model Engine Selector Dropdown Tag Parsing**:
+   - In `ProjectGenerationPage.tsx`, `e.target.value.split(':')` split on all colons. For composite tag identifiers such as `ollama:mistral:latest`, `targetModel` was truncated to `mistral` instead of `mistral:latest`, causing `<select value={`${targetProvider}:${targetModel}`}>` to mismatch `<option value="ollama:mistral:latest">` and glitch to blank or default.
+   - Refactored to split strictly on the first colon (`indexOf(':')`) preserving multi-colon model tags.
+3. **Live Synthesis Question Stream Preview**:
+   - Bound `activeStreamQuestion` to the Generation Studio Live Synthesis Card, showing real-time feedback with Bloom level, difficulty, and question stem as batches stream from background workers.
+4. **Repository Hygiene & Removal of Trial Dumps**:
+   - Cleaned up 51 legacy diagnostic scripts, HTML DOM dumps, and screenshot files under `scratch/`.
+   - Removed raw slide text dump `docs/all_slides_dump.txt`, test runner cache `test-results/`, and one-off generator script `scripts/generate-favicons.cjs`.
+5. **Codebase Zero-Lint State**:
+   - Resolved all ESLint warnings and errors across `apps/api` and `apps/web` (unused variables, regex escaping, loose `any` types), achieving 0 errors and 0 warnings on `eslint .`.
+
+---
+
+## [2026-11-03] — Added Official GroundQ Browser Tab Favicon and Brand Assets
+
+### Type
+Feature / Branding / Web Assets / UI Polish
+
+### Status
+Implemented, verified with 0 TypeScript compilation errors in Web, 100% passing tests (46/46 in Web), and successful production bundle build with assets copied to dist.
+
+### Root Cause & Requirements
+- Previously, `apps/web/index.html` contained no `<link rel="icon">` tags in `<head>`, and `apps/web/public/` contained only `.gitkeep`.
+- As a result, browsers defaulted to requesting `/favicon.ico` which resulted in 404s and a generic blank document icon in browser tabs.
+- The user requested GroundQ's official logo to be displayed in browser tabs.
+
+### Technical Implementation
+1. **Brand Mark Vectorization (`apps/web/public/favicon.svg`)**:
+   - Accurately vectorized GroundQ's signature `.brand-mark` identity (rotated -10° rounded container with 3 forward-skewed -18° ascending blue bars bottom-aligned).
+   - Embedded `@media (prefers-color-scheme: dark)` styling so the frame border and bars automatically adapt for optimal contrast on both dark and light browser chrome tab backgrounds (dark zinc `#18181b` on light tabs, crisp `#f4f4f5` on dark tabs).
+2. **Fallback Icons (`apps/web/public/`)**:
+   - `favicon.ico`: 32x32 standard ICO format for legacy browsers, search crawlers, and desktop bookmarks.
+   - `favicon-32x32.png`: 32x32 raster PNG fallback.
+   - `apple-touch-icon.png`: 180x180 high-resolution PNG for Apple mobile devices and home screen shortcuts.
+   - Built an automated asset generation script (`scripts/generate-favicons.cjs`) using supersampled rasterization and Node standard library `zlib`.
+3. **HTML Link Configuration (`apps/web/index.html`)**:
+   - Added standard `<link rel="icon" type="image/svg+xml" href="/favicon.svg" />`.
+   - Added alternate icon links for PNG, ICO, and Apple Touch Icon.
+
+---
+
 ## [2026-10-27] — Hardened Local Model Schema Normalization, Persistence Resilience, and Diagnostic Telemetry
 
 ### Type

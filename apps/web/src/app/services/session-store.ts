@@ -7,9 +7,13 @@
  */
 
 export interface CachedProjectData {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   project?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   resources?: any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   topics?: any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   questions?: any[];
   lastUpdated: number;
 }

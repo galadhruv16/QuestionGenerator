@@ -152,6 +152,7 @@ export function ProjectResourcesPage({
   const rawCachedList = Array.isArray(cached?.resources) ? cached.resources : [];
   const initialCachedResources: ResourceItem[] = (
     initialResources ?? rawCachedList
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ).map((r: any) => ({
     ...r,
     checksum_sha256: r.checksum_sha256 || r.id?.substring(0, 8) || 'pending',

@@ -1853,9 +1853,13 @@ export function ProjectGenerationPage() {
                         className="bg-transparent font-bold text-primary border-none outline-none cursor-pointer"
                         value={`${targetProvider}:${targetModel}`}
                         onChange={(e) => {
-                          const [prov, mod] = e.target.value.split(':') as ['gemini' | 'ollama' | 'groq', string];
-                          setTargetProvider(prov);
-                          setTargetModel(mod);
+                          const firstColon = e.target.value.indexOf(':');
+                          if (firstColon !== -1) {
+                            const prov = e.target.value.slice(0, firstColon) as 'gemini' | 'ollama' | 'groq';
+                            const mod = e.target.value.slice(firstColon + 1);
+                            setTargetProvider(prov);
+                            setTargetModel(mod);
+                          }
                         }}
                       >
                         <option value="ollama:mistral:latest">🖥️ Mistral 7B (Localhost Offline Recommended)</option>
@@ -2092,6 +2096,15 @@ export function ProjectGenerationPage() {
                     <p className="font-body-sm text-body-sm text-on-surface-variant">
                       Synthesizing and multi-constraint verifying against corpus chunks...
                     </p>
+                    {activeStreamQuestion && (
+                      <div className="p-2.5 rounded bg-surface-container-lowest border border-outline-variant/30 text-xs flex flex-col gap-1">
+                        <div className="flex items-center justify-between font-semibold text-primary">
+                          <span>Recent: {activeStreamQuestion.bloom_level} · {activeStreamQuestion.difficulty}</span>
+                          <span className="text-on-surface-variant text-[10px]">{activeStreamQuestion.question_type}</span>
+                        </div>
+                        <p className="line-clamp-2 text-on-surface font-normal">{activeStreamQuestion.stem}</p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="p-4 rounded-xl bg-surface-container-low border border-outline-variant/20 flex flex-col gap-2">

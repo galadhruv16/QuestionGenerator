@@ -68,7 +68,7 @@ export function parsePyqHeuristically(
   // 1. Detect question counts using numbering patterns
   // Examples: "Q1.", "1.", "Question 1:", "Part A", etc.
   const questionMatches = fullText.match(
-    /(?:^|\n)\s*(?:Q(?:uestion)?\s*\.?\s*(\d+)|(\d+)[\.\)])\s+/gi,
+    /(?:^|\n)\s*(?:Q(?:uestion)?\s*\.?\s*(\d+)|(\d+)[.)])\s+/gi,
   ) || [];
   const detectedCount = Math.max(questionMatches.length, 10);
 
@@ -536,7 +536,7 @@ Important Rules:
     }
 
     return pattern;
-  } catch (error) {
+  } catch {
     // If AI fails or returns malformed response, safely fallback to heuristic pattern
     setCachedPyqPattern(resourceId, fallbackPattern);
     return fallbackPattern;
