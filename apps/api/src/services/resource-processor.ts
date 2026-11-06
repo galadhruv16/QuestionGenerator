@@ -93,50 +93,13 @@ export function chunkPages(
 
 /**
 /**
- * Computes 768-dimensional embedding vector using Google Gemini text-embedding-004 (cloud)
- * with graceful fallback to local Ollama.
+ * Computes 768-dimensional embedding vector strictly using local Ollama (nomic-embed-text).
+ * Enforces local-first data privacy: never calls external cloud embedding APIs.
  */
 export async function getEmbedding(text: string): Promise<number[] | null> {
-  // 1. Cloud-native path: Use Google Gemini API text-embedding-004 (768 dimensions)
-  const apiKey = env.GEMINI_API_KEY ? env.GEMINI_API_KEY.trim() : undefined;
-  if (apiKey) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        body: JSON.stringify({
-          content: {
-            parts: [{ text }],
-          },
-          model: 'models/text-embedding-004',
-        }),
-        headers: { 'Content-Type': 'application/json' },
-        method: 'POST',
-        signal: controller.signal,
-      }).finally(() => clearTimeout(timeoutId));
-
-      if (response.ok) {
-        const payload = (await response.json()) as {
-          embedding?: { values?: number[] };
-        };
-        if (payload.embedding?.values && payload.embedding.values.length > 0) {
-          return payload.embedding.values;
-        }
-      } else {
-        console.warn(
-          `[resource-processor] Gemini embedding returned HTTP ${response.status}`,
-        );
-      }
-    } catch (err) {
-      console.warn('[resource-processor] Gemini embedding failed:', err);
-    }
-  }
-
-  // 2. Offline fallback: Local Ollama embedding instance
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     const response = await fetch(`${env.OLLAMA_BASE_URL}/api/embeddings`, {
       body: JSON.stringify({
@@ -148,16 +111,17 @@ export async function getEmbedding(text: string): Promise<number[] | null> {
       signal: controller.signal,
     }).finally(() => clearTimeout(timeoutId));
 
-    if (!response.ok) {
-      return null;
+    if (response.ok) {
+      const payload = (await response.json()) as { embedding?: number[] };
+      if (payload.embedding && payload.embedding.length > 0) {
+        return payload.embedding;
+      }
     }
-
-    const payload = (await response.json()) as { embedding?: number[] };
-    return payload.embedding ?? null;
+    return null;
   } catch (err) {
     console.warn(
-      '[resource-processor] Embedding generation failed or timed out:',
-      err,
+      `[resource-processor] Local Ollama embedding failed (${env.EMBEDDING_MODEL} @ ${env.OLLAMA_BASE_URL}):`,
+      err instanceof Error ? err.message : String(err),
     );
     return null;
   }
@@ -292,6 +256,11 @@ export async function processResourcePipeline(
       ['png', 'jpg', 'jpeg', 'webp'].includes(fileExt) ||
       mimeType.startsWith('image/')
     ) {
+      if (!env.GEMINI_API_KEY) {
+        throw new Error(
+          'Image resource detected. OCR transcription for images requires GEMINI_API_KEY in server configuration. In local-first mode, please upload digital text documents (PDF, DOCX, PPTX).',
+        );
+      }
       await updateRun({ metadata: { stage: 'TRANSCRIBING_IMAGE_VISION' } });
       console.log(
         `[resource-processor] Extracting handwritten notes & diagrams from image (${buffer.length} bytes)...`,
@@ -328,6 +297,11 @@ export async function processResourcePipeline(
         digitalChars < 50 ||
         digitalChars / (digitalResult.totalPages || 1) < 10
       ) {
+        if (!env.GEMINI_API_KEY) {
+          throw new Error(
+            `Scanned or non-selectable PDF detected (${digitalChars} digital characters extracted). In local-first mode, GroundQ does not transmit document images to external vision APIs without explicit cloud configuration (GEMINI_API_KEY). Please upload a text-selectable PDF, DOCX, or PPTX.`,
+          );
+        }
         console.log(
           `[resource-processor] Scanned or handwritten PDF detected (${digitalChars} digital chars). Engaging Gemini Multimodal Vision OCR...`,
         );
@@ -427,7 +401,8 @@ export async function processResourcePipeline(
       },
     });
 
-    const CONCURRENCY = 4;
+    // Concurrency set to 1 for local Ollama embeddings to avoid CPU thrashing and RAM contention
+    const CONCURRENCY = 1;
     let completedEmbeddings = 0;
     const embeddings = new Array<number[] | null>(chunks.length);
     let nextIdx = 0;

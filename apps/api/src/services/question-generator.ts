@@ -6,6 +6,7 @@ import type {
   GeneratedQuestionItem,
 } from '@groundq/contracts';
 import { getAIProvider } from '../ai/providers/ai-provider.js';
+import { OllamaProvider } from '../ai/providers/ollama-provider.js';
 import { env } from '../config/env.js';
 import { STOPWORDS } from './topic-inferencer.js';
 
@@ -227,6 +228,29 @@ export async function executeGenerationRun(
       throw new Error(`Failed to update run status to PLANNING: ${startErr.message}`);
     }
 
+    const chosenProvider = blueprint.model_provider || 'ollama';
+    const isLocal = chosenProvider === 'ollama';
+
+    // Preflight health and model verification for local runs
+    if (isLocal) {
+      const chosenModel =
+        blueprint.model_name || env.OLLAMA_MODEL || 'mistral:latest';
+      const ollama = new OllamaProvider();
+      const preflight = await ollama.checkModelAvailability(chosenModel);
+      if (!preflight.available) {
+        const preflightErr = `Ollama preflight check failed: ${preflight.error}`;
+        console.error(`[QuestionGenerator] ${preflightErr}`);
+        await client
+          .from('generation_runs')
+          .update({
+            error_message: preflightErr,
+            status: 'FAILED',
+          })
+          .eq('id', runId);
+        throw new Error(preflightErr);
+      }
+    }
+
     const refs = await loadReferences(client);
 
     // 2. Fetch topics in project
@@ -442,9 +466,7 @@ export async function executeGenerationRun(
     const generatedQuestions: GeneratedQuestionItem[] = [];
 
     // 6. Generate for plan targets (Batched on Cloud providers, single on local CPU)
-    const chosenProvider = blueprint.model_provider || 'ollama';
     const isCloud = chosenProvider === 'gemini' || chosenProvider === 'groq';
-    const isLocal = chosenProvider === 'ollama';
     const BATCH_SIZE = isCloud ? 3 : 1;
 
     // Ensure chunks are sorted monotonically by resource and page number for strictly proportional coverage
@@ -609,10 +631,12 @@ export async function executeGenerationRun(
     }
 
     let lastTargetError: string | null = null;
+    let budgetExceeded = false;
     const runStartTime = Date.now();
-    const MAX_RUN_BUDGET_MS = 15 * 60 * 1000; // 15 minute ceiling
+    const MAX_RUN_BUDGET_MS = isLocal ? 60 * 60 * 1000 : 15 * 60 * 1000; // 60 min ceiling for local Ollama, 15 min for cloud
 
     for (let bIdx = 0; bIdx < batchList.length; bIdx++) {
+      if (budgetExceeded) break;
       const batch = batchList[bIdx]!;
       // Safe RPM throttle for cloud providers (15 RPM free tier on Gemini)
       if (isCloud && bIdx > 0) {
@@ -641,9 +665,10 @@ export async function executeGenerationRun(
 
       for (const itemParam of batch) {
         if (Date.now() - runStartTime > MAX_RUN_BUDGET_MS) {
-          console.warn(
-            `[QuestionGenerator] Run ${runId} reached 15-minute execution ceiling. Finalizing generated items.`,
-          );
+          const budgetMins = Math.round(MAX_RUN_BUDGET_MS / 60000);
+          lastTargetError = `Local Ollama run reached the configured ${budgetMins}-minute execution budget. Generated ${generatedQuestions.length} of ${totalTargets} requested questions.`;
+          console.warn(`[QuestionGenerator] ${lastTargetError}`);
+          budgetExceeded = true;
           break;
         }
 
@@ -722,8 +747,10 @@ export async function executeGenerationRun(
                 poolChunks[(target.sequenceNumber * 3) % poolChunks.length] ||
                 selectedChunk;
 
+              let retrySuccess = false;
               try {
                 const retryItem = await synthesizeQuestionItem({
+                  attempt: 2,
                   blueprint: { ...blueprint, temperature: 0.35 },
                   chunk: altChunk,
                   maxExcerptChars: isLocal ? 500 : 1200,
@@ -739,56 +766,73 @@ export async function executeGenerationRun(
                   const sim = computeStemSimilarity(retryItem.stem, prior);
                   if (sim > retrySim) retrySim = sim;
                 }
-                // Accept retryItem
-                item = retryItem;
-                maxSim = retrySim;
+                if (retrySim <= 0.82) {
+                  item = retryItem;
+                  maxSim = retrySim;
+                  retrySuccess = true;
+                } else {
+                  console.warn(
+                    `[QuestionGenerator] Item #${target.sequenceNumber} retry candidate also exceeded duplicate threshold (${(retrySim * 100).toFixed(1)}%). Rejecting candidate per duplicate policy PREVENT.`,
+                  );
+                  lastItemError = `Duplicate threshold exceeded (${(retrySim * 100).toFixed(1)}% similar to "${mostSimilarStem.slice(0, 40)}...").`;
+                }
               } catch (retryErr) {
+                lastItemError =
+                  retryErr instanceof Error ? retryErr.message : String(retryErr);
                 console.warn(
                   `[QuestionGenerator] Retry after duplicate detection failed:`,
-                  retryErr instanceof Error ? retryErr.message : String(retryErr),
+                  lastItemError,
                 );
               }
-            }
 
-            // Persist to database with strictly contiguous monotonic ordering (no numbering gaps)
-            const savedQuestion = await persistGeneratedQuestion({
-              baseSortOrder,
-              client,
-              dedupScore: maxSim,
-              item,
-              persistedIndex: generatedQuestions.length + 1,
-              planItemId,
-              projectId,
-              refs,
-              runId,
-              selectedChunkId: selectedChunk?.id,
-              target,
-            });
-
-            if (savedQuestion) {
-              inRunStems.push(item.stem);
-              generatedQuestions.push(savedQuestion);
-              logGen(
-                `Item #${target.sequenceNumber} generated and saved successfully: "${item.stem.slice(0, 70)}..."`,
-              );
-
-              const { error: planCompErr } = await client
-                .from('generation_plan_items')
-                .update({ status: 'COMPLETED' })
-                .eq('id', planItemId);
-              if (planCompErr) {
-                console.warn(`[QuestionGenerator] Failed to mark plan item ${planItemId} as COMPLETED:`, planCompErr.message);
-              }
-
-              const { error: runAcceptedErr } = await client
-                .from('generation_runs')
-                .update({ accepted_count: generatedQuestions.length })
-                .eq('id', runId);
-              if (runAcceptedErr) {
-                console.warn(`[QuestionGenerator] Failed to update accepted_count on run ${runId}:`, runAcceptedErr.message);
+              if (!retrySuccess) {
+                item = null;
               }
             }
-          } else {
+
+            if (item) {
+              // Persist to database with strictly contiguous monotonic ordering (no numbering gaps)
+              const savedQuestion = await persistGeneratedQuestion({
+                baseSortOrder,
+                client,
+                dedupScore: maxSim,
+                item,
+                persistedIndex: generatedQuestions.length + 1,
+                planItemId,
+                projectId,
+                refs,
+                runId,
+                selectedChunkId: selectedChunk?.id,
+                target,
+              });
+
+              if (savedQuestion) {
+                inRunStems.push(item.stem);
+                generatedQuestions.push(savedQuestion);
+                logGen(
+                  `Item #${target.sequenceNumber} generated and saved successfully: "${item.stem.slice(0, 70)}..."`,
+                );
+
+                const { error: planCompErr } = await client
+                  .from('generation_plan_items')
+                  .update({ status: 'COMPLETED' })
+                  .eq('id', planItemId);
+                if (planCompErr) {
+                  console.warn(`[QuestionGenerator] Failed to mark plan item ${planItemId} as COMPLETED:`, planCompErr.message);
+                }
+
+                const { error: runAcceptedErr } = await client
+                  .from('generation_runs')
+                  .update({ accepted_count: generatedQuestions.length })
+                  .eq('id', runId);
+                if (runAcceptedErr) {
+                  console.warn(`[QuestionGenerator] Failed to update accepted_count on run ${runId}:`, runAcceptedErr.message);
+                }
+              }
+            }
+          }
+
+          if (!item) {
             lastTargetError = lastItemError || 'Failed to generate schema-compliant question';
             logGen(`Item #${target.sequenceNumber} generation failed: ${lastTargetError}`);
             console.error(
@@ -860,11 +904,17 @@ export async function executeGenerationRun(
     }
 
     // Mark any remaining unprocessed plan items (e.g. from early break, persistence error, or budget ceiling) as FAILED
-    await client
+    const { error: remainingPlanErr } = await client
       .from('generation_plan_items')
       .update({ status: 'FAILED' })
       .eq('generation_run_id', runId)
       .eq('status', 'PLANNED');
+    if (remainingPlanErr) {
+      console.warn(
+        `[QuestionGenerator] Failed to clean up remaining PLANNED plan items on run ${runId}:`,
+        remainingPlanErr.message,
+      );
+    }
 
     const finalStatus =
       generatedQuestions.length === planTargets.length
@@ -1306,7 +1356,15 @@ async function synthesizeQuestionItem(
 
   const aiProvider = getAIProvider(chosenProvider, chosenModel);
   const isLocal = chosenProvider === 'ollama';
-  const timeoutMs = isLocal ? 180000 : 25000;
+
+  // Hard execution constraint: When Ollama is selected, strictly lock execution to OllamaProvider
+  if (isLocal && !(aiProvider instanceof OllamaProvider)) {
+    throw new Error(
+      `Execution constraint violation: Expected OllamaProvider instance for local generation, received ${aiProvider.constructor.name}`,
+    );
+  }
+
+  const timeoutMs = isLocal ? env.OLLAMA_TIMEOUT_MS : 25000;
   const maxTokens = isLocal ? 650 : undefined;
 
   const priorStemsNotice =

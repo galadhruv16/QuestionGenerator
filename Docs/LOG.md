@@ -16,13 +16,19 @@ Implemented and verified. 100% automated test suite passing (94/94: 4 contracts,
 1. **Total Elimination of Fake/Synthetic Question Extraction**:
    - `regexFallbackExtractor` in `apps/api/src/services/question-generator.ts` previously attempted to reconstruct questions from malformed or truncated model outputs. This violated GroundQ's core ADR principle: failed model output must fail cleanly into the retry/manual-review queue, never synthesizing ungrounded question items.
    - Deleted `regexFallbackExtractor` completely. If JSON output from the model fails parsing or lacks required fields, a typed error is thrown, allowing the attempt retry loop and progressive context reduction to engage cleanly.
-2. **Tightened Local Latency & Stall Policy for Presentation Laptops**:
-   - Replaced bloated 10-minute (600s) local inference timeouts with realistic bounds tailored for AMD Ryzen/Intel mobile CPUs:
-     - `overallTimeoutMs`: 180s (3 minutes) per attempt.
-     - `stallTimeoutMs`: 60s without token streaming.
-     - Max retries per item: 2 attempts (down from 3).
-     - Overall run budget ceiling: 15 minutes (`MAX_RUN_BUDGET_MS = 15 * 60 * 1000`).
-   - Sliced excerpts progressively (550 chars on attempt 1, 280 chars on attempt 2) to eliminate context thrashing and keep generation under 35 seconds per item.
+2. **Provider-Locked Local Execution Constraint & Long-Latency Tolerance**:
+   - As mandated for local-first runs, when the user selects Ollama, execution is strictly locked to Ollama only (`OllamaProvider`). Added an explicit runtime assertion in `synthesizeQuestionItem` verifying `aiProvider instanceof OllamaProvider`. Under no circumstance can a local run fall back to Gemini or Groq.
+   - Long execution times on laptop CPUs are accepted and supported without early cancellation:
+     - `overallTimeoutMs`: Configurable via `env.OLLAMA_TIMEOUT_MS` (default 300s / 5 minutes per attempt).
+     - `stallTimeoutMs`: 120s (2 minutes) token stall guard with streaming token reset (error message accurately reports 120s).
+     - `MAX_RUN_BUDGET_MS`: 60 minutes for local Ollama runs (allowing a 10-question exam to take 30–40 minutes question-by-question without hitting arbitrary cutoffs).
+     - When the 60-minute budget is exceeded, an explicit diagnostic error message is recorded: `Local Ollama run reached the configured 60-minute execution budget. Generated X of Y requested questions.`
+   - In `resource-processor.ts`:
+     - Completely removed Gemini embedding fallback in `getEmbedding()`. Embedding generation uses local Ollama (`nomic-embed-text:latest`) exclusively.
+     - Reduced embedding concurrency to `1` sequentially to prevent Ollama CPU saturation and memory thrashing.
+     - Added fail-fast protection on scanned documents and images: in local-first mode without explicit `GEMINI_API_KEY`, image OCR and scanned PDFs fail immediately with an informative error rather than silently calling external APIs.
+   - Added **Ollama Preflight Verification**: `executeGenerationRun` checks that Ollama is reachable and the requested model is pulled locally via `checkModelAvailability()` before starting generation, providing immediate feedback rather than failing minutes into the run.
+   - Fixed **Duplicate Prevention Enforcement**: If a replacement question generated under `duplicate_policy: 'PREVENT'` also exceeds the similarity threshold (> 0.82), it is rejected, discarded, and sent to `NEEDS_REVIEW` rather than silently persisted to the question bank.
 3. **Prevention of Orphaned Plan Items (`PLANNED` State)**:
    - When a run halts early due to the 15-minute execution budget, any unstarted plan items in `generation_plan_items` are now explicitly updated to `status: 'FAILED'` before run finalization, preventing items from remaining indefinitely in `PLANNED`.
 4. **Resilient Database Persistence Error Handling**:

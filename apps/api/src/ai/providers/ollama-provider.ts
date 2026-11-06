@@ -7,15 +7,17 @@ export class OllamaProvider implements AIProvider {
 
   async generate(options: GenerateOptions): Promise<string> {
     const controller = new AbortController();
-    const overallTimeoutMs = options.timeoutMs ?? 180000; // 3 min default per attempt
-    const stallTimeoutMs = 60000; // 60s without a single token
+    const overallTimeoutMs = options.timeoutMs ?? env.OLLAMA_TIMEOUT_MS; // Configurable via OLLAMA_TIMEOUT_MS (default 5 min)
+    const stallTimeoutMs = 120000; // 120s without a single token
 
     let stallTimer: NodeJS.Timeout | null = null;
     const resetStallTimer = () => {
       if (stallTimer) clearTimeout(stallTimer);
       stallTimer = setTimeout(() => {
         controller.abort(
-          new Error('Ollama generation stalled: no tokens received for 60 seconds'),
+          new Error(
+            `Ollama generation stalled: no tokens received for ${stallTimeoutMs / 1000} seconds`,
+          ),
         );
       }, stallTimeoutMs);
     };
@@ -138,6 +140,62 @@ export class OllamaProvider implements AIProvider {
       return payload.embedding;
     } catch {
       return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async checkModelAvailability(
+    modelName: string,
+  ): Promise<{ available: boolean; error?: string }> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    try {
+      const response = await fetch(`${this.baseUrl}/api/tags`, {
+        headers: { 'Content-Type': 'application/json' },
+        method: 'GET',
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        return {
+          available: false,
+          error: `Ollama service at ${this.baseUrl} returned HTTP ${response.status}`,
+        };
+      }
+
+      const payload = (await response.json()) as {
+        models?: Array<{ name?: string }>;
+      };
+      const installedModels = (payload.models ?? [])
+        .map((m) => m.name || '')
+        .filter(Boolean);
+
+      const requestedNormalized = modelName.trim().toLowerCase();
+      const baseName = requestedNormalized.split(':')[0] || requestedNormalized;
+
+      const isInstalled = installedModels.some((name) => {
+        const n = name.toLowerCase();
+        return (
+          n === requestedNormalized ||
+          n === `${requestedNormalized}:latest` ||
+          n.split(':')[0] === baseName
+        );
+      });
+
+      if (!isInstalled) {
+        return {
+          available: false,
+          error: `Ollama model "${modelName}" is not installed locally. Installed models: [${installedModels.join(', ') || 'none'}]. Please run 'ollama pull ${modelName}' in your terminal.`,
+        };
+      }
+
+      return { available: true };
+    } catch (err) {
+      return {
+        available: false,
+        error: `Ollama is not reachable at ${this.baseUrl}. Please verify that the Ollama desktop service is running. (${err instanceof Error ? err.message : String(err)})`,
+      };
     } finally {
       clearTimeout(timeout);
     }

@@ -24,6 +24,7 @@ const envSchema = z.object({
   GROQ_MODEL: z.string().default('llama-3.3-70b-versatile'),
   OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),
   OLLAMA_MODEL: z.string().default('mistral:latest'),
+  OLLAMA_TIMEOUT_MS: z.coerce.number().int().positive().default(300000),
   EMBEDDING_MODEL: z.string().default('nomic-embed-text:latest'),
 });
 
