@@ -2,13 +2,36 @@ import os from 'node:os';
 import type { AIProvider, GenerateOptions } from './ai-provider.js';
 import { env } from '../../config/env.js';
 
+export function normalizeModelTag(tag: string): string {
+  const trimmed = tag.trim().toLowerCase();
+  return trimmed.includes(':') ? trimmed : `${trimmed}:latest`;
+}
+
+export function matchExactModel(
+  requested: string,
+  installed: string[],
+): boolean {
+  const reqNorm = normalizeModelTag(requested);
+  return installed.some((inst) => normalizeModelTag(inst) === reqNorm);
+}
+
+export interface PreflightResult {
+  available: boolean;
+  error?: string;
+  reason?:
+    | 'SERVICE_UNREACHABLE'
+    | 'MODEL_NOT_FOUND'
+    | 'EMBEDDING_MODEL_NOT_FOUND';
+  installedModels?: string[];
+}
+
 export class OllamaProvider implements AIProvider {
   constructor(private readonly baseUrl = env.OLLAMA_BASE_URL) {}
 
   async generate(options: GenerateOptions): Promise<string> {
     const controller = new AbortController();
     const overallTimeoutMs = options.timeoutMs ?? env.OLLAMA_TIMEOUT_MS; // Configurable via OLLAMA_TIMEOUT_MS (default 5 min)
-    const stallTimeoutMs = 120000; // 120s without a single token
+    const stallTimeoutMs = env.OLLAMA_STALL_TIMEOUT_MS; // Configurable via OLLAMA_STALL_TIMEOUT_MS (default 120s)
 
     let stallTimer: NodeJS.Timeout | null = null;
     const resetStallTimer = () => {
@@ -119,7 +142,10 @@ export class OllamaProvider implements AIProvider {
 
   async embed(text: string): Promise<number[] | null> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const timeout = setTimeout(
+      () => controller.abort(),
+      env.OLLAMA_EMBEDDING_TIMEOUT_MS,
+    );
     try {
       const response = await fetch(`${this.baseUrl}/api/embeddings`, {
         body: JSON.stringify({
@@ -136,7 +162,10 @@ export class OllamaProvider implements AIProvider {
         return null;
       }
 
-      const payload = (await response.json()) as { embedding: number[] };
+      const payload = (await response.json()) as { embedding?: number[] };
+      if (!payload.embedding || payload.embedding.length !== 768) {
+        return null;
+      }
       return payload.embedding;
     } catch {
       return null;
@@ -145,9 +174,10 @@ export class OllamaProvider implements AIProvider {
     }
   }
 
-  async checkModelAvailability(
-    modelName: string,
-  ): Promise<{ available: boolean; error?: string }> {
+  async checkPreflight(
+    generationModel: string,
+    embeddingModel?: string,
+  ): Promise<PreflightResult> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4000);
     try {
@@ -161,6 +191,7 @@ export class OllamaProvider implements AIProvider {
         return {
           available: false,
           error: `Ollama service at ${this.baseUrl} returned HTTP ${response.status}`,
+          reason: 'SERVICE_UNREACHABLE',
         };
       }
 
@@ -171,34 +202,42 @@ export class OllamaProvider implements AIProvider {
         .map((m) => m.name || '')
         .filter(Boolean);
 
-      const requestedNormalized = modelName.trim().toLowerCase();
-      const baseName = requestedNormalized.split(':')[0] || requestedNormalized;
-
-      const isInstalled = installedModels.some((name) => {
-        const n = name.toLowerCase();
-        return (
-          n === requestedNormalized ||
-          n === `${requestedNormalized}:latest` ||
-          n.split(':')[0] === baseName
-        );
-      });
-
-      if (!isInstalled) {
+      // 1. Check exact generation model (strict tag match, no base-name false positives)
+      if (!matchExactModel(generationModel, installedModels)) {
         return {
           available: false,
-          error: `Ollama model "${modelName}" is not installed locally. Installed models: [${installedModels.join(', ') || 'none'}]. Please run 'ollama pull ${modelName}' in your terminal.`,
+          error: `Ollama generation model "${generationModel}" is not installed locally. Installed models: [${installedModels.join(', ') || 'none'}]. Please run 'ollama pull ${generationModel}' in your terminal.`,
+          installedModels,
+          reason: 'MODEL_NOT_FOUND',
         };
       }
 
-      return { available: true };
+      // 2. Check exact embedding model if required
+      if (embeddingModel && !matchExactModel(embeddingModel, installedModels)) {
+        return {
+          available: false,
+          error: `Ollama embedding model "${embeddingModel}" is not installed locally. Installed models: [${installedModels.join(', ') || 'none'}]. Please run 'ollama pull ${embeddingModel}' in your terminal.`,
+          installedModels,
+          reason: 'EMBEDDING_MODEL_NOT_FOUND',
+        };
+      }
+
+      return { available: true, installedModels };
     } catch (err) {
       return {
         available: false,
-        error: `Ollama is not reachable at ${this.baseUrl}. Please verify that the Ollama desktop service is running. (${err instanceof Error ? err.message : String(err)})`,
+        error: `Ollama service is not reachable at ${this.baseUrl}. Please verify that the Ollama desktop service is running (e.g. 'ollama serve'). (${err instanceof Error ? err.message : String(err)})`,
+        reason: 'SERVICE_UNREACHABLE',
       };
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  async checkModelAvailability(
+    modelName: string,
+  ): Promise<{ available: boolean; error?: string }> {
+    return this.checkPreflight(modelName);
   }
 }
 

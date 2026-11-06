@@ -34,8 +34,8 @@ export const blueprintConfigurationSchema = z.object({
     medium: 50,
   }),
   duplicate_policy: duplicatePolicySchema.default('PREVENT'),
-  model_name: z.string().trim().min(1).default('gemini-flash-lite-latest'),
-  model_provider: z.enum(['gemini', 'ollama', 'groq']).default('gemini'),
+  model_name: z.string().trim().min(1).default('mistral:latest'),
+  model_provider: z.enum(['gemini', 'ollama', 'groq']).default('ollama'),
   question_count: z.number().int().min(1).max(100).default(10),
   styles: z.record(z.string(), z.number().min(0).max(100)).default({
     analytical: 40,
@@ -114,8 +114,10 @@ export const generationRunStatusValues = [
   'RETRIEVING',
   'GENERATING',
   'VALIDATING',
+  'REGENERATING',
   'COMPLETED',
   'FAILED',
+  'NEEDS_REVIEW',
 ] as const;
 
 export const generationRunStatusSchema = z.enum(generationRunStatusValues);
@@ -125,7 +127,7 @@ export const startGenerationRunSchema = z.object({
   blueprint_id: z.string().uuid().optional(),
   configuration: blueprintConfigurationSchema.optional(),
   model_name: z.string().trim().optional(),
-  model_provider: z.enum(['gemini', 'ollama']).optional(),
+  model_provider: z.enum(['gemini', 'ollama', 'groq']).optional(),
   request_id: z.string().optional(),
 });
 export type StartGenerationRunRequest = z.infer<

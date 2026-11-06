@@ -236,7 +236,10 @@ export async function executeGenerationRun(
       const chosenModel =
         blueprint.model_name || env.OLLAMA_MODEL || 'mistral:latest';
       const ollama = new OllamaProvider();
-      const preflight = await ollama.checkModelAvailability(chosenModel);
+      const preflight = await ollama.checkPreflight(
+        chosenModel,
+        env.EMBEDDING_MODEL,
+      );
       if (!preflight.available) {
         const preflightErr = `Ollama preflight check failed: ${preflight.error}`;
         console.error(`[QuestionGenerator] ${preflightErr}`);
@@ -633,7 +636,7 @@ export async function executeGenerationRun(
     let lastTargetError: string | null = null;
     let budgetExceeded = false;
     const runStartTime = Date.now();
-    const MAX_RUN_BUDGET_MS = isLocal ? 60 * 60 * 1000 : 15 * 60 * 1000; // 60 min ceiling for local Ollama, 15 min for cloud
+    const MAX_RUN_BUDGET_MS = isLocal ? env.OLLAMA_RUN_BUDGET_MS : 15 * 60 * 1000;
 
     for (let bIdx = 0; bIdx < batchList.length; bIdx++) {
       if (budgetExceeded) break;
@@ -1905,6 +1908,12 @@ export async function regenerateQuestionInPlace(
     for (const exStem of existingStems) {
       const sim = computeStemSimilarity(synthesized.stem, exStem);
       if (sim > maxSimilarity) maxSimilarity = sim;
+    }
+
+    if (maxSimilarity >= 0.82) {
+      throw new Error(
+        'Regeneration produced a duplicate question exceeding similarity threshold (0.82).',
+      );
     }
   }
 

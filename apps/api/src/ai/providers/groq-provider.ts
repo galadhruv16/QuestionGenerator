@@ -1,6 +1,5 @@
 import type { AIProvider, GenerateOptions } from './ai-provider.js';
 import { env } from '../../config/env.js';
-import { defaultAIProvider } from './ollama-provider.js';
 
 const FALLBACK_MODELS = [
   'llama-3.3-70b-versatile',
@@ -114,8 +113,8 @@ export class GroqProvider implements AIProvider {
     throw lastError ?? new Error('All Groq candidate models failed.');
   }
 
-  async embed(text: string): Promise<number[] | null> {
-    return defaultAIProvider.embed(text);
+  async embed(_text: string): Promise<number[] | null> {
+    throw new Error('GroqProvider does not support vector embeddings');
   }
 }
 

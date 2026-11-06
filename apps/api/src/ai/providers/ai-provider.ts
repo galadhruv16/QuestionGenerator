@@ -21,14 +21,26 @@ export interface AIProvider {
 }
 
 export function getAIProvider(
-  provider?: 'gemini' | 'ollama' | 'groq',
+  provider?: 'gemini' | 'ollama' | 'groq' | string,
   model?: string,
 ): AIProvider {
   const chosenProvider = provider || 'ollama';
 
+  if (
+    chosenProvider !== 'gemini' &&
+    chosenProvider !== 'groq' &&
+    chosenProvider !== 'ollama'
+  ) {
+    throw new Error(
+      `Unsupported AI provider: "${chosenProvider}". GroundQ only supports "ollama", "gemini", or "groq".`,
+    );
+  }
+
   if (chosenProvider === 'gemini') {
     if (!env.GEMINI_API_KEY) {
-      throw new Error('Gemini provider requested but GEMINI_API_KEY is not configured');
+      throw new Error(
+        'Gemini provider requested but GEMINI_API_KEY is not configured',
+      );
     }
     if (model) {
       return new GeminiProvider(env.GEMINI_API_KEY, model);
@@ -38,7 +50,9 @@ export function getAIProvider(
 
   if (chosenProvider === 'groq') {
     if (!env.GROQ_API_KEY) {
-      throw new Error('Groq provider requested but GROQ_API_KEY is not configured');
+      throw new Error(
+        'Groq provider requested but GROQ_API_KEY is not configured',
+      );
     }
     if (model) {
       return new GroqProvider(env.GROQ_API_KEY, model);
@@ -46,10 +60,16 @@ export function getAIProvider(
     return defaultGroqProvider;
   }
 
-  if (model) {
-    return new OllamaProvider(env.OLLAMA_BASE_URL);
+  // Ollama provider execution
+  const inst = model
+    ? new OllamaProvider(env.OLLAMA_BASE_URL)
+    : defaultAIProvider;
+  if (!(inst instanceof OllamaProvider)) {
+    throw new Error(
+      'Server assertion failure: Ollama provider requested but resolved provider is not an OllamaProvider instance.',
+    );
   }
-  return defaultAIProvider;
+  return inst;
 }
 
 export { defaultAIProvider };

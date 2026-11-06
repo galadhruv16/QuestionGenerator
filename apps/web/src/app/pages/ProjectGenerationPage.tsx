@@ -305,6 +305,7 @@ export function ProjectGenerationPage() {
       setCurrentRun((prev) => ({
         ...(prev ?? ({} as GenerationRun)),
         accepted_count: state.generatedCount,
+        error_message: state.error || prev?.error_message,
         id: state.runId,
         requested_count: state.targetCount || prev?.requested_count,
         status: state.status,
@@ -1984,7 +1985,11 @@ export function ProjectGenerationPage() {
                         ? 'bg-primary/10 text-primary font-bold'
                         : currentRun?.status === 'COMPLETED'
                           ? 'bg-secondary/15 text-secondary font-bold'
-                          : 'bg-surface-container text-on-surface-variant'
+                          : currentRun?.status === 'FAILED'
+                            ? 'bg-error/15 text-error font-bold'
+                            : currentRun?.status === 'NEEDS_REVIEW'
+                              ? 'bg-amber-500/15 text-amber-700 font-bold dark:text-amber-400'
+                              : 'bg-surface-container text-on-surface-variant'
                     }`}
                   >
                     {isGenerating
@@ -2106,6 +2111,51 @@ export function ProjectGenerationPage() {
                       </div>
                     )}
                   </div>
+                ) : currentRun?.status === 'FAILED' ? (
+                  <div className="p-4 rounded-xl bg-error/10 border border-error/30 flex flex-col gap-2 text-error">
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-sm text-label-sm font-bold flex items-center gap-1.5">
+                        <Icon name="crossCircle" size={16} />
+                        <span>Generation Run Failed</span>
+                      </span>
+                      <span className="font-mono text-xs font-semibold">
+                        {currentRun.accepted_count} / {currentRun.requested_count || questionCount} Saved
+                      </span>
+                    </div>
+                    <p className="font-body-sm text-xs text-error/90">
+                      {currentRun.error_message || 'The generation run encountered an error or model timeout.'}
+                    </p>
+                  </div>
+                ) : currentRun?.status === 'NEEDS_REVIEW' ? (
+                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-2 text-amber-800 dark:text-amber-300">
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-sm text-label-sm font-bold flex items-center gap-1.5">
+                        <Icon name="alert" size={16} />
+                        <span>Generation Completed with Items Needing Review</span>
+                      </span>
+                      <span className="font-mono text-xs font-semibold">
+                        {currentRun.accepted_count} Accepted · {currentRun.review_count || 0} Need Review
+                      </span>
+                    </div>
+                    <p className="font-body-sm text-xs text-amber-700 dark:text-amber-400">
+                      {currentRun.error_message || 'Some questions could not be validated or exceeded duplicate thresholds.'}
+                    </p>
+                  </div>
+                ) : currentRun?.status === 'COMPLETED' ? (
+                  <div className="p-4 rounded-xl bg-secondary/10 border border-secondary/30 flex flex-col gap-2 text-secondary">
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-sm text-label-sm font-bold flex items-center gap-1.5">
+                        <Icon name="checkCircle" size={16} />
+                        <span>Generation Completed Successfully</span>
+                      </span>
+                      <span className="font-mono text-xs font-semibold">
+                        {currentRun.accepted_count} / {currentRun.requested_count || questionCount} Questions
+                      </span>
+                    </div>
+                    <p className="font-body-sm text-xs text-secondary/90">
+                      All question items were synthesized, verified, and saved to the question bank.
+                    </p>
+                  </div>
                 ) : (
                   <div className="p-4 rounded-xl bg-surface-container-low border border-outline-variant/20 flex flex-col gap-2">
                     <div className="flex items-center justify-between">
@@ -2118,7 +2168,9 @@ export function ProjectGenerationPage() {
                       </span>
                     </div>
                     <p className="font-body-sm text-body-sm text-on-surface-variant text-xs">
-                      Adjust your target volume and topic balance above, then click synthesize.
+                      {targetProvider === 'ollama'
+                        ? 'Local Ollama synthesis runs on-device without cloud APIs. On CPU, inference takes ~1–3 minutes per question sequentially.'
+                        : 'Adjust your target volume and topic balance above, then click synthesize.'}
                     </p>
                   </div>
                 )}

@@ -576,6 +576,8 @@ topicsRouter.post('/infer', async (request, response, next) => {
     return response.json({
       data: {
         chunk_count: inferenceResult.chunkCount,
+        fallback_reason: inferenceResult.fallbackReason,
+        is_fallback: inferenceResult.isFallback ?? false,
         model_used: inferenceResult.modelUsed,
         modules_inferred: inferenceResult.modules.length,
         status: 'SUCCESS',

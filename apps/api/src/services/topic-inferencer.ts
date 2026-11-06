@@ -15,6 +15,8 @@ export interface InferredModule {
 
 export interface InferenceResult {
   chunkCount: number;
+  fallbackReason?: string;
+  isFallback?: boolean;
   modelUsed: string;
   modules: InferredModule[];
 }
@@ -62,6 +64,7 @@ export async function inferTopicsFromChunks(
   if (chunks.length === 0) {
     return {
       chunkCount: 0,
+      isFallback: false,
       modelUsed: chosenModel,
       modules: [],
     };
@@ -214,21 +217,25 @@ CRITICAL CONSTRAINTS:
     if (modules.length > 0) {
       return {
         chunkCount: chunks.length,
+        isFallback: false,
         modelUsed: chosenModel,
         modules,
       };
     }
     throw new Error('AI returned empty module list');
   } catch (err: unknown) {
+    const fallbackReason = err instanceof Error ? err.message : String(err);
     console.warn(
       `[TopicInferencer] Model inference (${chosenModel}) failed, using domain-grounded extractor:`,
-      err instanceof Error ? err.message : String(err),
+      fallbackReason,
     );
     // Robust, domain-grounded extractive fallback directly from source document headings and concepts
     const fallbackModules = extractIntelligentModules(chunks);
     return {
       chunkCount: chunks.length,
-      modelUsed: `${chosenModel}-extractive-grounded`,
+      fallbackReason,
+      isFallback: true,
+      modelUsed: `${chosenModel}-extractive-fallback`,
       modules: fallbackModules,
     };
   }

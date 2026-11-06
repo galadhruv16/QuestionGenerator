@@ -1,6 +1,5 @@
 import type { AIProvider, GenerateOptions } from './ai-provider.js';
 import { env } from '../../config/env.js';
-import { defaultAIProvider } from './ollama-provider.js';
 
 const FALLBACK_MODELS = [
   'gemini-flash-lite-latest',
@@ -129,11 +128,13 @@ export class GeminiProvider implements AIProvider {
 
   async embed(text: string): Promise<number[] | null> {
     if (!this.apiKey) {
-      return defaultAIProvider.embed(text);
+      throw new Error(
+        'GEMINI_API_KEY is not configured for GeminiProvider.embed',
+      );
     }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
       const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${this.apiKey}`;
       const response = await fetch(url, {
         body: JSON.stringify({
@@ -145,22 +146,27 @@ export class GeminiProvider implements AIProvider {
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
         signal: controller.signal,
-      }).finally(() => clearTimeout(timeout));
+      });
 
       if (!response.ok) {
-        console.warn(
-          `[GeminiProvider] Embedding returned HTTP ${response.status}, falling back to default provider`,
+        throw new Error(
+          `Gemini embedding returned HTTP ${response.status}`,
         );
-        return defaultAIProvider.embed(text);
       }
 
       const payload = (await response.json()) as {
         embedding?: { values?: number[] };
       };
-      return payload.embedding?.values ?? defaultAIProvider.embed(text);
+      if (!payload.embedding?.values) {
+        throw new Error('Gemini API returned no embedding values');
+      }
+      return payload.embedding.values;
     } catch (err) {
-      console.warn('[GeminiProvider] Embedding failed, falling back:', err);
-      return defaultAIProvider.embed(text);
+      throw new Error(
+        `Gemini embedding generation failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      clearTimeout(timeout);
     }
   }
 }

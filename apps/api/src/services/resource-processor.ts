@@ -2,11 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { PDFParse } from 'pdf-parse';
 import { env } from '../config/env.js';
 import { extractPagesFromDocx, extractPagesFromPptx } from './office-extractor.js';
-import {
-  countPdfPagesFromBuffer,
-  transcribeImageWithVision,
-  transcribePdfWithVision,
-} from './multimodal-transcriber.js';
 
 export interface ExtractedPage {
   pageNumber: number;
@@ -99,10 +94,14 @@ export function chunkPages(
 export async function getEmbedding(text: string): Promise<number[] | null> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      env.OLLAMA_EMBEDDING_TIMEOUT_MS,
+    );
 
     const response = await fetch(`${env.OLLAMA_BASE_URL}/api/embeddings`, {
       body: JSON.stringify({
+        keep_alive: '30m',
         model: env.EMBEDDING_MODEL,
         prompt: text,
       }),
@@ -113,7 +112,7 @@ export async function getEmbedding(text: string): Promise<number[] | null> {
 
     if (response.ok) {
       const payload = (await response.json()) as { embedding?: number[] };
-      if (payload.embedding && payload.embedding.length > 0) {
+      if (payload.embedding && payload.embedding.length === 768) {
         return payload.embedding;
       }
     }
@@ -162,6 +161,7 @@ export async function processResourcePipeline(
         `[resource-processor] Failed to update run ${runId}:`,
         error,
       );
+      throw new Error(`Database error updating processing run: ${error.message}`);
     }
   };
 
@@ -180,6 +180,7 @@ export async function processResourcePipeline(
         `[resource-processor] Failed to update resource ${resourceId}:`,
         error,
       );
+      throw new Error(`Database error updating resource: ${error.message}`);
     }
   };
 
@@ -224,7 +225,7 @@ export async function processResourcePipeline(
     let pages: ExtractedPage[] = [];
     let totalPages = 0;
     let parserVersion = 'pdf-parse-v1';
-    let ocrApplied = false;
+    const ocrApplied = false;
 
     if (
       fileExt === 'pptx' ||
@@ -256,26 +257,9 @@ export async function processResourcePipeline(
       ['png', 'jpg', 'jpeg', 'webp'].includes(fileExt) ||
       mimeType.startsWith('image/')
     ) {
-      if (!env.GEMINI_API_KEY) {
-        throw new Error(
-          'Image resource detected. OCR transcription for images requires GEMINI_API_KEY in server configuration. In local-first mode, please upload digital text documents (PDF, DOCX, PPTX).',
-        );
-      }
-      await updateRun({ metadata: { stage: 'TRANSCRIBING_IMAGE_VISION' } });
-      console.log(
-        `[resource-processor] Extracting handwritten notes & diagrams from image (${buffer.length} bytes)...`,
+      throw new Error(
+        'Image resource processing requires local OCR, which is not available in GroundQ. Please upload digital text documents (selectable PDF, DOCX, or PPTX).',
       );
-      const effectiveMime = mimeType.startsWith('image/')
-        ? mimeType
-        : `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`;
-      const imageResult = await transcribeImageWithVision(
-        buffer,
-        effectiveMime,
-      );
-      pages = imageResult.pages;
-      totalPages = imageResult.totalPages;
-      parserVersion = 'gemini-vision-image-v1';
-      ocrApplied = true;
     } else {
       // PDF processing: extract selectable text layer first
       await updateRun({ metadata: { stage: 'EXTRACTING_TEXT' } });
@@ -297,76 +281,14 @@ export async function processResourcePipeline(
         digitalChars < 50 ||
         digitalChars / (digitalResult.totalPages || 1) < 10
       ) {
-        if (!env.GEMINI_API_KEY) {
-          throw new Error(
-            `Scanned or non-selectable PDF detected (${digitalChars} digital characters extracted). In local-first mode, GroundQ does not transmit document images to external vision APIs without explicit cloud configuration (GEMINI_API_KEY). Please upload a text-selectable PDF, DOCX, or PPTX.`,
-          );
-        }
-        console.log(
-          `[resource-processor] Scanned or handwritten PDF detected (${digitalChars} digital chars). Engaging Gemini Multimodal Vision OCR...`,
+        throw new Error(
+          `Scanned or non-selectable PDF detected (${digitalChars} digital characters extracted across ${digitalResult.totalPages} pages). Local OCR is not available in GroundQ. Please upload a selectable digital text PDF, DOCX, or PPTX document.`,
         );
-        await updateRun({
-          metadata: {
-            reason: 'SCANNED_OR_HANDWRITTEN_PDF',
-            stage: 'OCR_VISION_TRANSCRIBING',
-          },
-        });
-
-        try {
-          const effectiveTotalPages =
-            digitalResult.totalPages > 0
-              ? digitalResult.totalPages
-              : countPdfPagesFromBuffer(buffer);
-
-          const visionResult = await transcribePdfWithVision(buffer, {
-            onProgress: async (p) => {
-              await updateRun({
-                metadata: {
-                  current_window: p.currentWindow,
-                  pages_transcribed: p.processedPages,
-                  progress_percent: p.progressPercent,
-                  reason: 'SCANNED_OR_HANDWRITTEN_PDF',
-                  stage: 'OCR_VISION_TRANSCRIBING',
-                  total_pages: p.totalPages,
-                },
-              });
-            },
-            totalPages: effectiveTotalPages,
-          });
-
-          if (
-            visionResult.pages.length > 0 &&
-            visionResult.pages.some((p) => p.text.length > 20)
-          ) {
-            pages = visionResult.pages;
-            totalPages = visionResult.totalPages;
-            parserVersion = 'gemini-vision-multimodal-v1';
-            ocrApplied = true;
-          } else {
-            throw new Error(
-              'Gemini Vision OCR returned empty text from scanned document.',
-            );
-          }
-        } catch (visionErr) {
-          console.warn(
-            `[resource-processor] Vision OCR transcription failed:`,
-            visionErr,
-          );
-          if (digitalResult.pages.length > 0 && digitalChars > 0) {
-            pages = digitalResult.pages;
-            totalPages = digitalResult.totalPages;
-            parserVersion = 'pdf-parse-v1 (partial)';
-          } else {
-            throw new Error(
-              `Non-selectable or handwritten PDF could not be transcribed. OCR Error: ${visionErr instanceof Error ? visionErr.message : String(visionErr)}`,
-            );
-          }
-        }
-      } else {
-        pages = digitalResult.pages;
-        totalPages = digitalResult.totalPages;
-        parserVersion = 'pdf-parse-v1';
       }
+
+      pages = digitalResult.pages;
+      totalPages = digitalResult.totalPages;
+      parserVersion = 'pdf-parse-v1';
     }
 
     const totalExtractedChars = pages.reduce(
@@ -436,6 +358,21 @@ export async function processResourcePipeline(
     );
     await Promise.all(workers);
 
+    // Validate that every single chunk received a valid 768-dim vector embedding
+    const EXPECTED_DIMENSION = 768;
+    const failedEmbeddingIdx = embeddings.findIndex(
+      (emb) => !emb || emb.length !== EXPECTED_DIMENSION,
+    );
+    if (failedEmbeddingIdx !== -1) {
+      const failedVec = embeddings[failedEmbeddingIdx];
+      const detail = !failedVec
+        ? `Embedding failed or timed out on chunk #${failedEmbeddingIdx}`
+        : `Vector dimension mismatch on chunk #${failedEmbeddingIdx}: received ${failedVec.length}, expected ${EXPECTED_DIMENSION}`;
+      throw new Error(
+        `Incomplete embeddings for resource ${resourceId}: ${detail}. Resource processing aborted.`,
+      );
+    }
+
     // 5. Batch insert chunks in batches of 50 to optimize database round-trips
     await updateRun({ metadata: { stage: 'PERSISTING_CHUNKS' } });
     const chunkRows = chunks.map((chunk, idx) => ({
@@ -502,15 +439,29 @@ export async function processResourcePipeline(
       error,
     );
 
-    await updateRun(
-      {
-        completed_at: new Date().toISOString(),
-        error_message: errorMessage,
-        metadata: { stage: 'FAILED' },
-      },
-      'FAILED',
-    );
+    try {
+      await updateRun(
+        {
+          completed_at: new Date().toISOString(),
+          error_message: errorMessage,
+          metadata: { stage: 'FAILED' },
+        },
+        'FAILED',
+      );
+    } catch (e) {
+      console.error(
+        '[resource-processor] Failed to update run status to FAILED:',
+        e,
+      );
+    }
 
-    await updateResource({}, 'FAILED');
+    try {
+      await updateResource({}, 'FAILED');
+    } catch (e) {
+      console.error(
+        '[resource-processor] Failed to update resource status to FAILED:',
+        e,
+      );
+    }
   }
 }

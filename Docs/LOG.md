@@ -4,6 +4,38 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-11-06] — Ollama-Only Resilience & Provider Immutability Hardening: Preflight Tag Matching, Embedding Fallback Abolition, Duplicate Rejection & Frontend Telemetry
+
+### Type
+Feature / AI Safety / Provider Immutability / Resilience Hardening / UI Refinement
+
+### Status
+Implemented and verified. 100% automated test suite passing (105/105: 4 contracts, 55 API, 46 web), 0 TypeScript compilation errors across all workspace packages (`tsc -p tsconfig.json`), 0 ESLint warnings/errors (`eslint .`), production web bundle built successfully (`vite build`).
+
+### Changes Implemented & Verified
+1. **Provider Immutability & Zero Cloud Fallback**:
+   - `apps/api/src/ai/providers/ai-provider.ts`: Added strict provider verification in `getAIProvider` rejecting unsupported providers (`openai`, `anthropic`, etc.) and asserting server-side that Ollama requests instantiate an `OllamaProvider`.
+   - `apps/api/src/ai/providers/gemini-provider.ts` & `groq-provider.ts`: Removed all delegation to `defaultAIProvider.embed()`. Cloud providers throw provider-specific errors on embedding failures rather than falling back to local Ollama.
+   - `apps/api/src/services/resource-processor.ts`: Uses local Ollama (`nomic-embed-text:latest`) exclusively for embeddings with strict 768-dimension checking and timeout handling. Concurrency is locked to 1. All chunks must have valid vectors before insertion; missing or malformed vectors fail both resource and run cleanly. Removed broken dead-code blocks for vision transcription; non-selectable/scanned documents immediately fail with an informative local-only message.
+2. **Exact Model Tag Preflight Verification**:
+   - `apps/api/src/ai/providers/ollama-provider.ts`: Exported `normalizeModelTag` and `matchExactModel` ensuring model tags are matched exactly (e.g., `mistral:7b` does NOT match `mistral:latest`).
+   - Added `checkPreflight(generationModel, embeddingModel)` verifying both that the Ollama service is reachable and that both exact models are pulled locally before any generation or ingestion begins.
+3. **Environment & Latency Configuration**:
+   - `apps/api/src/config/env.ts`: Added `OLLAMA_EMBEDDING_TIMEOUT_MS` (default 30000ms), `OLLAMA_STALL_TIMEOUT_MS` (default 120000ms), and `OLLAMA_RUN_BUDGET_MS` (default 3600000ms / 60 minutes).
+   - `apps/api/src/services/question-generator.ts`: Dynamic run budget ceiling consumes `env.OLLAMA_RUN_BUDGET_MS` for local runs, allowing long CPU inference runs to execute question-by-question without hitting artificial process aborts.
+4. **Duplicate Prevention Enforcement**:
+   - In `apps/api/src/services/question-generator.ts`, under `duplicate_policy: 'PREVENT'`, if a retry candidate question still exceeds the similarity threshold (> 0.82), it is rejected and not persisted; the plan item is marked `FAILED` and routed to `NEEDS_REVIEW`.
+   - In `regenerateQuestionInPlace`, if a regenerated question exceeds the 0.82 similarity threshold after retry, an explicit error is thrown, protecting existing question versions from being overwritten by duplicate content.
+5. **Topic Inference Extractive Grounding Metadata**:
+   - `apps/api/src/services/topic-inferencer.ts`: Extracted heuristic fallback now explicitly reports `isFallback: true`, `fallbackReason`, and `modelUsed: "${chosenModel}-extractive-fallback"`.
+   - `apps/api/src/routes/topics.ts`: Propagates `is_fallback` and `fallback_reason` in `/topics/infer` API response.
+6. **Contracts & Lifecycle States**:
+   - `packages/contracts/src/generation/index.ts`: Added `REGENERATING` and `NEEDS_REVIEW` to `generationRunStatusValues`, matching `Docs/DATABASE_DESIGN.md`. Added `groq` to `startGenerationRunSchema.model_provider`. Updated default `model_provider` in `blueprintConfigurationSchema` to `'ollama'`.
+7. **Frontend Status Telemetry & Guidance**:
+   - `apps/web/src/app/pages/ProjectGenerationPage.tsx`: Preserves `error_message` from generation manager state. Added visual telemetry banners for `FAILED` and `NEEDS_REVIEW` runs. Added local CPU generation guidance for Ollama explaining sequential 1-by-1 inference expectations.
+8. **Automated Resilience Test Suite**:
+   - Added `apps/api/test/ollama-resilience.test.ts` covering 11 dedicated test cases for tag normalization, exact tag matching, preflight failure modes (service down, missing generation model, missing embedding model, successful check), provider factory assertion, cloud embedding isolation, and duplicate threshold computation.
+
 ## [2026-11-06] — Pipeline Resilience & Presentation Readiness: Complete Removal of Synthetic Fallbacks, Bounded Local Latency, Orphan Cleanup, Seed Determinism & Local-First Security
 
 ### Type

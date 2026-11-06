@@ -25,6 +25,9 @@ const envSchema = z.object({
   OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),
   OLLAMA_MODEL: z.string().default('mistral:latest'),
   OLLAMA_TIMEOUT_MS: z.coerce.number().int().positive().default(300000),
+  OLLAMA_EMBEDDING_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+  OLLAMA_STALL_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
+  OLLAMA_RUN_BUDGET_MS: z.coerce.number().int().positive().default(3600000),
   EMBEDDING_MODEL: z.string().default('nomic-embed-text:latest'),
 });
 
