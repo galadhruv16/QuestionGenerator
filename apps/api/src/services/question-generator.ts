@@ -31,7 +31,10 @@ export function logGen(msg: string, data?: unknown) {
 }
 
 export class DatabasePersistenceError extends Error {
-  constructor(message: string, public override readonly cause?: unknown) {
+  constructor(
+    message: string,
+    public override readonly cause?: unknown,
+  ) {
     super(message);
     this.name = 'DatabasePersistenceError';
   }
@@ -109,9 +112,7 @@ export function allocateCounts(
 ): string[] {
   if (count <= 0) return [];
   const rawEntries = Array.isArray(weights) ? weights : Object.entries(weights);
-  const active = rawEntries.filter(
-    ([, w]) => typeof w === 'number' && w > 0,
-  );
+  const active = rawEntries.filter(([, w]) => typeof w === 'number' && w > 0);
 
   if (active.length === 0) {
     return Array(count).fill(fallbackKey);
@@ -251,8 +252,14 @@ export interface RunGenerationOptions {
 }
 
 export function computeStemSimilarity(a: string, b: string): number {
-  const normA = a.toLowerCase().replace(/[^\w\s]/g, ' ').trim();
-  const normB = b.toLowerCase().replace(/[^\w\s]/g, ' ').trim();
+  const normA = a
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .trim();
+  const normB = b
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .trim();
   if (normA === normB) return 1.0;
 
   const wordsA = new Set(normA.split(/\s+/).filter((w) => w.length > 2));
@@ -315,7 +322,9 @@ export async function executeGenerationRun(
       .update({ started_at: new Date().toISOString(), status: 'PLANNING' })
       .eq('id', runId);
     if (startErr) {
-      throw new Error(`Failed to update run status to PLANNING: ${startErr.message}`);
+      throw new Error(
+        `Failed to update run status to PLANNING: ${startErr.message}`,
+      );
     }
 
     const chosenProvider = blueprint.model_provider || 'ollama';
@@ -371,7 +380,9 @@ export async function executeGenerationRun(
 
     const isUuid = (val: unknown): val is string =>
       typeof val === 'string' &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        val,
+      );
 
     // Sanitize topicId so non-UUID dummy IDs never violate DB foreign keys
     for (const target of planTargets) {
@@ -423,7 +434,9 @@ export async function executeGenerationRun(
       .update({ status: 'RETRIEVING' })
       .eq('id', runId);
     if (retErr) {
-      throw new Error(`Failed to update run status to RETRIEVING: ${retErr.message}`);
+      throw new Error(
+        `Failed to update run status to RETRIEVING: ${retErr.message}`,
+      );
     }
 
     // Query max existing sort_order in project for monotonic numbering across runs
@@ -436,7 +449,10 @@ export async function executeGenerationRun(
       .maybeSingle();
 
     if (maxOrderErr) {
-      console.warn(`[QuestionGenerator] Could not fetch max sort_order:`, maxOrderErr.message);
+      console.warn(
+        `[QuestionGenerator] Could not fetch max sort_order:`,
+        maxOrderErr.message,
+      );
     }
 
     const baseSortOrder =
@@ -509,7 +525,10 @@ export async function executeGenerationRun(
       .range(0, 9999);
 
     if (linksErr) {
-      console.warn(`[QuestionGenerator] Could not fetch chunk_topics links:`, linksErr.message);
+      console.warn(
+        `[QuestionGenerator] Could not fetch chunk_topics links:`,
+        linksErr.message,
+      );
     }
 
     const topicToChunkIds = new Map<string, string[]>();
@@ -529,7 +548,9 @@ export async function executeGenerationRun(
       .update({ status: 'GENERATING' })
       .eq('id', runId);
     if (genStatusErr) {
-      throw new Error(`Failed to update run status to GENERATING: ${genStatusErr.message}`);
+      throw new Error(
+        `Failed to update run status to GENERATING: ${genStatusErr.message}`,
+      );
     }
 
     // Fetch existing question stems in the project for cross-batch and in-run deduplication
@@ -559,7 +580,9 @@ export async function executeGenerationRun(
     } catch (stemFetchErr) {
       console.warn(
         `[QuestionGenerator] Could not fetch prior question stems:`,
-        stemFetchErr instanceof Error ? stemFetchErr.message : String(stemFetchErr),
+        stemFetchErr instanceof Error
+          ? stemFetchErr.message
+          : String(stemFetchErr),
       );
     }
     const inRunStems: string[] = [];
@@ -613,7 +636,7 @@ export async function executeGenerationRun(
 
       // Chunks explicitly linked to target.topicId via chunk_topics
       const mappedChunkIds = target.topicId
-        ? topicToChunkIds.get(target.topicId) ?? []
+        ? (topicToChunkIds.get(target.topicId) ?? [])
         : [];
       const mappedChunks = mappedChunkIds
         .map((id) => chunkById.get(id))
@@ -650,9 +673,15 @@ export async function executeGenerationRun(
 
       let selectedChunk: (typeof poolChunks)[0] | undefined;
 
-      const unusedStratumTopic = stratumTopicLinked.filter((c) => !usedChunkIds.has(c.id));
-      const unusedStratumKeyword = stratumKeywordMatched.filter((c) => !usedChunkIds.has(c.id));
-      const unusedStratum = stratumChunks.filter((c) => !usedChunkIds.has(c.id));
+      const unusedStratumTopic = stratumTopicLinked.filter(
+        (c) => !usedChunkIds.has(c.id),
+      );
+      const unusedStratumKeyword = stratumKeywordMatched.filter(
+        (c) => !usedChunkIds.has(c.id),
+      );
+      const unusedStratum = stratumChunks.filter(
+        (c) => !usedChunkIds.has(c.id),
+      );
       const unusedMapped = mappedChunks.filter((c) => !usedChunkIds.has(c.id));
 
       if (unusedStratumTopic.length > 0) {
@@ -660,9 +689,11 @@ export async function executeGenerationRun(
       } else if (stratumTopicLinked.length > 0) {
         selectedChunk = stratumTopicLinked[tIdx % stratumTopicLinked.length];
       } else if (unusedStratumKeyword.length > 0) {
-        selectedChunk = unusedStratumKeyword[tIdx % unusedStratumKeyword.length];
+        selectedChunk =
+          unusedStratumKeyword[tIdx % unusedStratumKeyword.length];
       } else if (stratumKeywordMatched.length > 0) {
-        selectedChunk = stratumKeywordMatched[tIdx % stratumKeywordMatched.length];
+        selectedChunk =
+          stratumKeywordMatched[tIdx % stratumKeywordMatched.length];
       } else if (unusedStratum.length > 0) {
         selectedChunk = unusedStratum[Math.floor(unusedStratum.length / 2)];
       } else if (unusedMapped.length > 0) {
@@ -682,7 +713,10 @@ export async function executeGenerationRun(
         // If the closest mapped chunk is within 35% document distance, use it;
         // otherwise, use the stratum chunk to guarantee 100% full-document syllabus coverage!
         const maxAllowedDistance = Math.max(6, Math.floor(totalPool * 0.35));
-        if (Math.abs(closestMapped.chunk_index - windowStart) <= maxAllowedDistance) {
+        if (
+          Math.abs(closestMapped.chunk_index - windowStart) <=
+          maxAllowedDistance
+        ) {
           selectedChunk = closestMapped;
         } else {
           selectedChunk =
@@ -732,7 +766,9 @@ export async function executeGenerationRun(
     let lastTargetError: string | null = null;
     let budgetExceeded = false;
     const runStartTime = Date.now();
-    const MAX_RUN_BUDGET_MS = isLocal ? env.OLLAMA_RUN_BUDGET_MS : 15 * 60 * 1000;
+    const MAX_RUN_BUDGET_MS = isLocal
+      ? env.OLLAMA_RUN_BUDGET_MS
+      : 15 * 60 * 1000;
 
     for (let bIdx = 0; bIdx < batchList.length; bIdx++) {
       if (budgetExceeded) break;
@@ -751,9 +787,14 @@ export async function executeGenerationRun(
             runId,
           });
         } catch (batchErr) {
-          const errMsg = batchErr instanceof Error ? batchErr.message : String(batchErr);
-          if (/401|403|429|quota|unauthorized|forbidden|api.?key/i.test(errMsg)) {
-            console.error(`[QuestionGenerator] Fatal provider error in batch synthesis: ${errMsg}`);
+          const errMsg =
+            batchErr instanceof Error ? batchErr.message : String(batchErr);
+          if (
+            /401|403|429|quota|unauthorized|forbidden|api.?key/i.test(errMsg)
+          ) {
+            console.error(
+              `[QuestionGenerator] Fatal provider error in batch synthesis: ${errMsg}`,
+            );
             throw batchErr;
           }
           console.warn(
@@ -772,9 +813,15 @@ export async function executeGenerationRun(
           break;
         }
 
-        const { chunk: selectedChunk, planItemId, target, topicName } = itemParam;
+        const {
+          chunk: selectedChunk,
+          planItemId,
+          target,
+          topicName,
+        } = itemParam;
         try {
-          let item: RawSynthesizedQuestion | null = batchResults.get(target.sequenceNumber) ?? null;
+          let item: RawSynthesizedQuestion | null =
+            batchResults.get(target.sequenceNumber) ?? null;
           let lastItemError: string | null = null;
 
           if (!item) {
@@ -792,12 +839,15 @@ export async function executeGenerationRun(
                 const effectiveTemperature = isLocal
                   ? attempt === 1
                     ? 0.35
-                    : 0.20
+                    : 0.2
                   : (blueprint.temperature ?? 0.15);
 
                 item = await synthesizeQuestionItem({
                   attempt,
-                  blueprint: { ...blueprint, temperature: effectiveTemperature },
+                  blueprint: {
+                    ...blueprint,
+                    temperature: effectiveTemperature,
+                  },
                   chunk: selectedChunk,
                   maxExcerptChars,
                   planItemId,
@@ -813,7 +863,9 @@ export async function executeGenerationRun(
                 }
               } catch (attemptErr) {
                 lastItemError =
-                  attemptErr instanceof Error ? attemptErr.message : String(attemptErr);
+                  attemptErr instanceof Error
+                    ? attemptErr.message
+                    : String(attemptErr);
                 console.warn(
                   `[QuestionGenerator] Item #${target.sequenceNumber} attempt ${attempt} failed: ${lastItemError}`,
                 );
@@ -843,7 +895,9 @@ export async function executeGenerationRun(
               );
               // Select an alternative chunk from another section of the document that has not been used yet
               const altChunk =
-                sortedPoolChunks.find((c) => !usedChunkIds.has(c.id) && c.id !== selectedChunk?.id) ||
+                sortedPoolChunks.find(
+                  (c) => !usedChunkIds.has(c.id) && c.id !== selectedChunk?.id,
+                ) ||
                 poolChunks[(target.sequenceNumber * 3) % poolChunks.length] ||
                 selectedChunk;
 
@@ -878,7 +932,9 @@ export async function executeGenerationRun(
                 }
               } catch (retryErr) {
                 lastItemError =
-                  retryErr instanceof Error ? retryErr.message : String(retryErr);
+                  retryErr instanceof Error
+                    ? retryErr.message
+                    : String(retryErr);
                 console.warn(
                   `[QuestionGenerator] Retry after duplicate detection failed:`,
                   lastItemError,
@@ -918,7 +974,10 @@ export async function executeGenerationRun(
                   .update({ status: 'COMPLETED' })
                   .eq('id', planItemId);
                 if (planCompErr) {
-                  console.warn(`[QuestionGenerator] Failed to mark plan item ${planItemId} as COMPLETED:`, planCompErr.message);
+                  console.warn(
+                    `[QuestionGenerator] Failed to mark plan item ${planItemId} as COMPLETED:`,
+                    planCompErr.message,
+                  );
                 }
 
                 const { error: runAcceptedErr } = await client
@@ -926,15 +985,21 @@ export async function executeGenerationRun(
                   .update({ accepted_count: generatedQuestions.length })
                   .eq('id', runId);
                 if (runAcceptedErr) {
-                  console.warn(`[QuestionGenerator] Failed to update accepted_count on run ${runId}:`, runAcceptedErr.message);
+                  console.warn(
+                    `[QuestionGenerator] Failed to update accepted_count on run ${runId}:`,
+                    runAcceptedErr.message,
+                  );
                 }
               }
             }
           }
 
           if (!item) {
-            lastTargetError = lastItemError || 'Failed to generate schema-compliant question';
-            logGen(`Item #${target.sequenceNumber} generation failed: ${lastTargetError}`);
+            lastTargetError =
+              lastItemError || 'Failed to generate schema-compliant question';
+            logGen(
+              `Item #${target.sequenceNumber} generation failed: ${lastTargetError}`,
+            );
             console.error(
               `[QuestionGenerator] Item #${target.sequenceNumber} generation failed:`,
               lastTargetError,
@@ -944,7 +1009,10 @@ export async function executeGenerationRun(
               .update({ status: 'FAILED' })
               .eq('id', planItemId);
             if (planFailErr) {
-              console.warn(`[QuestionGenerator] Failed to mark plan item ${planItemId} as FAILED:`, planFailErr.message);
+              console.warn(
+                `[QuestionGenerator] Failed to mark plan item ${planItemId} as FAILED:`,
+                planFailErr.message,
+              );
             }
 
             const { error: runReviewErr } = await client
@@ -954,7 +1022,10 @@ export async function executeGenerationRun(
               })
               .eq('id', runId);
             if (runReviewErr) {
-              console.warn(`[QuestionGenerator] Failed to update review_count on run ${runId}:`, runReviewErr.message);
+              console.warn(
+                `[QuestionGenerator] Failed to update review_count on run ${runId}:`,
+                runReviewErr.message,
+              );
             }
           }
         } catch (genErr) {
@@ -977,7 +1048,9 @@ export async function executeGenerationRun(
           }
           lastTargetError =
             genErr instanceof Error ? genErr.message : String(genErr);
-          logGen(`Item #${target.sequenceNumber} unexpected error: ${lastTargetError}`);
+          logGen(
+            `Item #${target.sequenceNumber} unexpected error: ${lastTargetError}`,
+          );
           console.error(
             `[QuestionGenerator] Item #${target.sequenceNumber} unexpected error:`,
             lastTargetError,
@@ -987,7 +1060,10 @@ export async function executeGenerationRun(
             .update({ status: 'FAILED' })
             .eq('id', planItemId);
           if (planFailErr) {
-            console.warn(`[QuestionGenerator] Failed to mark plan item ${planItemId} as FAILED:`, planFailErr.message);
+            console.warn(
+              `[QuestionGenerator] Failed to mark plan item ${planItemId} as FAILED:`,
+              planFailErr.message,
+            );
           }
 
           const { error: runReviewErr } = await client
@@ -997,7 +1073,10 @@ export async function executeGenerationRun(
             })
             .eq('id', runId);
           if (runReviewErr) {
-            console.warn(`[QuestionGenerator] Failed to update review_count on run ${runId}:`, runReviewErr.message);
+            console.warn(
+              `[QuestionGenerator] Failed to update review_count on run ${runId}:`,
+              runReviewErr.message,
+            );
           }
         }
       }
@@ -1031,7 +1110,8 @@ export async function executeGenerationRun(
 
         // Select blueprint configuration from an unfulfilled target
         const candidateTarget =
-          planTargets[replenishmentAttempts % planTargets.length] || planTargets[0]!;
+          planTargets[replenishmentAttempts % planTargets.length] ||
+          planTargets[0]!;
 
         // Pick an unused chunk or alternate pool chunk
         const replChunk =
@@ -1045,7 +1125,12 @@ export async function executeGenerationRun(
         let replTopicId = candidateTarget.topicId;
         if (replChunk) {
           const linked = chunkToTopicIds.get(replChunk.id);
-          if (linked && linked.length > 0 && linked[0] && topicMap.has(linked[0])) {
+          if (
+            linked &&
+            linked.length > 0 &&
+            linked[0] &&
+            topicMap.has(linked[0])
+          ) {
             replTopicId = linked[0];
             replTopicName = topicMap.get(linked[0])!;
           }
@@ -1055,15 +1140,11 @@ export async function executeGenerationRun(
         }
 
         const replTarget: PlanTarget = {
-          bloomId: candidateTarget.bloomId,
           bloomSlug: candidateTarget.bloomSlug,
-          difficultyId: candidateTarget.difficultyId,
           difficultySlug: candidateTarget.difficultySlug,
           sequenceNumber: replSeqNum,
-          styleId: candidateTarget.styleId,
           styleSlug: candidateTarget.styleSlug,
           topicId: replTopicId,
-          typeId: candidateTarget.typeId,
           typeSlug: candidateTarget.typeSlug,
         };
 
@@ -1071,10 +1152,14 @@ export async function executeGenerationRun(
         const { data: replPlanItem } = await client
           .from('generation_plan_items')
           .insert({
-            bloom_level_id: refs.bloom.get(replTarget.bloomSlug.toLowerCase()) || null,
-            difficulty_level_id: refs.difficulty.get(replTarget.difficultySlug.toUpperCase()) || null,
+            bloom_level_id:
+              refs.bloom.get(replTarget.bloomSlug.toLowerCase()) || null,
+            difficulty_level_id:
+              refs.difficulty.get(replTarget.difficultySlug.toUpperCase()) ||
+              null,
             generation_run_id: runId,
-            question_type_id: refs.types.get(replTarget.typeSlug.toUpperCase()) || null,
+            question_type_id:
+              refs.types.get(replTarget.typeSlug.toUpperCase()) || null,
             sequence_number: replSeqNum,
             status: 'PLANNED',
             style_id:
@@ -1097,7 +1182,10 @@ export async function executeGenerationRun(
           try {
             replItem = await synthesizeQuestionItem({
               attempt,
-              blueprint: { ...blueprint, temperature: attempt === 1 ? 0.30 : 0.20 },
+              blueprint: {
+                ...blueprint,
+                temperature: attempt === 1 ? 0.3 : 0.2,
+              },
               chunk: replChunk,
               maxExcerptChars: isLocal ? (attempt === 1 ? 550 : 280) : 1200,
               planItemId: replPlanItemId,
@@ -1221,8 +1309,14 @@ export async function executeGenerationRun(
       .eq('id', runId);
 
     if (finalErr) {
-      console.error(`[QuestionGenerator] Failed to finalize generation run status:`, finalErr.message);
-      throw new DatabasePersistenceError(`Failed to finalize generation run: ${finalErr.message}`, finalErr);
+      console.error(
+        `[QuestionGenerator] Failed to finalize generation run status:`,
+        finalErr.message,
+      );
+      throw new DatabasePersistenceError(
+        `Failed to finalize generation run: ${finalErr.message}`,
+        finalErr,
+      );
     }
 
     return {
@@ -1232,8 +1326,12 @@ export async function executeGenerationRun(
   } catch (err: unknown) {
     const errorMsg =
       err instanceof Error ? err.message : 'Unknown generation error';
-    const catchStatus = generatedQuestions.length > 0 ? 'NEEDS_REVIEW' : 'FAILED';
-    const reviewCount = Math.max(0, planTargets.length - generatedQuestions.length);
+    const catchStatus =
+      generatedQuestions.length > 0 ? 'NEEDS_REVIEW' : 'FAILED';
+    const reviewCount = Math.max(
+      0,
+      planTargets.length - generatedQuestions.length,
+    );
     try {
       await client
         .from('generation_runs')
@@ -1386,7 +1484,8 @@ Source Excerpt:
   const timeoutMs =
     chosenProvider === 'gemini' || chosenProvider === 'groq' ? 35000 : 180000;
   const baseSeed = (blueprint as { seed?: number }).seed ?? 42;
-  const dynamicSeed = baseSeed + (batch[0]?.target.sequenceNumber ?? 1) * 37 + batch.length * 101;
+  const dynamicSeed =
+    baseSeed + (batch[0]?.target.sequenceNumber ?? 1) * 37 + batch.length * 101;
   const rawOutput = await aiProvider.generate({
     format: 'json',
     model: chosenModel,
@@ -1472,7 +1571,9 @@ export function safeParseJson(jsonStr: string): Record<string, unknown> | null {
 
     const lastBrace = jsonStr.lastIndexOf('}');
     if (lastBrace > firstBrace) {
-      const sliced = jsonStr.slice(firstBrace, lastBrace + 1).replace(/,\s*([}\]])/g, '$1');
+      const sliced = jsonStr
+        .slice(firstBrace, lastBrace + 1)
+        .replace(/,\s*([}\]])/g, '$1');
       try {
         return JSON.parse(sliced) as Record<string, unknown>;
       } catch {
@@ -1551,16 +1652,22 @@ export function normalizeSynthesizedQuestion(
   const stem = String(raw.stem || raw.question || raw.prompt || '').trim();
   if (stem.length < 8) return null;
 
-  let options: Array<{
-    explanation?: string;
-    is_correct: boolean;
-    option_index: number;
-    option_text: string;
-  }> | undefined;
+  let options:
+    | Array<{
+        explanation?: string;
+        is_correct: boolean;
+        option_index: number;
+        option_text: string;
+      }>
+    | undefined;
 
   if (target.typeSlug === 'MCQ') {
     const rawOptions = raw.options || raw.choices || raw.alternatives;
-    let optionList: Array<{ text: string; isCorrect: boolean; explanation: string }> = [];
+    let optionList: Array<{
+      text: string;
+      isCorrect: boolean;
+      explanation: string;
+    }> = [];
 
     if (Array.isArray(rawOptions)) {
       optionList = rawOptions.map((opt, idx) => {
@@ -1570,11 +1677,21 @@ export function normalizeSynthesizedQuestion(
         if (opt && typeof opt === 'object') {
           const optObj = opt as Record<string, unknown>;
           const text = String(
-            optObj.option_text || optObj.text || optObj.choice || optObj.label || `Option ${idx + 1}`,
+            optObj.option_text ||
+              optObj.text ||
+              optObj.choice ||
+              optObj.label ||
+              `Option ${idx + 1}`,
           ).trim();
-          const rawCorrect = optObj.is_correct ?? optObj.isCorrect ?? optObj.correct;
-          const isCorrect = typeof rawCorrect === 'string' ? rawCorrect.toLowerCase() === 'true' : Boolean(rawCorrect);
-          const explanation = String(optObj.explanation || optObj.reason || '').trim();
+          const rawCorrect =
+            optObj.is_correct ?? optObj.isCorrect ?? optObj.correct;
+          const isCorrect =
+            typeof rawCorrect === 'string'
+              ? rawCorrect.toLowerCase() === 'true'
+              : Boolean(rawCorrect);
+          const explanation = String(
+            optObj.explanation || optObj.reason || '',
+          ).trim();
           return { text, isCorrect, explanation };
         }
         return { text: `Option ${idx + 1}`, isCorrect: false, explanation: '' };
@@ -1587,9 +1704,14 @@ export function normalizeSynthesizedQuestion(
         }
         if (val && typeof val === 'object') {
           const vObj = val as Record<string, unknown>;
-          const text = String(vObj.option_text || vObj.text || vObj.choice || key).trim();
+          const text = String(
+            vObj.option_text || vObj.text || vObj.choice || key,
+          ).trim();
           const rawCorrect = vObj.is_correct ?? vObj.isCorrect ?? vObj.correct;
-          const isCorrect = typeof rawCorrect === 'string' ? rawCorrect.toLowerCase() === 'true' : Boolean(rawCorrect);
+          const isCorrect =
+            typeof rawCorrect === 'string'
+              ? rawCorrect.toLowerCase() === 'true'
+              : Boolean(rawCorrect);
           const explanation = String(vObj.explanation || '').trim();
           return { text, isCorrect, explanation };
         }
@@ -1597,7 +1719,9 @@ export function normalizeSynthesizedQuestion(
       });
     }
 
-    const rootAnswer = String(raw.answer || raw.correct_answer || raw.model_answer || '').trim();
+    const rootAnswer = String(
+      raw.answer || raw.correct_answer || raw.model_answer || '',
+    ).trim();
     if (rootAnswer) {
       const matchIdx = rootAnswer.match(/^[A-Da-d]$/)
         ? rootAnswer.toUpperCase().charCodeAt(0) - 65
@@ -1778,14 +1902,17 @@ Return JSON schema:
 ${jsonSchemaFormat} `;
 
   const baseSeed = (blueprint as { seed?: number }).seed ?? 42;
-  const dynamicSeed = baseSeed + target.sequenceNumber * 37 + (params.attempt ?? 1) * 101;
+  const dynamicSeed =
+    baseSeed + target.sequenceNumber * 37 + (params.attempt ?? 1) * 101;
   const rawOutput = await aiProvider.generate({
     format: 'json',
     maxTokens,
     model: chosenModel,
     prompt: `${promptSystem}\n\n${promptUser}`,
     seed: dynamicSeed,
-    temperature: isLocal ? (blueprint.temperature ?? 0.35) : (blueprint.temperature ?? 0.15),
+    temperature: isLocal
+      ? (blueprint.temperature ?? 0.35)
+      : (blueprint.temperature ?? 0.15),
     timeoutMs,
   });
 
@@ -1801,8 +1928,15 @@ ${jsonSchemaFormat} `;
   const normalized = normalizeSynthesizedQuestion(parsed, target);
 
   if (normalized && normalized.stem.length > 10) {
-    if (target.typeSlug === 'MCQ' && normalized.options && normalized.options.length >= 2) {
-      const shuffled = shuffleOptions(normalized.options, target.sequenceNumber);
+    if (
+      target.typeSlug === 'MCQ' &&
+      normalized.options &&
+      normalized.options.length >= 2
+    ) {
+      const shuffled = shuffleOptions(
+        normalized.options,
+        target.sequenceNumber,
+      );
       shuffled.forEach((opt, idx) => {
         opt.option_index = idx;
       });
@@ -1912,7 +2046,9 @@ async function persistGeneratedQuestion(params: {
       option_text: opt.option_text || `Option ${idx + 1}`,
       question_version_id: versionId,
     }));
-    const { error: optErr } = await client.from('question_options').insert(optionRows);
+    const { error: optErr } = await client
+      .from('question_options')
+      .insert(optionRows);
     if (optErr) {
       const errText = `Failed to insert question options: ${optErr.message}`;
       logGen(errText, optErr);
@@ -2034,7 +2170,8 @@ export async function regenerateQuestionInPlace(
   // 1. Fetch current question and its current version details
   const { data: existingQ, error: fetchErr } = await client
     .from('questions')
-    .select(`
+    .select(
+      `
       id,
       project_id,
       generation_run_id,
@@ -2070,7 +2207,8 @@ export async function regenerateQuestionInPlace(
           )
         )
       )
-    `)
+    `,
+    )
     .eq('id', questionId)
     .eq('project_id', projectId)
     .maybeSingle();
@@ -2088,31 +2226,36 @@ export async function regenerateQuestionInPlace(
       'Accepted questions are locked to preserve assessment integrity and cannot be regenerated.',
     );
     (error as unknown as { code: string; statusCode: number }).statusCode = 400;
-    (error as unknown as { code: string; statusCode: number }).code = 'QUESTION_LOCKED';
+    (error as unknown as { code: string; statusCode: number }).code =
+      'QUESTION_LOCKED';
     throw error;
   }
 
-  const curVer = (existingQ as unknown as { current_version?: {
-    bloom_levels?: { slug: string };
-    difficulty_levels?: { slug: string };
-    id: string;
-    question_source_refs?: Array<{
-      chunk_id: string;
-      evidence_text: string | null;
-      id: string;
-      resource_chunks?: {
+  const curVer = (
+    existingQ as unknown as {
+      current_version?: {
+        bloom_levels?: { slug: string };
+        difficulty_levels?: { slug: string };
         id: string;
-        page_number: number | null;
-        resource_id: string;
-        text: string;
+        question_source_refs?: Array<{
+          chunk_id: string;
+          evidence_text: string | null;
+          id: string;
+          resource_chunks?: {
+            id: string;
+            page_number: number | null;
+            resource_id: string;
+            text: string;
+          };
+        }>;
+        question_styles?: { slug: string };
+        question_types?: { slug: string };
+        topic_id: string | null;
+        topics?: { name: string };
+        version_number: number;
       };
-    }>;
-    question_styles?: { slug: string };
-    question_types?: { slug: string };
-    topic_id: string | null;
-    topics?: { name: string };
-    version_number: number;
-  } }).current_version;
+    }
+  ).current_version;
 
   const currentChunkRef = curVer?.question_source_refs?.[0];
   const chunkData = currentChunkRef?.resource_chunks;
@@ -2130,9 +2273,7 @@ export async function regenerateQuestionInPlace(
     curVer?.difficulty_levels?.slug ||
     'MEDIUM'
   ).toUpperCase();
-  const activeTypeSlug = (
-    curVer?.question_types?.slug || 'MCQ'
-  ).toUpperCase();
+  const activeTypeSlug = (curVer?.question_types?.slug || 'MCQ').toUpperCase();
   const activeStyleSlug = (
     curVer?.question_styles?.slug || 'SCENARIO'
   ).toUpperCase();
@@ -2176,12 +2317,14 @@ export async function regenerateQuestionInPlace(
   // 5. Gather existing question stems in the project for deduplication guardrail
   const { data: projectQuestions } = await client
     .from('questions')
-    .select(`
+    .select(
+      `
       id,
       current_version:question_versions!fk_questions_current_version (
         question_text
       )
-    `)
+    `,
+    )
     .eq('project_id', projectId)
     .neq('id', questionId)
     .is('archived_at', null);
@@ -2220,9 +2363,7 @@ export async function regenerateQuestionInPlace(
   }
 
   const resolvedProvider: 'gemini' | 'groq' | 'ollama' =
-    (modelProvider as 'gemini' | 'groq' | 'ollama') ||
-    origProvider ||
-    'ollama';
+    (modelProvider as 'gemini' | 'groq' | 'ollama') || origProvider || 'ollama';
 
   const rawModel: string =
     modelName ||
@@ -2314,7 +2455,9 @@ export async function regenerateQuestionInPlace(
       .eq('id', versionId);
 
     if (updateVerErr) {
-      throw new Error(`Failed to update question version: ${updateVerErr.message}`);
+      throw new Error(
+        `Failed to update question version: ${updateVerErr.message}`,
+      );
     }
 
     // Delete existing options and insert new shuffled options
@@ -2324,7 +2467,9 @@ export async function regenerateQuestionInPlace(
       .eq('question_version_id', versionId);
 
     if (deleteOptErr) {
-      throw new Error(`Failed to clear old question options: ${deleteOptErr.message}`);
+      throw new Error(
+        `Failed to clear old question options: ${deleteOptErr.message}`,
+      );
     }
 
     if (synthesized.options && synthesized.options.length > 0) {
@@ -2339,9 +2484,13 @@ export async function regenerateQuestionInPlace(
         option_text: opt.option_text,
         question_version_id: versionId,
       }));
-      const { error: insertOptErr } = await client.from('question_options').insert(optionRows);
+      const { error: insertOptErr } = await client
+        .from('question_options')
+        .insert(optionRows);
       if (insertOptErr) {
-        throw new Error(`Failed to save regenerated question options: ${insertOptErr.message}`);
+        throw new Error(
+          `Failed to save regenerated question options: ${insertOptErr.message}`,
+        );
       }
     }
 
@@ -2364,18 +2513,24 @@ export async function regenerateQuestionInPlace(
           })
           .eq('id', existingRef.id);
         if (updateRefErr) {
-          throw new Error(`Failed to update question source reference: ${updateRefErr.message}`);
+          throw new Error(
+            `Failed to update question source reference: ${updateRefErr.message}`,
+          );
         }
       } else {
-        const { error: insertRefErr } = await client.from('question_source_refs').insert({
-          chunk_id: selectedChunkId,
-          evidence_text:
-            synthesized.citation_anchor || synthesized.evidence_quote || null,
-          question_version_id: versionId,
-          relevance_score: 0.994,
-        });
+        const { error: insertRefErr } = await client
+          .from('question_source_refs')
+          .insert({
+            chunk_id: selectedChunkId,
+            evidence_text:
+              synthesized.citation_anchor || synthesized.evidence_quote || null,
+            question_version_id: versionId,
+            relevance_score: 0.994,
+          });
         if (insertRefErr) {
-          throw new Error(`Failed to insert question source reference: ${insertRefErr.message}`);
+          throw new Error(
+            `Failed to insert question source reference: ${insertRefErr.message}`,
+          );
         }
       }
     }
@@ -2391,7 +2546,9 @@ export async function regenerateQuestionInPlace(
     .eq('id', questionId);
 
   if (updateQuestionErr) {
-    throw new Error(`Failed to update question status: ${updateQuestionErr.message}`);
+    throw new Error(
+      `Failed to update question status: ${updateQuestionErr.message}`,
+    );
   }
 
   // 10. Update generation run counters

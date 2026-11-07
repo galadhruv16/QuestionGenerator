@@ -20,25 +20,52 @@ const apiBaseUrl =
     ? `${import.meta.env.VITE_API_URL}/api/v1`
     : 'http://localhost:3001/api/v1');
 
-export function WorkspacePage() {
+export function WorkspacePage({
+  initialProjects,
+}: {
+  initialProjects?: Project[];
+} = {}) {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>(initialProjects ?? []);
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   const [searchFilter, setSearchFilter] = useState('');
   const [userEmail, setUserEmail] = useState<string>(
     'instructor@groundq.local',
   );
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!initialProjects);
 
-  // Modal State
+  // Create Project Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Edit / Rename Modal State
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editName, setEditName] = useState('');
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+
+  // Archive / Delete Confirmation State
+  const [archivingProject, setArchivingProject] = useState<Project | null>(
+    null,
+  );
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+
+  // Toast Notification State
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
   // Context menu state: projectId -> boolean
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => {
+      setToastMessage((current) => (current === message ? null : current));
+    }, 4000);
+  };
 
   const request = async (path: string, init?: RequestInit) => {
     const { data } = await getSupabaseClient().auth.getSession();
@@ -89,7 +116,11 @@ export function WorkspacePage() {
   };
 
   useEffect(() => {
-    void loadProjects();
+    if (!initialProjects) {
+      void loadProjects();
+    } else {
+      setIsLoading(false);
+    }
 
     void getSupabaseClient()
       .auth.getUser()
@@ -98,7 +129,26 @@ export function WorkspacePage() {
           setUserEmail(data.user.email);
         }
       });
-  }, []);
+  }, [initialProjects]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (editingProject) {
+          closeRenameModal();
+        } else if (archivingProject) {
+          closeArchiveModal();
+        } else if (isModalOpen) {
+          setIsModalOpen(false);
+        } else if (openMenuId) {
+          setOpenMenuId(null);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editingProject, archivingProject, isModalOpen, openMenuId]);
 
   const createProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -117,6 +167,7 @@ export function WorkspacePage() {
       setName('');
       setDescription('');
       setIsModalOpen(false);
+      showToast(`Created project "${payload.data.name}".`);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -128,22 +179,105 @@ export function WorkspacePage() {
     }
   };
 
-  const archiveProject = async (projectId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const openRenameModal = (project: Project) => {
+    setEditingProject(project);
+    setEditName(project.name);
+    setRenameError(null);
+    setOpenMenuId(null);
+  };
+
+  const closeRenameModal = () => {
+    setEditingProject(null);
+    setEditName('');
+    setRenameError(null);
+  };
+
+  const handleRenameSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingProject) return;
+
+    const trimmed = editName.trim();
+    if (!trimmed) {
+      setRenameError('Project name cannot be empty.');
+      return;
+    }
+    if (trimmed.length > 120) {
+      setRenameError('Project name cannot exceed 120 characters.');
+      return;
+    }
+
+    setRenameError(null);
+    setIsRenaming(true);
+
     try {
-      await request(`/projects/${projectId}/archive`, {
-        method: 'POST',
+      const payload = await request(`/projects/${editingProject.id}`, {
+        body: JSON.stringify({ name: trimmed }),
+        method: 'PATCH',
       });
-      setProjects((prev) =>
-        prev.map((p) =>
-          p.id === projectId
-            ? { ...p, archived_at: new Date().toISOString() }
+      const updated = payload.data as Project;
+      setProjects((current) =>
+        current.map((p) =>
+          p.id === editingProject.id ? { ...p, name: updated.name } : p,
+        ),
+      );
+      closeRenameModal();
+      showToast(`Project renamed to "${updated.name}".`);
+    } catch (requestError) {
+      setRenameError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Failed to rename project.',
+      );
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
+  const openArchiveModal = (project: Project) => {
+    setArchivingProject(project);
+    setArchiveError(null);
+    setOpenMenuId(null);
+  };
+
+  const closeArchiveModal = () => {
+    setArchivingProject(null);
+    setArchiveError(null);
+  };
+
+  const handleArchiveConfirm = async () => {
+    if (!archivingProject) return;
+
+    setIsArchiving(true);
+    setArchiveError(null);
+
+    try {
+      const payload = await request(
+        `/projects/${archivingProject.id}/archive`,
+        {
+          method: 'POST',
+        },
+      );
+      const archivedAtTimestamp =
+        payload.data?.archived_at || new Date().toISOString();
+      const archivedName = archivingProject.name;
+
+      setProjects((current) =>
+        current.map((p) =>
+          p.id === archivingProject.id
+            ? { ...p, archived_at: archivedAtTimestamp }
             : p,
         ),
       );
-      setOpenMenuId(null);
-    } catch {
-      setError('Failed to archive project.');
+      closeArchiveModal();
+      showToast(`Project "${archivedName}" was archived.`);
+    } catch (requestError) {
+      setArchiveError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Failed to archive project.',
+      );
+    } finally {
+      setIsArchiving(false);
     }
   };
 
@@ -481,50 +615,104 @@ export function WorkspacePage() {
                     <div className="flex flex-col gap-3">
                       {/* Card Header & Context Menu */}
                       <div className="flex items-center justify-between">
-                        <span className="font-label-sm text-label-sm font-semibold tracking-wider px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed uppercase">
-                          COURSE
-                        </span>
-                        <div className="relative">
-                          <button
-                            aria-label={`Options for ${project.name}`}
-                            className="p-1.5 rounded text-outline hover:text-on-surface hover:bg-surface-container transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenMenuId(isMenuOpen ? null : project.id);
-                            }}
-                            type="button"
-                          >
-                            <Icon name="more_horiz" size={18} />
-                          </button>
+                        {isArchived ? (
+                          <span className="font-label-sm text-label-sm font-semibold tracking-wider px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant uppercase">
+                            ARCHIVED
+                          </span>
+                        ) : (
+                          <span className="font-label-sm text-label-sm font-semibold tracking-wider px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed uppercase">
+                            COURSE
+                          </span>
+                        )}
 
-                          {isMenuOpen && (
-                            <div className="absolute right-0 mt-1 w-44 bg-surface-container-lowest rounded-lg shadow-xl py-1 z-20 border border-outline-variant/30">
-                              {!isArchived && (
-                                <button
-                                  className="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-2 transition-colors"
-                                  onClick={(e) => archiveProject(project.id, e)}
-                                  type="button"
-                                >
-                                  <Icon name="archive" size={14} />
-                                  <span>Archive Project</span>
-                                </button>
-                              )}
-                              <Link
-                                className="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-2 transition-colors"
-                                to={`/app/projects/${project.id}/resources`}
+                        <div className="flex items-center gap-1">
+                          {!isArchived && (
+                            <>
+                              <button
+                                aria-label={`Edit ${project.name}`}
+                                className="p-1.5 rounded text-outline hover:text-on-surface hover:bg-surface-container transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openRenameModal(project);
+                                }}
+                                title="Rename Course Project"
+                                type="button"
                               >
-                                <Icon name="file" size={14} />
-                                <span>View Resources</span>
-                              </Link>
-                              <Link
-                                className="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-2 transition-colors"
-                                to={`/app/projects/${project.id}/topics`}
+                                <Icon name="edit" size={16} />
+                              </button>
+                              <button
+                                aria-label={`Delete ${project.name}`}
+                                className="p-1.5 rounded text-outline hover:text-error hover:bg-error-container/20 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openArchiveModal(project);
+                                }}
+                                title="Delete / Archive Project"
+                                type="button"
                               >
-                                <Icon name="tree" size={14} />
-                                <span>Topic Map</span>
-                              </Link>
-                            </div>
+                                <Icon name="delete" size={16} />
+                              </button>
+                            </>
                           )}
+
+                          <div className="relative">
+                            <button
+                              aria-label={`Options for ${project.name}`}
+                              className="p-1.5 rounded text-outline hover:text-on-surface hover:bg-surface-container transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(isMenuOpen ? null : project.id);
+                              }}
+                              type="button"
+                            >
+                              <Icon name="more_horiz" size={18} />
+                            </button>
+
+                            {isMenuOpen && (
+                              <div className="absolute right-0 mt-1 w-44 bg-surface-container-lowest rounded-lg shadow-xl py-1 z-20 border border-outline-variant/30">
+                                {!isArchived && (
+                                  <>
+                                    <button
+                                      className="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-2 transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openRenameModal(project);
+                                      }}
+                                      type="button"
+                                    >
+                                      <Icon name="edit" size={14} />
+                                      <span>Rename Project</span>
+                                    </button>
+                                    <button
+                                      className="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-error hover:bg-error-container/20 flex items-center gap-2 transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openArchiveModal(project);
+                                      }}
+                                      type="button"
+                                    >
+                                      <Icon name="delete" size={14} />
+                                      <span>Delete Project</span>
+                                    </button>
+                                  </>
+                                )}
+                                <Link
+                                  className="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-2 transition-colors"
+                                  to={`/app/projects/${project.id}/resources`}
+                                >
+                                  <Icon name="file" size={14} />
+                                  <span>View Resources</span>
+                                </Link>
+                                <Link
+                                  className="w-full text-left px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-high flex items-center gap-2 transition-colors"
+                                  to={`/app/projects/${project.id}/topics`}
+                                >
+                                  <Icon name="tree" size={14} />
+                                  <span>Topic Map</span>
+                                </Link>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -708,6 +896,223 @@ export function WorkspacePage() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Rename Project Modal Dialog */}
+      {editingProject && (
+        <div
+          aria-labelledby="rename-project-modal-title"
+          aria-modal="true"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+          role="dialog"
+        >
+          <div className="w-full max-w-md bg-surface-container-lowest rounded-xl shadow-2xl overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="px-6 py-4 flex items-center justify-between border-b border-outline-variant/20">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-primary-fixed flex items-center justify-center text-primary">
+                  <Icon name="edit" size={18} />
+                </div>
+                <div>
+                  <h3
+                    className="font-headline-sm text-headline-sm text-on-surface"
+                    id="rename-project-modal-title"
+                  >
+                    Rename Course Project
+                  </h3>
+                  <p className="font-label-sm text-label-sm text-on-surface-variant">
+                    Update course environment title
+                  </p>
+                </div>
+              </div>
+              <button
+                aria-label="Close modal"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container transition-colors"
+                onClick={closeRenameModal}
+                type="button"
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form
+              className="p-6 flex flex-col gap-4"
+              onSubmit={handleRenameSubmit}
+            >
+              {renameError && (
+                <div
+                  className="p-3 rounded-lg bg-error-container text-on-error-container font-body-sm text-body-sm border border-error/20"
+                  role="alert"
+                >
+                  {renameError}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-1">
+                <label
+                  className="font-label-md text-label-md text-on-surface font-medium"
+                  htmlFor="rename-project-input"
+                >
+                  Course Name / Title
+                </label>
+                <input
+                  autoFocus
+                  className="w-full bg-surface-container-low text-on-surface placeholder:text-outline font-body-sm text-body-sm px-3 py-2 rounded-lg border border-outline-variant/20 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  id="rename-project-input"
+                  maxLength={120}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Course name"
+                  required
+                  type="text"
+                  value={editName}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  className="px-4 py-2 rounded-lg font-label-md text-label-md font-medium text-on-surface-variant hover:bg-surface-container transition-colors"
+                  onClick={closeRenameModal}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="flex items-center gap-2 bg-primary text-on-primary px-5 py-2 rounded-lg font-label-md text-label-md font-semibold shadow-sm hover:bg-primary/90 active:scale-[0.985] transition-all disabled:opacity-50"
+                  disabled={isRenaming || !editName.trim()}
+                  type="submit"
+                >
+                  {isRenaming ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
+                      <span>Saving…</span>
+                    </>
+                  ) : (
+                    <span>Save Changes</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Archive / Delete Confirmation Modal Dialog */}
+      {archivingProject && (
+        <div
+          aria-describedby="archive-project-modal-desc"
+          aria-labelledby="archive-project-modal-title"
+          aria-modal="true"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+          role="dialog"
+        >
+          <div className="w-full max-w-md bg-surface-container-lowest rounded-xl shadow-2xl overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="px-6 py-4 flex items-center justify-between border-b border-outline-variant/20">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-error-container text-error flex items-center justify-center">
+                  <Icon name="delete" size={18} />
+                </div>
+                <div>
+                  <h3
+                    className="font-headline-sm text-headline-sm text-on-surface"
+                    id="archive-project-modal-title"
+                  >
+                    Archive Project
+                  </h3>
+                  <p className="font-label-sm text-label-sm text-on-surface-variant">
+                    Archive-first lifecycle retention
+                  </p>
+                </div>
+              </div>
+              <button
+                aria-label="Close modal"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container transition-colors"
+                onClick={closeArchiveModal}
+                type="button"
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 flex flex-col gap-4">
+              {archiveError && (
+                <div
+                  className="p-3 rounded-lg bg-error-container text-on-error-container font-body-sm text-body-sm border border-error/20"
+                  role="alert"
+                >
+                  {archiveError}
+                </div>
+              )}
+
+              <div
+                className="flex flex-col gap-2"
+                id="archive-project-modal-desc"
+              >
+                <p className="font-body-md text-body-md text-on-surface">
+                  Are you sure you want to delete and archive{' '}
+                  <span className="font-semibold text-primary">
+                    "{archivingProject.name}"
+                  </span>
+                  ?
+                </p>
+                <div className="p-3 bg-surface-container-low rounded-lg border border-outline-variant/20 flex flex-col gap-1 text-on-surface-variant font-body-sm text-body-sm">
+                  <div className="flex items-center gap-1.5 font-medium text-on-surface">
+                    <Icon name="archive" size={15} />
+                    <span>Safe Archive Guarantee</span>
+                  </div>
+                  <p>
+                    This project will disappear from your Active Projects list
+                    and move to the Archived view. All uploaded syllabus
+                    documents, extracted curriculum topics, and question
+                    generation history remain securely preserved in the
+                    database. Data is not permanently erased.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  className="px-4 py-2 rounded-lg font-label-md text-label-md font-medium text-on-surface-variant hover:bg-surface-container transition-colors"
+                  onClick={closeArchiveModal}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="flex items-center gap-2 bg-error text-on-error px-5 py-2 rounded-lg font-label-md text-label-md font-semibold shadow-sm hover:bg-error/90 active:scale-[0.985] transition-all disabled:opacity-50"
+                  disabled={isArchiving}
+                  onClick={handleArchiveConfirm}
+                  type="button"
+                >
+                  {isArchiving ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-on-error border-t-transparent rounded-full animate-spin" />
+                      <span>Archiving…</span>
+                    </>
+                  ) : (
+                    <span>Archive Project</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-700 font-label-md text-label-md animate-in slide-in-from-bottom-2 duration-200"
+          role="status"
+        >
+          <span className="text-secondary">
+            <Icon name="checkCircle" size={18} />
+          </span>
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

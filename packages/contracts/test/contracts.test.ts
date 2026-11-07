@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   apiVersion,
+  createProjectSchema,
   generationBlueprintSchema,
   idSchema,
   projectSchema,
   questionVersionSchema,
+  updateProjectSchema,
   uploadInitRequestSchema,
   validationCheckSchema,
 } from '../src/index.js';
@@ -92,5 +94,41 @@ describe('shared contracts scaffold', () => {
     expect(uploadInitRequestSchema.safeParse(unsupportedInit).success).toBe(
       false,
     );
+  });
+
+  it('validates project create and update schemas with strict name and length boundaries', () => {
+    // Valid create
+    expect(
+      createProjectSchema.safeParse({ name: 'Valid Project' }).success,
+    ).toBe(true);
+
+    // Trim whitespace
+    const parsed = createProjectSchema.safeParse({
+      name: '  Trimmed Project  ',
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.name).toBe('Trimmed Project');
+    }
+
+    // Rejects empty or whitespace-only name
+    expect(createProjectSchema.safeParse({ name: '' }).success).toBe(false);
+    expect(createProjectSchema.safeParse({ name: '   ' }).success).toBe(false);
+    expect(
+      createProjectSchema.safeParse({ name: 'a'.repeat(121) }).success,
+    ).toBe(false);
+
+    // Update schema partial
+    expect(updateProjectSchema.safeParse({ name: 'New Name' }).success).toBe(
+      true,
+    );
+    expect(updateProjectSchema.safeParse({ name: '' }).success).toBe(false);
+    expect(updateProjectSchema.safeParse({ name: '   ' }).success).toBe(false);
+    expect(
+      updateProjectSchema.safeParse({ name: 'a'.repeat(121) }).success,
+    ).toBe(false);
+    expect(
+      updateProjectSchema.safeParse({ description: 'a'.repeat(1001) }).success,
+    ).toBe(false);
   });
 });

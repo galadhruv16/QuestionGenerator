@@ -4,6 +4,32 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-11-07] — GroundQ Workspace Project Rename (Edit) and Archive-First Deletion Controls
+
+### Type
+Feature / UI & UX Refinement / API Security Hardening / Archive-First Data Retention
+
+### Status
+Implemented and verified. 100% automated test suite passing (143/143: 5 contracts, 83 API, 55 web). Workspace build and typecheck clean across all packages.
+
+### Changes Implemented & Verified
+1. **Backend Route Hardening & Archive-First Lifecycle**:
+   - `apps/api/src/routes/projects.ts`:
+     - Hardened `PATCH /api/v1/projects/:projectId` with strict UUID validation, user ownership verification (`owner_id = authUser.id`), rejection of updates on archived projects (`404 NOT_FOUND: Archived projects cannot be modified.`), trimming of project name, enforcement of 1–120 character length boundaries, and safe updating with `.is('archived_at', null)`.
+     - Hardened `POST /api/v1/projects/:projectId/archive` and added `DELETE /api/v1/projects/:projectId` as an idempotent archive route. Enforces ownership (`owner_id = authUser.id`), checks for already-archived projects (`404 NOT_FOUND: Project is already archived.`), and archives via `UPDATE projects SET archived_at = now() WHERE id = ... AND owner_id = ... AND archived_at IS NULL`.
+     - Strictly enforced the repository's archive-first mandate: zero physical SQL deletion; all resources, topics, questions, and generation history remain fully preserved and auditable in PostgreSQL.
+2. **Frontend Workspace Controls, Modals & Toast Notifications**:
+   - `apps/web/src/app/pages/WorkspacePage.tsx`:
+     - Added quick-access Rename (`edit` icon) and Delete (`delete` icon) buttons directly to each project card header, as well as within the 3-dots action context menu.
+     - Implemented an accessible Rename Modal dialog (`aria-modal="true"`, `aria-labelledby`) pre-filled with the current project name, auto-focusing input, trimming whitespace, validating empty input, disabling submit during save operations, supporting Enter to submit and Escape to cancel.
+     - Implemented an accessible Delete / Archive Confirmation Modal dialog (`aria-modal="true"`, `aria-labelledby`, `aria-describedby`) identifying the project by name, prominently stating the "Safe Archive Guarantee" (clarifying that the project is hidden from the active list, not permanently erased, and all curriculum assets remain recoverable in the database), and disabling the confirm button while archiving.
+     - Implemented immediate optimistic/in-place local state transitions: renames update visible card titles instantly, archives update active and archived tab counts and move the project card to the Archived view without page reload.
+     - Added a floating toast notification system (`aria-live="polite"`, role="status") providing non-intrusive feedback on successful rename and archive actions.
+3. **Automated Testing & Contracts Coverage**:
+   - `apps/api/test/projects.test.ts`: Added route protection test suite verifying unauthenticated rejection (401) on `GET /projects`, `PATCH /projects/:projectId`, `POST /projects/:projectId/archive`, and `DELETE /projects/:projectId`.
+   - `packages/contracts/test/contracts.test.ts`: Added unit tests verifying `createProjectSchema` and `updateProjectSchema` trimming, length restrictions, and empty/whitespace rejection.
+   - `apps/web/test/workspace.test.tsx`: Expanded to 7 comprehensive UI tests verifying active card rendering, modal interactions, Escape key dismissal, rename submission with immediate card update and toast notification, archive confirmation notice verification, and active-to-archived tab count transitions.
+
 ## [2026-11-07] — Background Run Terminal Status Preservation (`NEEDS_REVIEW` vs `FAILED`) & Provider Interface Strictness
 
 ### Type

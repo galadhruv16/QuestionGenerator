@@ -1,5 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import type {
   BlueprintConfiguration,
   GeneratedQuestionItem,
@@ -10,7 +15,10 @@ import type {
 import { getSupabaseClient } from '../../lib/supabase';
 import { Icon, Logo } from '../components/ui';
 
-import { getCachedProject, updateProjectCache } from '../services/session-store';
+import {
+  getCachedProject,
+  updateProjectCache,
+} from '../services/session-store';
 import { generationManager } from '../services/generation-manager';
 import { rebalancePercentages } from '../utils/distribution';
 
@@ -48,11 +56,13 @@ export function ProjectGenerationPage() {
   const pyqIdParam = searchParams.get('pyq_id');
 
   const cached = projectId ? getCachedProject(projectId) : null;
-  const activeGen = projectId ? generationManager.getActiveRun(projectId) : null;
+  const activeGen = projectId
+    ? generationManager.getActiveRun(projectId)
+    : null;
   const isCurrentlyActive = Boolean(
     activeGen &&
-      activeGen.status !== 'COMPLETED' &&
-      activeGen.status !== 'FAILED',
+    activeGen.status !== 'COMPLETED' &&
+    activeGen.status !== 'FAILED',
   );
 
   // PYQ Pattern state
@@ -60,20 +70,23 @@ export function ProjectGenerationPage() {
   const [selectedPyqPattern, setSelectedPyqPattern] =
     useState<PyqAnalysisPattern | null>(null);
 
-
   // Project context state
   const [project, setProject] = useState<ProjectData | null>(
     (cached?.project as ProjectData | null) ?? null,
   );
   const [topics, setTopics] = useState<TopicItem[]>(
-    (Array.isArray(cached?.topics) ? (cached.topics as TopicItem[]) : []),
+    Array.isArray(cached?.topics) ? (cached.topics as TopicItem[]) : [],
   );
   const [resources, setResources] = useState<ResourceItem[]>(
-    (Array.isArray(cached?.resources) ? (cached.resources as ResourceItem[]) : []),
+    Array.isArray(cached?.resources)
+      ? (cached.resources as ResourceItem[])
+      : [],
   );
   const [presets, setPresets] = useState<Preset[]>([]);
   const [recentRuns, setRecentRuns] = useState<GenerationRun[]>([]);
-  const [isLoading, setIsLoading] = useState(!Array.isArray(cached?.topics) || cached.topics.length === 0);
+  const [isLoading, setIsLoading] = useState(
+    !Array.isArray(cached?.topics) || cached.topics.length === 0,
+  );
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [collapsedModuleIds, setCollapsedModuleIds] = useState<
     Record<string, boolean>
@@ -131,7 +144,9 @@ export function ProjectGenerationPage() {
   // Quality invariants
   const [strictDeduplication, setStrictDeduplication] = useState(true);
   const [requireCitationAnchors, setRequireCitationAnchors] = useState(true);
-  const [targetProvider, setTargetProvider] = useState<'gemini' | 'ollama' | 'groq'>('ollama');
+  const [targetProvider, setTargetProvider] = useState<
+    'gemini' | 'ollama' | 'groq'
+  >('ollama');
   const [targetModel, setTargetModel] = useState('mistral:latest');
 
   // Generation execution state
@@ -190,7 +205,8 @@ export function ProjectGenerationPage() {
       label: 'Case-Based',
     },
     {
-      description: 'Constructive protocol or system architecture design problem',
+      description:
+        'Constructive protocol or system architecture design problem',
       id: 'design_synthesis',
       label: 'Design & Synthesis',
     },
@@ -250,7 +266,10 @@ export function ProjectGenerationPage() {
     items: number,
   ) => {
     if (questionCount <= 0) return;
-    const clampedItems = Math.max(0, Math.min(questionCount, Math.round(items)));
+    const clampedItems = Math.max(
+      0,
+      Math.min(questionCount, Math.round(items)),
+    );
     const pct = Math.round((clampedItems / questionCount) * 100);
     setDifficultyWeights((prev) => rebalancePercentages(prev, key, pct));
   };
@@ -262,7 +281,10 @@ export function ProjectGenerationPage() {
 
   const handleTypeItemCountChange = (key: string, items: number) => {
     if (questionCount <= 0) return;
-    const clampedItems = Math.max(0, Math.min(questionCount, Math.round(items)));
+    const clampedItems = Math.max(
+      0,
+      Math.min(questionCount, Math.round(items)),
+    );
     const pct = Math.round((clampedItems / questionCount) * 100);
     setTypeWeights((prev) => rebalancePercentages(prev, key, pct));
   };
@@ -405,59 +427,66 @@ export function ProjectGenerationPage() {
   useEffect(() => {
     if (!projectId) return;
 
-    const unsubscribe = generationManager.subscribe(projectId, async (state) => {
-      const active =
-        state.status !== 'COMPLETED' &&
-        state.status !== 'FAILED' &&
-        state.status !== 'NEEDS_REVIEW';
-      setIsGenerating(active);
-      setExecutionStep(state.step);
-      setCurrentRun((prev) => ({
-        ...(prev ?? ({} as GenerationRun)),
-        accepted_count: state.generatedCount,
-        error_message: state.error || prev?.error_message,
-        id: state.runId,
-        requested_count: state.targetCount || prev?.requested_count,
-        status: state.status,
-      } as GenerationRun));
-      if (state.targetCount && state.targetCount > 0) {
-        setQuestionCount(state.targetCount);
-      }
-
-      if (
-        state.status === 'COMPLETED' ||
-        state.status === 'FAILED' ||
-        state.status === 'NEEDS_REVIEW'
-      ) {
-        try {
-          const [runsRes, qRes] = await Promise.all([
-            apiRequest(`/projects/${projectId}/generation-runs`),
-            apiRequest(
-              `/projects/${projectId}/generation-runs/${state.runId}/questions`,
-            ),
-          ]);
-          if (runsRes?.data) setRecentRuns(runsRes.data);
-          if (qRes?.data && qRes.data.length > 0) {
-            const first = qRes.data[0];
-            const version = first.current_version;
-            setActiveStreamQuestion({
-              bloom_level: version?.bloom_levels?.name || 'Analyze',
-              difficulty: version?.difficulty_levels?.name || 'Hard',
-              id: first.id,
-              model_answer: version?.model_answer,
-              options: version?.question_options,
-              question_type: version?.question_types?.name || 'Multiple Choice',
-              status: 'AVAILABLE',
-              stem: version?.question_text || '',
-              style: version?.question_styles?.name || 'Scenario',
-              version_number: 1,
-            });
-          }
-        } catch {
-          // Ignore
+    const unsubscribe = generationManager.subscribe(
+      projectId,
+      async (state) => {
+        const active =
+          state.status !== 'COMPLETED' &&
+          state.status !== 'FAILED' &&
+          state.status !== 'NEEDS_REVIEW';
+        setIsGenerating(active);
+        setExecutionStep(state.step);
+        setCurrentRun(
+          (prev) =>
+            ({
+              ...(prev ?? ({} as GenerationRun)),
+              accepted_count: state.generatedCount,
+              error_message: state.error || prev?.error_message,
+              id: state.runId,
+              requested_count: state.targetCount || prev?.requested_count,
+              status: state.status,
+            }) as GenerationRun,
+        );
+        if (state.targetCount && state.targetCount > 0) {
+          setQuestionCount(state.targetCount);
         }
-      }
-    });
+
+        if (
+          state.status === 'COMPLETED' ||
+          state.status === 'FAILED' ||
+          state.status === 'NEEDS_REVIEW'
+        ) {
+          try {
+            const [runsRes, qRes] = await Promise.all([
+              apiRequest(`/projects/${projectId}/generation-runs`),
+              apiRequest(
+                `/projects/${projectId}/generation-runs/${state.runId}/questions`,
+              ),
+            ]);
+            if (runsRes?.data) setRecentRuns(runsRes.data);
+            if (qRes?.data && qRes.data.length > 0) {
+              const first = qRes.data[0];
+              const version = first.current_version;
+              setActiveStreamQuestion({
+                bloom_level: version?.bloom_levels?.name || 'Analyze',
+                difficulty: version?.difficulty_levels?.name || 'Hard',
+                id: first.id,
+                model_answer: version?.model_answer,
+                options: version?.question_options,
+                question_type:
+                  version?.question_types?.name || 'Multiple Choice',
+                status: 'AVAILABLE',
+                stem: version?.question_text || '',
+                style: version?.question_styles?.name || 'Scenario',
+                version_number: 1,
+              });
+            }
+          } catch {
+            // Ignore
+          }
+        }
+      },
+    );
 
     return () => unsubscribe();
   }, [projectId]);
@@ -532,7 +561,7 @@ export function ProjectGenerationPage() {
           },
           recurring_themes: [
             'Mutual exclusion & distributed synchronization',
-            'Banker\'s Algorithm safe sequence verification',
+            "Banker's Algorithm safe sequence verification",
             'Virtual memory page replacement anomalies',
           ],
           resource_id: 'demo-pyq',
@@ -570,7 +599,6 @@ export function ProjectGenerationPage() {
       showToast('Custom Blueprint unlocked for manual calibration.');
     }
   };
-
 
   // Launch Generation
   const handleStartGeneration = async () => {
@@ -829,7 +857,11 @@ export function ProjectGenerationPage() {
               >
                 <Icon name="tree" size={16} />
                 <span>
-                  2. Topics ({totalSubtopicsCount > 0 ? `${topics.length} Modules · ${totalSubtopicsCount} Topics` : topics.length})
+                  2. Topics (
+                  {totalSubtopicsCount > 0
+                    ? `${topics.length} Modules · ${totalSubtopicsCount} Topics`
+                    : topics.length}
+                  )
                 </span>
               </Link>
               <div className="flex items-center gap-2 px-4 py-2.5 bg-surface-container-lowest text-primary font-body-sm text-body-sm font-medium border-b-2 border-primary whitespace-nowrap">
@@ -1060,7 +1092,9 @@ export function ProjectGenerationPage() {
                         ? 'shadow-md ring-2 ring-purple-600 bg-purple-500/5'
                         : 'shadow-sm hover:shadow-md'
                     }`}
-                    onClick={() => handleSelectPreset('PYQ Blueprint Synthesis')}
+                    onClick={() =>
+                      handleSelectPreset('PYQ Blueprint Synthesis')
+                    }
                     type="button"
                   >
                     <div>
@@ -1204,10 +1238,7 @@ export function ProjectGenerationPage() {
                             value={selectedPyqPattern?.resource_id ?? ''}
                           >
                             {pyqPatterns.map((p) => (
-                              <option
-                                key={p.resource_id}
-                                value={p.resource_id}
-                              >
+                              <option key={p.resource_id} value={p.resource_id}>
                                 {p.resource_name} ({p.total_detected_questions}{' '}
                                 Qs · {p.detected_marks_total}M)
                               </option>
@@ -1241,14 +1272,16 @@ export function ProjectGenerationPage() {
                           <span className="font-label-sm text-label-sm text-on-surface-variant">
                             PYQ Focus Areas:
                           </span>
-                          {selectedPyqPattern.recurring_themes.map((th, idx) => (
-                            <span
-                              className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-700 dark:text-purple-300 font-label-sm text-label-sm"
-                              key={idx}
-                            >
-                              {th}
-                            </span>
-                          ))}
+                          {selectedPyqPattern.recurring_themes.map(
+                            (th, idx) => (
+                              <span
+                                className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-700 dark:text-purple-300 font-label-sm text-label-sm"
+                                key={idx}
+                              >
+                                {th}
+                              </span>
+                            ),
+                          )}
                         </div>
                       )}
                   </div>
@@ -1267,7 +1300,9 @@ export function ProjectGenerationPage() {
                     </h2>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">Target Output:</span>
+                    <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">
+                      Target Output:
+                    </span>
                     <span className="px-3 py-1 rounded bg-primary text-on-primary font-headline-sm text-headline-sm font-bold">
                       {questionCount} Questions
                     </span>
@@ -1277,17 +1312,23 @@ export function ProjectGenerationPage() {
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between gap-4">
                     <span className="font-body-sm text-body-sm text-on-surface-variant">
-                      Choose the total number of questions to synthesize for this examination batch. Scalable up to 100 questions.
+                      Choose the total number of questions to synthesize for
+                      this examination batch. Scalable up to 100 questions.
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-on-surface-variant font-medium">Custom:</span>
+                      <span className="text-xs text-on-surface-variant font-medium">
+                        Custom:
+                      </span>
                       <input
                         type="number"
                         min={1}
                         max={100}
                         value={questionCount}
                         onChange={(e) => {
-                          const val = Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1));
+                          const val = Math.max(
+                            1,
+                            Math.min(100, parseInt(e.target.value, 10) || 1),
+                          );
                           setQuestionCount(val);
                         }}
                         className="w-16 px-2 py-1 text-center font-bold text-sm rounded border border-outline-variant bg-surface text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1298,23 +1339,31 @@ export function ProjectGenerationPage() {
 
                   {/* Range Slider */}
                   <div className="flex items-center gap-4 pt-1">
-                    <span className="text-xs text-on-surface-variant font-semibold">5</span>
+                    <span className="text-xs text-on-surface-variant font-semibold">
+                      5
+                    </span>
                     <input
                       type="range"
                       min={5}
                       max={100}
                       step={5}
                       value={questionCount}
-                      onChange={(e) => setQuestionCount(parseInt(e.target.value, 10))}
+                      onChange={(e) =>
+                        setQuestionCount(parseInt(e.target.value, 10))
+                      }
                       className="flex-1 accent-primary cursor-pointer h-2 bg-surface-container rounded-lg"
                       aria-label="Question count range slider"
                     />
-                    <span className="text-xs text-on-surface-variant font-semibold">100</span>
+                    <span className="text-xs text-on-surface-variant font-semibold">
+                      100
+                    </span>
                   </div>
 
                   {/* Quick Pills */}
                   <div className="flex items-center gap-2 flex-wrap pt-1">
-                    <span className="text-xs text-on-surface-variant font-medium mr-1">Quick Presets:</span>
+                    <span className="text-xs text-on-surface-variant font-medium mr-1">
+                      Quick Presets:
+                    </span>
                     {[5, 10, 15, 25, 30, 50, 75, 100].map((count) => (
                       <button
                         key={count}
@@ -1347,7 +1396,8 @@ export function ProjectGenerationPage() {
                   <div className="flex items-center gap-1.5 px-3 py-1 rounded bg-secondary/15 text-secondary font-label-sm text-label-sm font-semibold">
                     <Icon name="verified" size={14} />
                     <span>
-                      Total Selected: {selectedTopicIds.size} Topics ({topics.length} Modules, {totalSubtopicsCount} Subtopics)
+                      Total Selected: {selectedTopicIds.size} Topics (
+                      {topics.length} Modules, {totalSubtopicsCount} Subtopics)
                     </span>
                   </div>
                 </div>
@@ -1366,7 +1416,8 @@ export function ProjectGenerationPage() {
                   ) : topics.length === 0 ? (
                     <div className="p-6 rounded bg-surface-container-low text-center flex flex-col items-center gap-3">
                       <p className="text-on-surface-variant font-body-sm">
-                        No syllabus topics have been extracted for this project yet.
+                        No syllabus topics have been extracted for this project
+                        yet.
                       </p>
                       <Link
                         to={`/app/projects/${projectId}/topics`}
@@ -1430,7 +1481,9 @@ export function ProjectGenerationPage() {
                                       subtopics.forEach((s) => next.add(s.id));
                                     } else {
                                       next.delete(module.id);
-                                      subtopics.forEach((s) => next.delete(s.id));
+                                      subtopics.forEach((s) =>
+                                        next.delete(s.id),
+                                      );
                                     }
                                     setSelectedTopicIds(next);
                                   }}
@@ -1449,7 +1502,8 @@ export function ProjectGenerationPage() {
                                   </p>
                                   {subtopics.length > 0 && (
                                     <span className="font-label-sm text-label-sm text-primary font-medium mt-0.5 inline-block">
-                                      {subSelectedCount} of {subtopics.length} Subtopics Active
+                                      {subSelectedCount} of {subtopics.length}{' '}
+                                      Subtopics Active
                                     </span>
                                   )}
                                 </div>
@@ -1494,7 +1548,9 @@ export function ProjectGenerationPage() {
                           {isExpanded && subtopics.length > 0 && (
                             <div className="divide-y divide-outline-variant/15 border-t border-outline-variant/20 bg-surface-container-lowest">
                               {subtopics.map((sub) => {
-                                const isSubChecked = selectedTopicIds.has(sub.id);
+                                const isSubChecked = selectedTopicIds.has(
+                                  sub.id,
+                                );
                                 return (
                                   <div
                                     className="p-3 pl-9 sm:pl-11 flex items-start justify-between gap-3 hover:bg-surface-container-low/40 transition-colors"
@@ -1506,7 +1562,9 @@ export function ProjectGenerationPage() {
                                         className="mt-0.5 accent-primary w-3.5 h-3.5 cursor-pointer"
                                         id={`sub-${sub.id}`}
                                         onChange={(e) => {
-                                          const next = new Set(selectedTopicIds);
+                                          const next = new Set(
+                                            selectedTopicIds,
+                                          );
                                           if (e.target.checked) {
                                             next.add(sub.id);
                                             next.add(module.id);
@@ -1660,7 +1718,7 @@ export function ProjectGenerationPage() {
                   {/* L1: Remember */}
                   <div
                     className={`p-3 rounded bg-surface-container-low flex flex-col gap-1.5 transition-all ${
-                      bloomDistribution.remember > 0
+                      (bloomDistribution.remember ?? 0) > 0
                         ? 'ring-1 ring-outline/20'
                         : 'opacity-60'
                     }`}
@@ -1670,7 +1728,7 @@ export function ProjectGenerationPage() {
                         L1: Remember
                       </span>
                       <span className="px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-bold">
-                        {bloomDistribution.remember}%
+                        {bloomDistribution.remember ?? 0}%
                       </span>
                     </div>
                     <p className="font-body-sm text-body-sm text-on-surface-variant text-[12px] leading-tight">
@@ -1684,14 +1742,14 @@ export function ProjectGenerationPage() {
                         handleBloomChange('remember', Number(e.target.value))
                       }
                       type="range"
-                      value={bloomDistribution.remember}
+                      value={bloomDistribution.remember ?? 0}
                     />
                   </div>
 
                   {/* L2: Understand */}
                   <div
                     className={`p-3 rounded bg-surface-container-low flex flex-col gap-1.5 transition-all ${
-                      bloomDistribution.understand > 0
+                      (bloomDistribution.understand ?? 0) > 0
                         ? 'ring-1 ring-outline/20'
                         : 'opacity-60'
                     }`}
@@ -1701,7 +1759,7 @@ export function ProjectGenerationPage() {
                         L2: Understand
                       </span>
                       <span className="px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-bold">
-                        {bloomDistribution.understand}%
+                        {bloomDistribution.understand ?? 0}%
                       </span>
                     </div>
                     <p className="font-body-sm text-body-sm text-on-surface-variant text-[12px] leading-tight">
@@ -1715,14 +1773,14 @@ export function ProjectGenerationPage() {
                         handleBloomChange('understand', Number(e.target.value))
                       }
                       type="range"
-                      value={bloomDistribution.understand}
+                      value={bloomDistribution.understand ?? 0}
                     />
                   </div>
 
                   {/* L3: Apply */}
                   <div
                     className={`p-3 rounded bg-surface-container-low flex flex-col gap-1.5 transition-all ${
-                      bloomDistribution.apply > 0
+                      (bloomDistribution.apply ?? 0) > 0
                         ? 'ring-1 ring-outline/20'
                         : 'opacity-60'
                     }`}
@@ -1732,7 +1790,7 @@ export function ProjectGenerationPage() {
                         L3: Apply
                       </span>
                       <span className="px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-bold">
-                        {bloomDistribution.apply}%
+                        {bloomDistribution.apply ?? 0}%
                       </span>
                     </div>
                     <p className="font-body-sm text-body-sm text-on-surface-variant text-[12px] leading-tight">
@@ -1747,14 +1805,14 @@ export function ProjectGenerationPage() {
                         handleBloomChange('apply', Number(e.target.value))
                       }
                       type="range"
-                      value={bloomDistribution.apply}
+                      value={bloomDistribution.apply ?? 0}
                     />
                   </div>
 
                   {/* L4: Analyze */}
                   <div
                     className={`p-3 rounded bg-surface-container-low flex flex-col gap-1.5 ring-1 ${
-                      bloomDistribution.analyze > 0
+                      (bloomDistribution.analyze ?? 0) > 0
                         ? 'ring-primary/40 bg-primary/[0.02]'
                         : 'opacity-60 ring-outline/10'
                     }`}
@@ -1764,7 +1822,7 @@ export function ProjectGenerationPage() {
                         L4: Analyze (Core)
                       </span>
                       <span className="px-1.5 py-0.5 rounded bg-primary text-on-primary font-bold">
-                        {bloomDistribution.analyze}%
+                        {bloomDistribution.analyze ?? 0}%
                       </span>
                     </div>
                     <p className="font-body-sm text-body-sm text-on-surface-variant text-[12px] leading-tight">
@@ -1779,14 +1837,14 @@ export function ProjectGenerationPage() {
                         handleBloomChange('analyze', Number(e.target.value))
                       }
                       type="range"
-                      value={bloomDistribution.analyze}
+                      value={bloomDistribution.analyze ?? 0}
                     />
                   </div>
 
                   {/* L5: Evaluate */}
                   <div
                     className={`p-3 rounded bg-surface-container-low flex flex-col gap-1.5 transition-all ${
-                      bloomDistribution.evaluate > 0
+                      (bloomDistribution.evaluate ?? 0) > 0
                         ? 'ring-1 ring-outline/20'
                         : 'opacity-60'
                     }`}
@@ -1796,7 +1854,7 @@ export function ProjectGenerationPage() {
                         L5: Evaluate
                       </span>
                       <span className="px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-bold">
-                        {bloomDistribution.evaluate}%
+                        {bloomDistribution.evaluate ?? 0}%
                       </span>
                     </div>
                     <p className="font-body-sm text-body-sm text-on-surface-variant text-[12px] leading-tight">
@@ -1811,14 +1869,14 @@ export function ProjectGenerationPage() {
                         handleBloomChange('evaluate', Number(e.target.value))
                       }
                       type="range"
-                      value={bloomDistribution.evaluate}
+                      value={bloomDistribution.evaluate ?? 0}
                     />
                   </div>
 
                   {/* L6: Synthesize */}
                   <div
                     className={`p-3 rounded bg-surface-container-low flex flex-col gap-1.5 transition-all ${
-                      bloomDistribution.create > 0
+                      (bloomDistribution.create ?? 0) > 0
                         ? 'ring-1 ring-outline/20'
                         : 'opacity-60'
                     }`}
@@ -1828,7 +1886,7 @@ export function ProjectGenerationPage() {
                         L6: Synthesize
                       </span>
                       <span className="px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-bold">
-                        {bloomDistribution.create}%
+                        {bloomDistribution.create ?? 0}%
                       </span>
                     </div>
                     <p className="font-body-sm text-body-sm text-on-surface-variant text-[12px] leading-tight">
@@ -1843,7 +1901,7 @@ export function ProjectGenerationPage() {
                         handleBloomChange('create', Number(e.target.value))
                       }
                       type="range"
-                      value={bloomDistribution.create}
+                      value={bloomDistribution.create ?? 0}
                     />
                   </div>
                 </div>
@@ -2030,7 +2088,11 @@ export function ProjectGenerationPage() {
                       <button
                         className="text-[11px] text-primary hover:underline font-semibold text-right transition-colors"
                         onClick={() =>
-                          setDifficultyWeights({ easy: 100, hard: 0, medium: 0 })
+                          setDifficultyWeights({
+                            easy: 100,
+                            hard: 0,
+                            medium: 0,
+                          })
                         }
                         type="button"
                       >
@@ -2104,7 +2166,11 @@ export function ProjectGenerationPage() {
                       <button
                         className="text-[11px] text-primary hover:underline font-semibold text-right transition-colors"
                         onClick={() =>
-                          setDifficultyWeights({ easy: 0, hard: 0, medium: 100 })
+                          setDifficultyWeights({
+                            easy: 0,
+                            hard: 0,
+                            medium: 100,
+                          })
                         }
                         type="button"
                       >
@@ -2178,7 +2244,11 @@ export function ProjectGenerationPage() {
                       <button
                         className="text-[11px] text-primary hover:underline font-semibold text-right transition-colors"
                         onClick={() =>
-                          setDifficultyWeights({ easy: 0, hard: 100, medium: 0 })
+                          setDifficultyWeights({
+                            easy: 0,
+                            hard: 100,
+                            medium: 0,
+                          })
                         }
                         type="button"
                       >
@@ -2196,9 +2266,9 @@ export function ProjectGenerationPage() {
                     </span>
                     <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600">
                       Total:{' '}
-                      {typeWeights.mcq +
-                        typeWeights.short_answer +
-                        typeWeights.long_answer}
+                      {(typeWeights.mcq ?? 0) +
+                        (typeWeights.short_answer ?? 0) +
+                        (typeWeights.long_answer ?? 0)}
                       % · {questionCount} Items
                     </span>
                   </div>
@@ -2305,7 +2375,7 @@ export function ProjectGenerationPage() {
                     {/* MCQ Card */}
                     <div
                       className={`p-3.5 rounded bg-surface-container-low flex flex-col gap-2 transition-all ${
-                        typeWeights.mcq > 0
+                        (typeWeights.mcq ?? 0) > 0
                           ? 'ring-1 ring-primary/30'
                           : 'opacity-60 ring-1 ring-outline/10'
                       }`}
@@ -2320,7 +2390,7 @@ export function ProjectGenerationPage() {
                           </p>
                         </div>
                         <span className="px-2 py-0.5 rounded bg-primary text-on-primary font-bold text-sm">
-                          {typeWeights.mcq}%
+                          {typeWeights.mcq ?? 0}%
                         </span>
                       </div>
 
@@ -2342,7 +2412,7 @@ export function ProjectGenerationPage() {
                             }
                             type="number"
                             value={Math.round(
-                              (questionCount * typeWeights.mcq) / 100,
+                              (questionCount * (typeWeights.mcq ?? 0)) / 100,
                             )}
                           />
                           <span className="text-on-surface-variant text-[11px]">
@@ -2359,7 +2429,7 @@ export function ProjectGenerationPage() {
                           handleTypeSliderChange('mcq', Number(e.target.value))
                         }
                         type="range"
-                        value={typeWeights.mcq}
+                        value={typeWeights.mcq ?? 0}
                       />
 
                       <button
@@ -2380,7 +2450,7 @@ export function ProjectGenerationPage() {
                     {/* Short Answer Card */}
                     <div
                       className={`p-3.5 rounded bg-surface-container-low flex flex-col gap-2 transition-all ${
-                        typeWeights.short_answer > 0
+                        (typeWeights.short_answer ?? 0) > 0
                           ? 'ring-1 ring-primary/30'
                           : 'opacity-60 ring-1 ring-outline/10'
                       }`}
@@ -2395,7 +2465,7 @@ export function ProjectGenerationPage() {
                           </p>
                         </div>
                         <span className="px-2 py-0.5 rounded bg-surface-container-highest font-bold text-on-surface text-sm">
-                          {typeWeights.short_answer}%
+                          {typeWeights.short_answer ?? 0}%
                         </span>
                       </div>
 
@@ -2417,7 +2487,9 @@ export function ProjectGenerationPage() {
                             }
                             type="number"
                             value={Math.round(
-                              (questionCount * typeWeights.short_answer) / 100,
+                              (questionCount *
+                                (typeWeights.short_answer ?? 0)) /
+                                100,
                             )}
                           />
                           <span className="text-on-surface-variant text-[11px]">
@@ -2437,7 +2509,7 @@ export function ProjectGenerationPage() {
                           )
                         }
                         type="range"
-                        value={typeWeights.short_answer}
+                        value={typeWeights.short_answer ?? 0}
                       />
 
                       <button
@@ -2458,7 +2530,7 @@ export function ProjectGenerationPage() {
                     {/* Long Scenario Card */}
                     <div
                       className={`p-3.5 rounded bg-surface-container-low flex flex-col gap-2 transition-all ${
-                        typeWeights.long_answer > 0
+                        (typeWeights.long_answer ?? 0) > 0
                           ? 'ring-1 ring-primary/30'
                           : 'opacity-60 ring-1 ring-outline/10'
                       }`}
@@ -2473,7 +2545,7 @@ export function ProjectGenerationPage() {
                           </p>
                         </div>
                         <span className="px-2 py-0.5 rounded bg-surface-container-highest font-bold text-on-surface text-sm">
-                          {typeWeights.long_answer}%
+                          {typeWeights.long_answer ?? 0}%
                         </span>
                       </div>
 
@@ -2495,7 +2567,8 @@ export function ProjectGenerationPage() {
                             }
                             type="number"
                             value={Math.round(
-                              (questionCount * typeWeights.long_answer) / 100,
+                              (questionCount * (typeWeights.long_answer ?? 0)) /
+                                100,
                             )}
                           />
                           <span className="text-on-surface-variant text-[11px]">
@@ -2515,7 +2588,7 @@ export function ProjectGenerationPage() {
                           )
                         }
                         type="range"
-                        value={typeWeights.long_answer}
+                        value={typeWeights.long_answer ?? 0}
                       />
 
                       <button
@@ -2645,7 +2718,9 @@ export function ProjectGenerationPage() {
                       </span>
                     </div>
                     <div className="font-label-sm text-label-sm bg-surface-container-lowest px-3 py-1.5 rounded shadow-sm flex items-center gap-2">
-                      <span className="text-on-surface-variant font-medium">Engine:</span>
+                      <span className="text-on-surface-variant font-medium">
+                        Engine:
+                      </span>
                       <select
                         aria-label="Target Model"
                         className="bg-transparent font-bold text-primary border-none outline-none cursor-pointer"
@@ -2653,18 +2728,29 @@ export function ProjectGenerationPage() {
                         onChange={(e) => {
                           const firstColon = e.target.value.indexOf(':');
                           if (firstColon !== -1) {
-                            const prov = e.target.value.slice(0, firstColon) as 'gemini' | 'ollama' | 'groq';
+                            const prov = e.target.value.slice(0, firstColon) as
+                              'gemini' | 'ollama' | 'groq';
                             const mod = e.target.value.slice(firstColon + 1);
                             setTargetProvider(prov);
                             setTargetModel(mod);
                           }
                         }}
                       >
-                        <option value="ollama:mistral:latest">🖥️ Mistral 7B (Localhost Offline Recommended)</option>
-                        <option value="ollama:phi3:latest">🖥️ Phi-3 3.8B (Localhost Offline Lightweight)</option>
-                        <option value="gemini:gemini-flash-lite-latest">⚡ Gemini Flash Lite (Cloud Fast ~1s)</option>
-                        <option value="gemini:gemini-flash-latest">⚡ Gemini Flash (Cloud ~2s)</option>
-                        <option value="groq:llama-3.3-70b-versatile">🚀 Groq Llama 3.3 70B (Cloud ~0.5s)</option>
+                        <option value="ollama:mistral:latest">
+                          🖥️ Mistral 7B (Localhost Offline Recommended)
+                        </option>
+                        <option value="ollama:phi3:latest">
+                          🖥️ Phi-3 3.8B (Localhost Offline Lightweight)
+                        </option>
+                        <option value="gemini:gemini-flash-lite-latest">
+                          ⚡ Gemini Flash Lite (Cloud Fast ~1s)
+                        </option>
+                        <option value="gemini:gemini-flash-latest">
+                          ⚡ Gemini Flash (Cloud ~2s)
+                        </option>
+                        <option value="groq:llama-3.3-70b-versatile">
+                          🚀 Groq Llama 3.3 70B (Cloud ~0.5s)
+                        </option>
                       </select>
                     </div>
                   </div>
@@ -2874,7 +2960,9 @@ export function ProjectGenerationPage() {
                       </span>
                       <span className="font-mono text-xs font-semibold text-primary">
                         {currentRun?.accepted_count ?? 0} /{' '}
-                        {currentRun?.requested_count || activeGen?.targetCount || questionCount}
+                        {currentRun?.requested_count ||
+                          activeGen?.targetCount ||
+                          questionCount}
                       </span>
                     </div>
                     <div className="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
@@ -2883,7 +2971,7 @@ export function ProjectGenerationPage() {
                         style={{
                           width: `${Math.min(
                             100,
-                            (((currentRun?.accepted_count ?? 0)) /
+                            ((currentRun?.accepted_count ?? 0) /
                               Math.max(
                                 1,
                                 currentRun?.requested_count ||
@@ -2896,15 +2984,23 @@ export function ProjectGenerationPage() {
                       />
                     </div>
                     <p className="font-body-sm text-body-sm text-on-surface-variant">
-                      Synthesizing and multi-constraint verifying against corpus chunks...
+                      Synthesizing and multi-constraint verifying against corpus
+                      chunks...
                     </p>
                     {activeStreamQuestion && (
                       <div className="p-2.5 rounded bg-surface-container-lowest border border-outline-variant/30 text-xs flex flex-col gap-1">
                         <div className="flex items-center justify-between font-semibold text-primary">
-                          <span>Recent: {activeStreamQuestion.bloom_level} · {activeStreamQuestion.difficulty}</span>
-                          <span className="text-on-surface-variant text-[10px]">{activeStreamQuestion.question_type}</span>
+                          <span>
+                            Recent: {activeStreamQuestion.bloom_level} ·{' '}
+                            {activeStreamQuestion.difficulty}
+                          </span>
+                          <span className="text-on-surface-variant text-[10px]">
+                            {activeStreamQuestion.question_type}
+                          </span>
                         </div>
-                        <p className="line-clamp-2 text-on-surface font-normal">{activeStreamQuestion.stem}</p>
+                        <p className="line-clamp-2 text-on-surface font-normal">
+                          {activeStreamQuestion.stem}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -2916,11 +3012,13 @@ export function ProjectGenerationPage() {
                         <span>Generation Run Failed</span>
                       </span>
                       <span className="font-mono text-xs font-semibold">
-                        {currentRun.accepted_count} / {currentRun.requested_count || questionCount} Saved
+                        {currentRun.accepted_count} /{' '}
+                        {currentRun.requested_count || questionCount} Saved
                       </span>
                     </div>
                     <p className="font-body-sm text-xs text-error/90">
-                      {currentRun.error_message || 'The generation run encountered an error or model timeout.'}
+                      {currentRun.error_message ||
+                        'The generation run encountered an error or model timeout.'}
                     </p>
                   </div>
                 ) : currentRun?.status === 'NEEDS_REVIEW' ? (
@@ -2928,14 +3026,18 @@ export function ProjectGenerationPage() {
                     <div className="flex items-center justify-between">
                       <span className="font-label-sm text-label-sm font-bold flex items-center gap-1.5">
                         <Icon name="alert" size={16} />
-                        <span>Generation Completed with Items Needing Review</span>
+                        <span>
+                          Generation Completed with Items Needing Review
+                        </span>
                       </span>
                       <span className="font-mono text-xs font-semibold">
-                        {currentRun.accepted_count} Accepted · {currentRun.review_count || 0} Need Review
+                        {currentRun.accepted_count} Accepted ·{' '}
+                        {currentRun.review_count || 0} Need Review
                       </span>
                     </div>
                     <p className="font-body-sm text-xs text-amber-700 dark:text-amber-400">
-                      {currentRun.error_message || 'Some questions could not be validated or exceeded duplicate thresholds.'}
+                      {currentRun.error_message ||
+                        'Some questions could not be validated or exceeded duplicate thresholds.'}
                     </p>
                   </div>
                 ) : currentRun?.status === 'COMPLETED' ? (
@@ -2946,11 +3048,13 @@ export function ProjectGenerationPage() {
                         <span>Generation Completed Successfully</span>
                       </span>
                       <span className="font-mono text-xs font-semibold">
-                        {currentRun.accepted_count} / {currentRun.requested_count || questionCount} Questions
+                        {currentRun.accepted_count} /{' '}
+                        {currentRun.requested_count || questionCount} Questions
                       </span>
                     </div>
                     <p className="font-body-sm text-xs text-secondary/90">
-                      All question items were synthesized, verified, and saved to the question bank.
+                      All question items were synthesized, verified, and saved
+                      to the question bank.
                     </p>
                   </div>
                 ) : (
