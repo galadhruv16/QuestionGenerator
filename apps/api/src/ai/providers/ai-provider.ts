@@ -15,7 +15,7 @@ export interface GenerateOptions {
 }
 
 export interface AIProvider {
-  name?: 'gemini' | 'ollama' | 'groq';
+  readonly name: 'gemini' | 'ollama' | 'groq';
   generate(options: GenerateOptions): Promise<string>;
   embed(text: string): Promise<number[] | null>;
 }

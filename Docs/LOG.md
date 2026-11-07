@@ -4,6 +4,24 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-11-07] — Background Run Terminal Status Preservation (`NEEDS_REVIEW` vs `FAILED`) & Provider Interface Strictness
+
+### Type
+Bug Fix / State Machine Hardening / Async Error Handling Resilience
+
+### Status
+Implemented and verified. 100% automated test suite passing (133/133: 4 contracts, 79 API, 50 web).
+
+### Changes Implemented & Verified
+1. **Preserve `NEEDS_REVIEW` Status in Background Catch Handler**:
+   - `apps/api/src/routes/generation-runs.ts`: Fixed a race/overwrite bug in the detached background `.catch()` handler. When `executeGenerationRun` caught an unexpected error during generation, it correctly calculated `catchStatus` as `'NEEDS_REVIEW'` if accepted questions existed (`generatedQuestions.length > 0`), updated the database, and rethrew. However, the outer detached promise handler was unconditionally updating `status: 'FAILED'`, wiping out `'NEEDS_REVIEW'` and obscuring partial progress.
+   - Updated the handler to inspect current database run state: if `currentRun?.status` is already `'COMPLETED'` or `'NEEDS_REVIEW'`, it does not overwrite. If `currentRun?.accepted_count > 0`, it preserves `'NEEDS_REVIEW'`; it only marks `'FAILED'` if 0 questions were accepted.
+2. **Environment Schema & Documentation Synchronization**:
+   - `apps/api/src/config/env.ts`: Verified `SUPABASE_SECRET_KEY` is formally declared in `envSchema` alongside `SUPABASE_SERVICE_ROLE_KEY`.
+   - `.env.example` and `apps/api/.env.example`: Synchronized both template files to document both key aliases.
+3. **Mandatory Provider Name on `AIProvider` Interface**:
+   - `apps/api/src/ai/providers/ai-provider.ts`: Changed `name?: 'gemini' | 'ollama' | 'groq'` to `readonly name: 'gemini' | 'ollama' | 'groq'` as a required property. All concrete providers (`OllamaProvider`, `GeminiProvider`, `GroqProvider`) strictly implement `readonly name = ... as const`.
+
 ## [2026-11-07] — Full Interactive Customization for Difficulty, Formats & Style Sliders with Auto-Balancing & Pipeline Enforcement
 
 ### Type

@@ -255,12 +255,34 @@ generationRunsRouter.post('/', async (request, response, next) => {
       );
       try {
         const errorMsg = err instanceof Error ? err.message : String(err);
+
+        // Inspect current database run state to preserve partial progress and NEEDS_REVIEW
+        const { data: currentRun } = await backgroundClient
+          .from('generation_runs')
+          .select('status, accepted_count')
+          .eq('id', run.id)
+          .maybeSingle();
+
+        // If the run has already been terminalized as COMPLETED or NEEDS_REVIEW, do not overwrite status
+        if (
+          currentRun?.status === 'COMPLETED' ||
+          currentRun?.status === 'NEEDS_REVIEW'
+        ) {
+          return;
+        }
+
+        // If some questions were accepted before the failure occurred, mark as NEEDS_REVIEW instead of FAILED
+        const terminalStatus =
+          currentRun?.accepted_count && currentRun.accepted_count > 0
+            ? 'NEEDS_REVIEW'
+            : 'FAILED';
+
         await backgroundClient
           .from('generation_runs')
           .update({
             completed_at: new Date().toISOString(),
             error_message: errorMsg,
-            status: 'FAILED',
+            status: terminalStatus,
           })
           .eq('id', run.id);
       } catch (dbErr) {
