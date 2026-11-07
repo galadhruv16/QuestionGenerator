@@ -59,17 +59,28 @@ async function loadReferences(
   ]);
 
   const bloom = new Map<string, string>();
-  for (const b of bloomRes.data ?? []) bloom.set(b.slug.toLowerCase(), b.id);
+  for (const b of bloomRes.data ?? []) {
+    bloom.set(b.slug.toLowerCase(), b.id);
+    bloom.set(b.slug.toUpperCase(), b.id);
+  }
 
   const difficulty = new Map<string, string>();
-  for (const d of diffRes.data ?? [])
+  for (const d of diffRes.data ?? []) {
     difficulty.set(d.slug.toUpperCase(), d.id);
+    difficulty.set(d.slug.toLowerCase(), d.id);
+  }
 
   const types = new Map<string, string>();
-  for (const t of typeRes.data ?? []) types.set(t.slug.toUpperCase(), t.id);
+  for (const t of typeRes.data ?? []) {
+    types.set(t.slug.toUpperCase(), t.id);
+    types.set(t.slug.toLowerCase(), t.id);
+  }
 
   const styles = new Map<string, string>();
-  for (const s of styleRes.data ?? []) styles.set(s.slug.toUpperCase(), s.id);
+  for (const s of styleRes.data ?? []) {
+    styles.set(s.slug.toUpperCase(), s.id);
+    styles.set(s.slug.toLowerCase(), s.id);
+  }
 
   cachedReferences = { bloom, difficulty, styles, types };
   return cachedReferences;
@@ -85,6 +96,90 @@ export interface PlanTarget {
 }
 
 /**
+ * Allocates discrete integer counts from fractional percentage weights using the
+ * Largest Remainder (Hamilton) method. Guarantees that:
+ * 1. Zero-weight items are NEVER allocated (count = 0).
+ * 2. If a single item has >0 weight, 100% of items are that single choice.
+ * 3. Sum of allocations strictly equals count.
+ */
+export function allocateCounts(
+  weights: Record<string, number> | [string, number][],
+  count: number,
+  fallbackKey: string,
+): string[] {
+  if (count <= 0) return [];
+  const rawEntries = Array.isArray(weights) ? weights : Object.entries(weights);
+  const active = rawEntries.filter(
+    ([, w]) => typeof w === 'number' && w > 0,
+  );
+
+  if (active.length === 0) {
+    return Array(count).fill(fallbackKey);
+  }
+  if (active.length === 1) {
+    return Array(count).fill(active[0]![0]);
+  }
+
+  const totalWeight = active.reduce((acc, [, w]) => acc + w, 0);
+  if (totalWeight <= 0) {
+    return Array(count).fill(active[0]![0]);
+  }
+
+  // Largest Remainder Method (Hamilton Method)
+  const items = active.map(([key, w]) => {
+    const exact = (w / totalWeight) * count;
+    const base = Math.floor(exact);
+    return {
+      base,
+      exact,
+      key,
+      remainder: exact - base,
+    };
+  });
+
+  let allocated = items.reduce((sum, item) => sum + item.base, 0);
+  const remaining = count - allocated;
+
+  // Distribute remaining fractional slots to items with largest remainder
+  items.sort((a, b) => b.remainder - a.remainder);
+  for (let i = 0; i < remaining && i < items.length; i++) {
+    items[i]!.base += 1;
+    allocated += 1;
+  }
+
+  // Safety fallback if any rounding deficit remains
+  while (allocated < count) {
+    items[0]!.base += 1;
+    allocated += 1;
+  }
+
+  const pool: string[] = [];
+  for (const item of items) {
+    for (let c = 0; c < item.base; c++) {
+      pool.push(item.key);
+    }
+  }
+
+  if (pool.length <= 1) return pool;
+
+  // Interleave pool smoothly across sequence indices
+  const result: string[] = new Array(count);
+  const step = 3;
+  let resIdx = 0;
+  const used = new Set<number>();
+  for (let i = 0; i < count; i++) {
+    while (used.has(resIdx)) {
+      resIdx = (resIdx + 1) % count;
+    }
+    result[resIdx] = pool[i]!;
+    used.add(resIdx);
+    resIdx = (resIdx + step) % count;
+  }
+
+  return result;
+}
+
+/**
  * Decomposes blueprint configuration distributions into discrete per-question plan targets.
  */
 export function buildGenerationPlan(
@@ -97,52 +192,42 @@ export function buildGenerationPlan(
   // Topics
   const topicWeights = config.topics || {};
   const activeTopicEntries = Object.entries(topicWeights).filter(
-    ([, w]) => w > 0,
+    ([, w]) => typeof w === 'number' && w > 0,
   );
   const topicList =
     activeTopicEntries.length > 0
       ? activeTopicEntries.map(([id]) => id)
       : availableTopicIds;
 
-  // Bloom distributions
-  const bloomWeights = Object.entries(
+  // Proportional allocations with zero-weight exclusion guarantee
+  const bloomAllocations = allocateCounts(
     config.bloom || { analyze: 50, apply: 50 },
+    count,
+    'analyze',
   );
-  const diffWeights = Object.entries(
+  const diffAllocations = allocateCounts(
     config.difficulty || { EASY: 20, HARD: 30, MEDIUM: 50 },
+    count,
+    'MEDIUM',
   );
-  const typeWeights = Object.entries(
+  const typeAllocations = allocateCounts(
     config.types || { LONG_ANSWER: 20, MCQ: 50, SHORT_ANSWER: 30 },
+    count,
+    'MCQ',
   );
-  const styleWeights = Object.entries(
+  const styleAllocations = allocateCounts(
     config.styles || { ANALYTICAL: 40, CONCEPTUAL: 20, SCENARIO: 40 },
+    count,
+    'SCENARIO',
   );
-
-  const pickByWeight = (
-    entries: [string, number][],
-    index: number,
-    defaultVal: string,
-  ): string => {
-    if (entries.length === 0) return defaultVal;
-    const total = entries.reduce((acc, [, w]) => acc + w, 0);
-    if (total <= 0) return entries[index % entries.length]![0];
-    const normalized = entries.map(([k, w]) => [k, w / total] as const);
-    let cumulative = 0;
-    const point = ((index * 37) % 100) / 100;
-    for (const [k, w] of normalized) {
-      cumulative += w;
-      if (point <= cumulative) return k;
-    }
-    return entries[0]![0];
-  };
 
   for (let i = 1; i <= count; i++) {
     const topicId =
       topicList.length > 0 ? topicList[(i - 1) % topicList.length]! : null;
-    const bloomSlug = pickByWeight(bloomWeights, i, 'analyze').toLowerCase();
-    const difficultySlug = pickByWeight(diffWeights, i, 'MEDIUM').toUpperCase();
-    const typeSlug = pickByWeight(typeWeights, i, 'MCQ').toUpperCase();
-    const styleSlug = pickByWeight(styleWeights, i, 'SCENARIO').toUpperCase();
+    const bloomSlug = (bloomAllocations[i - 1] || 'analyze').toLowerCase();
+    const difficultySlug = (diffAllocations[i - 1] || 'MEDIUM').toUpperCase();
+    const typeSlug = (typeAllocations[i - 1] || 'MCQ').toUpperCase();
+    const styleSlug = (styleAllocations[i - 1] || 'SCENARIO').toUpperCase();
 
     targets.push({
       bloomSlug,
@@ -918,6 +1003,174 @@ export async function executeGenerationRun(
       }
     }
 
+    // =========================================================================
+    // AUTOMATIC DEFICIT REPLENISHMENT PASS
+    // If any items failed (e.g. timeout, malformed JSON, duplicate threshold),
+    // automatically generate replacement questions to fulfill the promised total,
+    // up to a safe replenishment ceiling (maximum 3 replacement attempts).
+    // =========================================================================
+    if (generatedQuestions.length < planTargets.length && !budgetExceeded) {
+      const deficit = planTargets.length - generatedQuestions.length;
+      const maxReplenishmentAttempts = Math.min(deficit * 2, 5);
+      let replenishmentAttempts = 0;
+
+      console.log(
+        `[QuestionGenerator] Starting deficit replenishment pass: ${deficit} items needed to reach requested volume of ${planTargets.length}`,
+      );
+      logGen(
+        `Starting deficit replenishment pass: ${deficit} items needed to reach requested volume of ${planTargets.length}`,
+      );
+
+      while (
+        generatedQuestions.length < planTargets.length &&
+        replenishmentAttempts < maxReplenishmentAttempts &&
+        Date.now() - runStartTime < MAX_RUN_BUDGET_MS
+      ) {
+        replenishmentAttempts++;
+        const replSeqNum = planTargets.length + replenishmentAttempts;
+
+        // Select blueprint configuration from an unfulfilled target
+        const candidateTarget =
+          planTargets[replenishmentAttempts % planTargets.length] || planTargets[0]!;
+
+        // Pick an unused chunk or alternate pool chunk
+        const replChunk =
+          sortedPoolChunks.find((c) => !usedChunkIds.has(c.id)) ||
+          poolChunks[(replSeqNum * 7) % poolChunks.length] ||
+          sortedPoolChunks[0];
+
+        if (replChunk) usedChunkIds.add(replChunk.id);
+
+        let replTopicName = 'Curriculum Topic';
+        let replTopicId = candidateTarget.topicId;
+        if (replChunk) {
+          const linked = chunkToTopicIds.get(replChunk.id);
+          if (linked && linked.length > 0 && linked[0] && topicMap.has(linked[0])) {
+            replTopicId = linked[0];
+            replTopicName = topicMap.get(linked[0])!;
+          }
+        }
+        if (replTopicId && topicMap.has(replTopicId)) {
+          replTopicName = topicMap.get(replTopicId)!;
+        }
+
+        const replTarget: PlanTarget = {
+          bloomId: candidateTarget.bloomId,
+          bloomSlug: candidateTarget.bloomSlug,
+          difficultyId: candidateTarget.difficultyId,
+          difficultySlug: candidateTarget.difficultySlug,
+          sequenceNumber: replSeqNum,
+          styleId: candidateTarget.styleId,
+          styleSlug: candidateTarget.styleSlug,
+          topicId: replTopicId,
+          typeId: candidateTarget.typeId,
+          typeSlug: candidateTarget.typeSlug,
+        };
+
+        // Insert new replacement plan item into database
+        const { data: replPlanItem } = await client
+          .from('generation_plan_items')
+          .insert({
+            bloom_level_id: refs.bloom.get(replTarget.bloomSlug.toLowerCase()) || null,
+            difficulty_level_id: refs.difficulty.get(replTarget.difficultySlug.toUpperCase()) || null,
+            generation_run_id: runId,
+            question_type_id: refs.types.get(replTarget.typeSlug.toUpperCase()) || null,
+            sequence_number: replSeqNum,
+            status: 'PLANNED',
+            style_id:
+              refs.styles.get(replTarget.styleSlug.toUpperCase()) ||
+              refs.styles.get(replTarget.styleSlug.toLowerCase()) ||
+              null,
+            topic_id: replTarget.topicId,
+          })
+          .select('id')
+          .single();
+
+        const replPlanItemId = replPlanItem?.id || `repl-${replSeqNum}`;
+
+        logGen(
+          `Synthesizing replacement item #${replSeqNum} (Topic: "${replTopicName.slice(0, 35)}", Type: ${replTarget.typeSlug})`,
+        );
+
+        let replItem: RawSynthesizedQuestion | null = null;
+        for (let attempt = 1; attempt <= (isLocal ? 2 : 2); attempt++) {
+          try {
+            replItem = await synthesizeQuestionItem({
+              attempt,
+              blueprint: { ...blueprint, temperature: attempt === 1 ? 0.30 : 0.20 },
+              chunk: replChunk,
+              maxExcerptChars: isLocal ? (attempt === 1 ? 550 : 280) : 1200,
+              planItemId: replPlanItemId,
+              priorStems: [...existingStems, ...inRunStems],
+              refs,
+              runId,
+              target: replTarget,
+              topicName: replTopicName,
+            });
+            if (replItem) break;
+          } catch (rErr) {
+            logGen(
+              `Replacement item #${replSeqNum} attempt ${attempt} failed: ${rErr instanceof Error ? rErr.message : String(rErr)}`,
+            );
+          }
+        }
+
+        if (replItem) {
+          const allPriorStems = [...existingStems, ...inRunStems];
+          let maxSim = 0;
+          for (const prior of allPriorStems) {
+            const sim = computeStemSimilarity(replItem.stem, prior);
+            if (sim > maxSim) maxSim = sim;
+          }
+
+          if (blueprint.duplicate_policy === 'PREVENT' && maxSim > 0.82) {
+            logGen(
+              `Replacement item #${replSeqNum} duplicate detected (${(maxSim * 100).toFixed(1)}%). Marking FAILED.`,
+            );
+            await client
+              .from('generation_plan_items')
+              .update({ status: 'FAILED' })
+              .eq('id', replPlanItemId);
+          } else {
+            const saved = await persistGeneratedQuestion({
+              baseSortOrder,
+              client,
+              dedupScore: maxSim,
+              item: replItem,
+              persistedIndex: generatedQuestions.length + 1,
+              planItemId: replPlanItemId,
+              projectId,
+              refs,
+              runId,
+              selectedChunkId: replChunk?.id,
+              target: replTarget,
+            });
+
+            if (saved) {
+              inRunStems.push(replItem.stem);
+              generatedQuestions.push(saved);
+              await client
+                .from('generation_plan_items')
+                .update({ status: 'COMPLETED' })
+                .eq('id', replPlanItemId);
+              await client
+                .from('generation_runs')
+                .update({ accepted_count: generatedQuestions.length })
+                .eq('id', runId);
+              logGen(
+                `Replacement item #${replSeqNum} saved successfully! Accepted now: ${generatedQuestions.length}/${planTargets.length}`,
+              );
+            }
+          }
+        } else {
+          await client
+            .from('generation_plan_items')
+            .update({ status: 'FAILED' })
+            .eq('id', replPlanItemId);
+        }
+      }
+    }
+
     // Mark any remaining unprocessed plan items (e.g. from early break, persistence error, or budget ceiling) as FAILED
     const { error: remainingPlanErr } = await client
       .from('generation_plan_items')
@@ -1215,8 +1468,10 @@ export function safeParseJson(jsonStr: string): Record<string, unknown> | null {
     return JSON.parse(jsonStr) as Record<string, unknown>;
   } catch {
     const firstBrace = jsonStr.indexOf('{');
+    if (firstBrace < 0) return null;
+
     const lastBrace = jsonStr.lastIndexOf('}');
-    if (firstBrace >= 0 && lastBrace > firstBrace) {
+    if (lastBrace > firstBrace) {
       const sliced = jsonStr.slice(firstBrace, lastBrace + 1).replace(/,\s*([}\]])/g, '$1');
       try {
         return JSON.parse(sliced) as Record<string, unknown>;
@@ -1229,10 +1484,60 @@ export function safeParseJson(jsonStr: string): Record<string, unknown> | null {
           );
           return JSON.parse(sanitizedNewlines) as Record<string, unknown>;
         } catch {
-          // Fall through
+          // Fall through to truncation repair
         }
       }
     }
+
+    // Truncation repair: attempt to auto-close unclosed strings, arrays, and objects
+    try {
+      let repair = jsonStr.slice(firstBrace).trim();
+      let inString = false;
+      for (let i = 0; i < repair.length; i++) {
+        if (repair[i] === '"' && (i === 0 || repair[i - 1] !== '\\')) {
+          inString = !inString;
+        }
+      }
+      if (inString) {
+        repair += '"';
+      }
+
+      let openBraces = 0;
+      let closeBraces = 0;
+      let openBrackets = 0;
+      let closeBrackets = 0;
+      inString = false;
+      for (let i = 0; i < repair.length; i++) {
+        if (repair[i] === '"' && (i === 0 || repair[i - 1] !== '\\')) {
+          inString = !inString;
+          continue;
+        }
+        if (!inString) {
+          if (repair[i] === '{') openBraces++;
+          else if (repair[i] === '}') closeBraces++;
+          else if (repair[i] === '[') openBrackets++;
+          else if (repair[i] === ']') closeBrackets++;
+        }
+      }
+
+      repair = repair.replace(/,\s*$/, '');
+      while (closeBrackets < openBrackets) {
+        repair += ']';
+        closeBrackets++;
+      }
+      while (closeBraces < openBraces) {
+        repair += '}';
+        closeBraces++;
+      }
+
+      const repaired = JSON.parse(repair) as Record<string, unknown>;
+      if (repaired && typeof repaired === 'object') {
+        return repaired;
+      }
+    } catch {
+      // Ignore repair failure
+    }
+
     return null;
   }
 }
@@ -1403,7 +1708,7 @@ async function synthesizeQuestionItem(
   }
 
   const timeoutMs = isLocal ? env.OLLAMA_TIMEOUT_MS : 25000;
-  const maxTokens = isLocal ? 650 : undefined;
+  const maxTokens = isLocal ? 900 : undefined;
 
   const priorStemsNotice =
     params.priorStems && params.priorStems.length > 0
@@ -1413,6 +1718,8 @@ async function synthesizeQuestionItem(
           .map((s) => `- ${s.slice(0, isLocal ? 80 : 100)}`)
           .join('\n')
       : '';
+
+  const isMcq = target.typeSlug.toUpperCase() === 'MCQ';
 
   const promptSystem = `You are an expert assessment item designer creating curriculum-grounded university exam questions.
 Generate a single rigorous question strictly adhering to:
@@ -1425,37 +1732,50 @@ Generate a single rigorous question strictly adhering to:
 CRITICAL RULES:
 1. Return strictly valid JSON with no markdown backticks or text outside the JSON object.
 2. Ground the question conceptually in the provided source excerpt. The question must test authentic principles and relationships.
-3. For MCQ questions:
+${
+  isMcq
+    ? `3. For MCQ questions:
    - Provide exactly 4 distinct options with plausible, educative distractors and exactly ONE marked correct (is_correct: true).
    - Naturally vary the position of the correct option (index 0, 1, 2, or 3) across questions.
    - Each option must have a detailed explanation describing why it is correct or what specific conceptual error makes it incorrect.
-   - NEVER use document headings, software brand names (Microsoft Word, Mozilla Firefox, etc.), or author names as stems or options.
-4. For SHORT_ANSWER and LONG_ANSWER questions:
-   - Provide an exemplary model_answer demonstrating complete conceptual mastery.
-   - Provide an array of rubric_criteria detailing point distribution.
-5. Provide a citation_anchor representing the source fact or concept supporting the question.${priorStemsNotice}`;
+   - NEVER use document headings, software brand names (Microsoft Word, Mozilla Firefox, etc.), or author names as stems or options.`
+    : `3. For ${target.typeSlug} questions:
+   - Provide an exemplary, comprehensive model_answer demonstrating complete conceptual mastery.
+   - Provide an array of rubric_criteria detailing point distribution (e.g. 40%, 40%, 20%).
+   - Do NOT generate multiple choice options.`
+}
+4. Provide a citation_anchor representing the source fact or concept supporting the question.${priorStemsNotice}`;
 
   const charLimit = params.maxExcerptChars ?? (isLocal ? 650 : 1500);
   const excerpt = chunkText.slice(0, charLimit);
 
-  const promptUser = `Source Excerpt:
-"${excerpt}"
-
-Return JSON schema:
-{
+  const jsonSchemaFormat = isMcq
+    ? `{
   "stem": "Detailed question stem...",
-  "question_type": "${target.typeSlug}",
+  "question_type": "MCQ",
   "options": [
     { "option_index": 0, "option_text": "...", "is_correct": false, "explanation": "Why this distractor is incorrect..." },
     { "option_index": 1, "option_text": "...", "is_correct": false, "explanation": "Why this distractor is incorrect..." },
     { "option_index": 2, "option_text": "...", "is_correct": true, "explanation": "Why this option is correct based on the excerpt..." },
     { "option_index": 3, "option_text": "...", "is_correct": false, "explanation": "Why this distractor is incorrect..." }
   ],
+  "explanation": "Pedagogical rationale explaining the assessed concept...",
+  "citation_anchor": "Brief source sentence or concept anchoring this question..."
+}`
+    : `{
+  "stem": "Detailed question stem...",
+  "question_type": "${target.typeSlug}",
   "model_answer": "Comprehensive model answer...",
   "explanation": "Pedagogical rationale explaining the assessed concept...",
   "rubric_criteria": ["Criterion 1 (40%)", "Criterion 2 (40%)", "Criterion 3 (20%)"],
   "citation_anchor": "Brief source sentence or concept anchoring this question..."
-} `;
+}`;
+
+  const promptUser = `Source Excerpt:
+"${excerpt}"
+
+Return JSON schema:
+${jsonSchemaFormat} `;
 
   const baseSeed = (blueprint as { seed?: number }).seed ?? 42;
   const dynamicSeed = baseSeed + target.sequenceNumber * 37 + (params.attempt ?? 1) * 101;

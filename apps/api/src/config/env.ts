@@ -19,6 +19,7 @@ const envSchema = z.object({
   SUPABASE_URL: optionalString.pipe(z.string().url().optional()),
   SUPABASE_ANON_KEY: optionalString,
   SUPABASE_SERVICE_ROLE_KEY: optionalString,
+  SUPABASE_SECRET_KEY: optionalString,
   GEMINI_API_KEY: optionalString,
   GEMINI_MODEL: z.string().default('gemini-flash-lite-latest'),
   GROQ_API_KEY: optionalString,

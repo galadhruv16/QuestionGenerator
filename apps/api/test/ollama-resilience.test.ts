@@ -499,15 +499,18 @@ describe('Ollama-Only Resilience and Provider Immutability', () => {
       vi.restoreAllMocks();
     });
 
-    it('createSupabaseAdminClient throws descriptive error when SUPABASE_SERVICE_ROLE_KEY is missing', () => {
+    it('createSupabaseAdminClient throws descriptive error when service-role/secret key is missing', () => {
       const originalKey = env.SUPABASE_SERVICE_ROLE_KEY;
+      const originalSecret = env.SUPABASE_SECRET_KEY;
       try {
-        (env as { SUPABASE_SERVICE_ROLE_KEY?: string }).SUPABASE_SERVICE_ROLE_KEY = undefined;
+        (env as { SUPABASE_SERVICE_ROLE_KEY?: string; SUPABASE_SECRET_KEY?: string }).SUPABASE_SERVICE_ROLE_KEY = undefined;
+        (env as { SUPABASE_SERVICE_ROLE_KEY?: string; SUPABASE_SECRET_KEY?: string }).SUPABASE_SECRET_KEY = undefined;
         expect(() => createSupabaseAdminClient()).toThrow(
-          /SUPABASE_SERVICE_ROLE_KEY is not configured on the server/i,
+          /SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY is not configured on the server/i,
         );
       } finally {
-        (env as { SUPABASE_SERVICE_ROLE_KEY?: string }).SUPABASE_SERVICE_ROLE_KEY = originalKey;
+        (env as { SUPABASE_SERVICE_ROLE_KEY?: string; SUPABASE_SECRET_KEY?: string }).SUPABASE_SERVICE_ROLE_KEY = originalKey;
+        (env as { SUPABASE_SERVICE_ROLE_KEY?: string; SUPABASE_SECRET_KEY?: string }).SUPABASE_SECRET_KEY = originalSecret;
       }
     });
 
@@ -520,6 +523,21 @@ describe('Ollama-Only Resilience and Provider Immutability', () => {
         expect(client.auth).toBeDefined();
       } finally {
         (env as { SUPABASE_SERVICE_ROLE_KEY?: string }).SUPABASE_SERVICE_ROLE_KEY = originalKey;
+      }
+    });
+
+    it('createSupabaseAdminClient instantiates client without session persistence when modern SUPABASE_SECRET_KEY is provided', () => {
+      const originalKey = env.SUPABASE_SERVICE_ROLE_KEY;
+      const originalSecret = env.SUPABASE_SECRET_KEY;
+      try {
+        (env as { SUPABASE_SERVICE_ROLE_KEY?: string; SUPABASE_SECRET_KEY?: string }).SUPABASE_SERVICE_ROLE_KEY = undefined;
+        (env as { SUPABASE_SERVICE_ROLE_KEY?: string; SUPABASE_SECRET_KEY?: string }).SUPABASE_SECRET_KEY = 'sb_secret_mock_12345';
+        const client = createSupabaseAdminClient();
+        expect(client).toBeDefined();
+        expect(client.auth).toBeDefined();
+      } finally {
+        (env as { SUPABASE_SERVICE_ROLE_KEY?: string; SUPABASE_SECRET_KEY?: string }).SUPABASE_SERVICE_ROLE_KEY = originalKey;
+        (env as { SUPABASE_SERVICE_ROLE_KEY?: string; SUPABASE_SECRET_KEY?: string }).SUPABASE_SECRET_KEY = originalSecret;
       }
     });
 

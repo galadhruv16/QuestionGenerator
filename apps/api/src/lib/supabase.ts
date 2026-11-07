@@ -31,10 +31,10 @@ export const createSupabaseAdminClient = (): SupabaseClient => {
     throw new Error('SUPABASE_URL is not configured for backend service-role operations.');
   }
 
-  const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SECRET_KEY;
   if (!serviceRoleKey) {
     throw new Error(
-      'SUPABASE_SERVICE_ROLE_KEY is not configured on the server. Background operations require a backend service-role key for persistence.',
+      'SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY is not configured on the server. Background operations require a backend service-role key for persistence.',
     );
   }
 

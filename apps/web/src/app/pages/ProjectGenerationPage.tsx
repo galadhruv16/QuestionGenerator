@@ -12,6 +12,7 @@ import { Icon, Logo } from '../components/ui';
 
 import { getCachedProject, updateProjectCache } from '../services/session-store';
 import { generationManager } from '../services/generation-manager';
+import { rebalancePercentages } from '../utils/distribution';
 
 interface ProjectData {
   created_at: string;
@@ -122,10 +123,9 @@ export function ProjectGenerationPage() {
   });
 
   // Styles
-  const [stylesWeights] = useState<Record<string, number>>({
-    analytical: 40,
-    conceptual: 20,
-    scenario: 40,
+  const [stylesWeights, setStylesWeights] = useState<Record<string, number>>({
+    analytical: 50,
+    scenario: 50,
   });
 
   // Quality invariants
@@ -160,6 +160,116 @@ export function ProjectGenerationPage() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  // Available question styles
+  const AVAILABLE_STYLES = [
+    {
+      description: 'Realistic application scenario or hypothetical state',
+      id: 'scenario',
+      label: 'Scenario-Based',
+    },
+    {
+      description: 'Rigorous step-by-step mathematical or algorithmic analysis',
+      id: 'analytical',
+      label: 'Direct Analytical',
+    },
+    {
+      description: 'Explicit contrast and trade-off comparison between options',
+      id: 'comparative',
+      label: 'Comparative Case',
+    },
+    {
+      description: 'Foundational syllabus concepts and principle definitions',
+      id: 'conceptual',
+      label: 'Direct Conceptual',
+    },
+    {
+      description: 'In-depth situational case requiring structured deduction',
+      id: 'case_based',
+      label: 'Case-Based',
+    },
+    {
+      description: 'Constructive protocol or system architecture design problem',
+      id: 'design_synthesis',
+      label: 'Design & Synthesis',
+    },
+  ];
+
+  // Style toggle handler
+  const handleToggleStyle = (styleId: string) => {
+    const activeKeys = Object.entries(stylesWeights)
+      .filter(([, w]) => typeof w === 'number' && w > 0)
+      .map(([k]) => k);
+
+    const isCurrentlyActive = (stylesWeights[styleId] || 0) > 0;
+
+    if (isCurrentlyActive) {
+      if (activeKeys.length <= 1) {
+        showToast('At least one style constraint must remain active.');
+        return;
+      }
+      const remaining = activeKeys.filter((k) => k !== styleId);
+      const share = Math.floor(100 / remaining.length);
+      const rem = 100 - share * remaining.length;
+      const next: Record<string, number> = {};
+      for (const k of Object.keys(stylesWeights)) {
+        next[k] = 0;
+      }
+      remaining.forEach((k, idx) => {
+        next[k] = share + (idx < rem ? 1 : 0);
+      });
+      setStylesWeights(next);
+      showToast(`Deactivated style constraint.`);
+    } else {
+      const nextActive = [...activeKeys, styleId];
+      const share = Math.floor(100 / nextActive.length);
+      const rem = 100 - share * nextActive.length;
+      const next: Record<string, number> = { ...stylesWeights };
+      for (const k of Object.keys(next)) {
+        next[k] = 0;
+      }
+      nextActive.forEach((k, idx) => {
+        next[k] = share + (idx < rem ? 1 : 0);
+      });
+      setStylesWeights(next);
+      showToast(`Activated style constraint.`);
+    }
+  };
+
+  // Difficulty change handlers
+  const handleDifficultySliderChange = (
+    key: 'easy' | 'medium' | 'hard',
+    value: number,
+  ) => {
+    setDifficultyWeights((prev) => rebalancePercentages(prev, key, value));
+  };
+
+  const handleDifficultyItemCountChange = (
+    key: 'easy' | 'medium' | 'hard',
+    items: number,
+  ) => {
+    if (questionCount <= 0) return;
+    const clampedItems = Math.max(0, Math.min(questionCount, Math.round(items)));
+    const pct = Math.round((clampedItems / questionCount) * 100);
+    setDifficultyWeights((prev) => rebalancePercentages(prev, key, pct));
+  };
+
+  // Format type change handlers
+  const handleTypeSliderChange = (key: string, value: number) => {
+    setTypeWeights((prev) => rebalancePercentages(prev, key, value));
+  };
+
+  const handleTypeItemCountChange = (key: string, items: number) => {
+    if (questionCount <= 0) return;
+    const clampedItems = Math.max(0, Math.min(questionCount, Math.round(items)));
+    const pct = Math.round((clampedItems / questionCount) * 100);
+    setTypeWeights((prev) => rebalancePercentages(prev, key, pct));
+  };
+
+  // Bloom change handler
+  const handleBloomChange = (key: string, value: number) => {
+    setBloomDistribution((prev) => rebalancePercentages(prev, key, value));
   };
 
   // Helper for authenticated API calls
@@ -1436,7 +1546,7 @@ export function ProjectGenerationPage() {
                 </div>
               </section>
 
-              {/* Section 2: Pedagogical Depth (Bloom's Taxonomy Matrix) */}
+              {/* Section 2: Pedagogical Depth (Bloom's Taxonomy) */}
               <section className="p-5 rounded bg-surface-container-lowest shadow-sm flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 bg-surface-container-low p-3 rounded">
                   <div>
@@ -1447,19 +1557,114 @@ export function ProjectGenerationPage() {
                       2. Pedagogical Depth (Bloom's Taxonomy)
                     </h2>
                   </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded bg-primary/10 text-primary font-label-sm text-label-sm font-semibold">
-                    <Icon name="sliders" size={14} />
-                    <span>Cognitive Span: L1–L6</span>
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 px-3 py-1 rounded bg-emerald-500/10 text-emerald-600 font-label-sm text-label-sm font-semibold">
+                      <span>
+                        Total:{' '}
+                        {Object.values(bloomDistribution).reduce(
+                          (a, b) => a + b,
+                          0,
+                        )}
+                        %
+                      </span>
+                    </span>
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded bg-primary/10 text-primary font-label-sm text-label-sm font-semibold">
+                      <Icon name="sliders" size={14} />
+                      <span>Cognitive Span: L1–L6</span>
+                    </div>
                   </div>
                 </div>
                 <p className="font-body-sm text-body-sm text-on-surface-variant -mt-1">
                   Calibrate cognitive complexity. Higher tiers require synthetic
-                  scenario setups and multi-hop grounding deductions.
+                  scenario setups and multi-hop grounding deductions. Sliders
+                  automatically auto-balance across remaining tiers to preserve
+                  a strict 100% total.
                 </p>
+
+                {/* Quick Bloom Presets */}
+                <div className="flex items-center gap-1.5 flex-wrap font-label-sm text-label-sm pb-1">
+                  <span className="text-on-surface-variant text-xs font-semibold mr-1">
+                    Quick Presets:
+                  </span>
+                  <button
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                      bloomDistribution.analyze === 100
+                        ? 'bg-primary text-on-primary font-bold shadow-sm'
+                        : 'bg-surface-container hover:bg-surface-container-high text-on-surface'
+                    }`}
+                    onClick={() =>
+                      setBloomDistribution({
+                        analyze: 100,
+                        apply: 0,
+                        create: 0,
+                        evaluate: 0,
+                        remember: 0,
+                        understand: 0,
+                      })
+                    }
+                    type="button"
+                  >
+                    100% Analyze (Core)
+                  </button>
+                  <button
+                    className="px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium transition-all"
+                    onClick={() =>
+                      setBloomDistribution({
+                        analyze: 40,
+                        apply: 0,
+                        create: 25,
+                        evaluate: 35,
+                        remember: 0,
+                        understand: 0,
+                      })
+                    }
+                    type="button"
+                  >
+                    High-Order (L4–L6)
+                  </button>
+                  <button
+                    className="px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium transition-all"
+                    onClick={() =>
+                      setBloomDistribution({
+                        analyze: 30,
+                        apply: 25,
+                        create: 5,
+                        evaluate: 15,
+                        remember: 10,
+                        understand: 15,
+                      })
+                    }
+                    type="button"
+                  >
+                    Balanced (L1–L6)
+                  </button>
+                  <button
+                    className="px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium transition-all"
+                    onClick={() =>
+                      setBloomDistribution({
+                        analyze: 0,
+                        apply: 30,
+                        create: 0,
+                        evaluate: 0,
+                        remember: 35,
+                        understand: 35,
+                      })
+                    }
+                    type="button"
+                  >
+                    Foundational (L1–L3)
+                  </button>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                   {/* L1: Remember */}
-                  <div className="p-3 rounded bg-surface-container-low flex flex-col gap-1.5">
+                  <div
+                    className={`p-3 rounded bg-surface-container-low flex flex-col gap-1.5 transition-all ${
+                      bloomDistribution.remember > 0
+                        ? 'ring-1 ring-outline/20'
+                        : 'opacity-60'
+                    }`}
+                  >
                     <div className="flex justify-between items-center font-label-sm text-label-sm">
                       <span className="text-on-surface font-semibold">
                         L1: Remember
@@ -1472,14 +1677,11 @@ export function ProjectGenerationPage() {
                       Definitions, terminology, syntax, and foundational recall.
                     </p>
                     <input
-                      className="w-full accent-outline cursor-pointer h-1.5 bg-surface-container rounded"
+                      className="w-full accent-primary cursor-pointer h-1.5 bg-surface-container rounded"
                       max="100"
                       min="0"
                       onChange={(e) =>
-                        setBloomDistribution((prev) => ({
-                          ...prev,
-                          remember: Number(e.target.value),
-                        }))
+                        handleBloomChange('remember', Number(e.target.value))
                       }
                       type="range"
                       value={bloomDistribution.remember}
@@ -1487,7 +1689,13 @@ export function ProjectGenerationPage() {
                   </div>
 
                   {/* L2: Understand */}
-                  <div className="p-3 rounded bg-surface-container-low flex flex-col gap-1.5">
+                  <div
+                    className={`p-3 rounded bg-surface-container-low flex flex-col gap-1.5 transition-all ${
+                      bloomDistribution.understand > 0
+                        ? 'ring-1 ring-outline/20'
+                        : 'opacity-60'
+                    }`}
+                  >
                     <div className="flex justify-between items-center font-label-sm text-label-sm">
                       <span className="text-on-surface font-semibold">
                         L2: Understand
@@ -1504,10 +1712,7 @@ export function ProjectGenerationPage() {
                       max="100"
                       min="0"
                       onChange={(e) =>
-                        setBloomDistribution((prev) => ({
-                          ...prev,
-                          understand: Number(e.target.value),
-                        }))
+                        handleBloomChange('understand', Number(e.target.value))
                       }
                       type="range"
                       value={bloomDistribution.understand}
@@ -1515,7 +1720,13 @@ export function ProjectGenerationPage() {
                   </div>
 
                   {/* L3: Apply */}
-                  <div className="p-3 rounded bg-surface-container-low flex flex-col gap-1.5">
+                  <div
+                    className={`p-3 rounded bg-surface-container-low flex flex-col gap-1.5 transition-all ${
+                      bloomDistribution.apply > 0
+                        ? 'ring-1 ring-outline/20'
+                        : 'opacity-60'
+                    }`}
+                  >
                     <div className="flex justify-between items-center font-label-sm text-label-sm">
                       <span className="text-on-surface font-semibold">
                         L3: Apply
@@ -1533,10 +1744,7 @@ export function ProjectGenerationPage() {
                       max="100"
                       min="0"
                       onChange={(e) =>
-                        setBloomDistribution((prev) => ({
-                          ...prev,
-                          apply: Number(e.target.value),
-                        }))
+                        handleBloomChange('apply', Number(e.target.value))
                       }
                       type="range"
                       value={bloomDistribution.apply}
@@ -1544,7 +1752,13 @@ export function ProjectGenerationPage() {
                   </div>
 
                   {/* L4: Analyze */}
-                  <div className="p-3 rounded bg-surface-container-low flex flex-col gap-1.5 ring-1 ring-primary/30">
+                  <div
+                    className={`p-3 rounded bg-surface-container-low flex flex-col gap-1.5 ring-1 ${
+                      bloomDistribution.analyze > 0
+                        ? 'ring-primary/40 bg-primary/[0.02]'
+                        : 'opacity-60 ring-outline/10'
+                    }`}
+                  >
                     <div className="flex justify-between items-center font-label-sm text-label-sm">
                       <span className="text-primary font-bold">
                         L4: Analyze (Core)
@@ -1562,10 +1776,7 @@ export function ProjectGenerationPage() {
                       max="100"
                       min="0"
                       onChange={(e) =>
-                        setBloomDistribution((prev) => ({
-                          ...prev,
-                          analyze: Number(e.target.value),
-                        }))
+                        handleBloomChange('analyze', Number(e.target.value))
                       }
                       type="range"
                       value={bloomDistribution.analyze}
@@ -1573,7 +1784,13 @@ export function ProjectGenerationPage() {
                   </div>
 
                   {/* L5: Evaluate */}
-                  <div className="p-3 rounded bg-surface-container-low flex flex-col gap-1.5">
+                  <div
+                    className={`p-3 rounded bg-surface-container-low flex flex-col gap-1.5 transition-all ${
+                      bloomDistribution.evaluate > 0
+                        ? 'ring-1 ring-outline/20'
+                        : 'opacity-60'
+                    }`}
+                  >
                     <div className="flex justify-between items-center font-label-sm text-label-sm">
                       <span className="text-on-surface font-semibold">
                         L5: Evaluate
@@ -1591,10 +1808,7 @@ export function ProjectGenerationPage() {
                       max="100"
                       min="0"
                       onChange={(e) =>
-                        setBloomDistribution((prev) => ({
-                          ...prev,
-                          evaluate: Number(e.target.value),
-                        }))
+                        handleBloomChange('evaluate', Number(e.target.value))
                       }
                       type="range"
                       value={bloomDistribution.evaluate}
@@ -1602,7 +1816,13 @@ export function ProjectGenerationPage() {
                   </div>
 
                   {/* L6: Synthesize */}
-                  <div className="p-3 rounded bg-surface-container-low flex flex-col gap-1.5">
+                  <div
+                    className={`p-3 rounded bg-surface-container-low flex flex-col gap-1.5 transition-all ${
+                      bloomDistribution.create > 0
+                        ? 'ring-1 ring-outline/20'
+                        : 'opacity-60'
+                    }`}
+                  >
                     <div className="flex justify-between items-center font-label-sm text-label-sm">
                       <span className="text-on-surface font-semibold">
                         L6: Synthesize
@@ -1620,10 +1840,7 @@ export function ProjectGenerationPage() {
                       max="100"
                       min="0"
                       onChange={(e) =>
-                        setBloomDistribution((prev) => ({
-                          ...prev,
-                          create: Number(e.target.value),
-                        }))
+                        handleBloomChange('create', Number(e.target.value))
                       }
                       type="range"
                       value={bloomDistribution.create}
@@ -1633,7 +1850,7 @@ export function ProjectGenerationPage() {
               </section>
 
               {/* Section 3: Difficulty & Question Formats */}
-              <section className="p-5 rounded bg-surface-container-lowest shadow-sm flex flex-col gap-4">
+              <section className="p-5 rounded bg-surface-container-lowest shadow-sm flex flex-col gap-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 bg-surface-container-low p-3 rounded">
                   <div>
                     <span className="font-label-sm text-label-sm text-primary font-bold uppercase tracking-wider">
@@ -1643,141 +1860,721 @@ export function ProjectGenerationPage() {
                       3. Difficulty &amp; Question Formats
                     </h2>
                   </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded bg-surface-container-highest text-on-surface-variant font-label-sm text-label-sm">
-                    <span>3 Formats Active</span>
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded bg-surface-container-highest text-on-surface-variant font-label-sm text-label-sm font-semibold">
+                    <span>
+                      {
+                        Object.entries(typeWeights).filter(
+                          ([, w]) => typeof w === 'number' && w > 0,
+                        ).length
+                      }{' '}
+                      Formats Active
+                    </span>
                   </div>
                 </div>
 
-                {/* Difficulty Pills */}
-                <div className="flex flex-col gap-2">
-                  <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
-                    Difficulty Calibration:
-                  </span>
-                  <div className="grid grid-cols-3 gap-3">
+                {/* 3A: Difficulty Calibration */}
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                    <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold">
+                      Difficulty Calibration:
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600">
+                        Total:{' '}
+                        {difficultyWeights.easy +
+                          difficultyWeights.medium +
+                          difficultyWeights.hard}
+                        % · {questionCount} Items
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Difficulty Quick Presets */}
+                  <div className="flex items-center gap-1.5 flex-wrap font-label-sm text-label-sm">
+                    <span className="text-on-surface-variant text-xs font-semibold mr-1">
+                      Presets:
+                    </span>
                     <button
-                      className={`p-3 rounded text-center transition-all ${
-                        difficultyWeights.easy > 30
-                          ? 'bg-primary/10 ring-1 ring-primary text-primary font-bold'
+                      className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                        difficultyWeights.hard === 100
+                          ? 'bg-primary text-on-primary font-bold shadow-sm'
                           : 'bg-surface-container hover:bg-surface-container-high text-on-surface'
                       }`}
                       onClick={() =>
-                        setDifficultyWeights({ easy: 40, hard: 20, medium: 40 })
+                        setDifficultyWeights({ easy: 0, hard: 100, medium: 0 })
                       }
                       type="button"
                     >
-                      <div>Easy ({difficultyWeights.easy}%)</div>
-                      <span className="font-label-sm text-label-sm text-on-surface-variant">
-                        {Math.round(
-                          (questionCount * difficultyWeights.easy) / 100,
-                        )}{' '}
-                        Items
-                      </span>
+                      All Hard (100%)
                     </button>
                     <button
-                      className={`p-3 rounded text-center transition-all ${
-                        difficultyWeights.medium >= 40
-                          ? 'bg-primary/10 ring-1 ring-primary text-primary font-bold'
+                      className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                        difficultyWeights.medium === 100
+                          ? 'bg-primary text-on-primary font-bold shadow-sm'
                           : 'bg-surface-container hover:bg-surface-container-high text-on-surface'
                       }`}
                       onClick={() =>
-                        setDifficultyWeights({ easy: 20, hard: 30, medium: 50 })
+                        setDifficultyWeights({ easy: 0, hard: 0, medium: 100 })
                       }
                       type="button"
                     >
-                      <div>Medium ({difficultyWeights.medium}%)</div>
-                      <span className="font-label-sm text-label-sm text-primary">
-                        {Math.round(
-                          (questionCount * difficultyWeights.medium) / 100,
-                        )}{' '}
-                        Items
-                      </span>
+                      All Medium (100%)
                     </button>
                     <button
-                      className={`p-3 rounded text-center transition-all ${
-                        difficultyWeights.hard >= 40
-                          ? 'bg-primary/10 ring-1 ring-primary text-primary font-bold'
+                      className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                        difficultyWeights.easy === 100
+                          ? 'bg-primary text-on-primary font-bold shadow-sm'
                           : 'bg-surface-container hover:bg-surface-container-high text-on-surface'
                       }`}
+                      onClick={() =>
+                        setDifficultyWeights({ easy: 100, hard: 0, medium: 0 })
+                      }
+                      type="button"
+                    >
+                      All Easy (100%)
+                    </button>
+                    <button
+                      className="px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium transition-all"
                       onClick={() =>
                         setDifficultyWeights({ easy: 10, hard: 60, medium: 30 })
                       }
                       type="button"
                     >
-                      <div>Hard ({difficultyWeights.hard}%)</div>
-                      <span className="font-label-sm text-label-sm text-on-surface-variant">
-                        {Math.round(
-                          (questionCount * difficultyWeights.hard) / 100,
-                        )}{' '}
-                        Items
-                      </span>
+                      Hard-Heavy (10/30/60)
                     </button>
+                    <button
+                      className="px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium transition-all"
+                      onClick={() =>
+                        setDifficultyWeights({ easy: 20, hard: 30, medium: 50 })
+                      }
+                      type="button"
+                    >
+                      Balanced (20/50/30)
+                    </button>
+                    <button
+                      className="px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium transition-all"
+                      onClick={() =>
+                        setDifficultyWeights({ easy: 33, hard: 34, medium: 33 })
+                      }
+                      type="button"
+                    >
+                      Even Split (33/34/33)
+                    </button>
+                  </div>
+
+                  {/* Difficulty Interactive Slider Cards with Direct Item Inputs */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                    {/* Easy Card */}
+                    <div
+                      className={`p-3.5 rounded bg-surface-container-low flex flex-col gap-2 transition-all ${
+                        difficultyWeights.easy > 0
+                          ? 'ring-1 ring-primary/30'
+                          : 'opacity-60 ring-1 ring-outline/10'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="font-body-sm text-body-sm font-semibold text-on-surface">
+                            Easy
+                          </span>
+                          <p className="font-label-sm text-[11px] text-on-surface-variant">
+                            Direct foundational recall
+                          </p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded bg-surface-container-highest font-bold text-on-surface text-sm">
+                          {difficultyWeights.easy}%
+                        </span>
+                      </div>
+
+                      {/* Direct Item Count Input */}
+                      <div className="flex items-center justify-between gap-2 pt-1 font-label-sm text-xs">
+                        <label className="text-on-surface-variant font-medium">
+                          Allocated Questions:
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            className="w-14 px-2 py-1 text-center font-bold text-xs rounded bg-surface-container-highest border border-outline/20 text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+                            max={questionCount}
+                            min={0}
+                            onChange={(e) =>
+                              handleDifficultyItemCountChange(
+                                'easy',
+                                Number(e.target.value),
+                              )
+                            }
+                            type="number"
+                            value={Math.round(
+                              (questionCount * difficultyWeights.easy) / 100,
+                            )}
+                          />
+                          <span className="text-on-surface-variant text-[11px]">
+                            / {questionCount}
+                          </span>
+                        </div>
+                      </div>
+
+                      <input
+                        className="w-full accent-primary cursor-pointer h-1.5 bg-surface-container rounded"
+                        max="100"
+                        min="0"
+                        onChange={(e) =>
+                          handleDifficultySliderChange(
+                            'easy',
+                            Number(e.target.value),
+                          )
+                        }
+                        type="range"
+                        value={difficultyWeights.easy}
+                      />
+
+                      <button
+                        className="text-[11px] text-primary hover:underline font-semibold text-right transition-colors"
+                        onClick={() =>
+                          setDifficultyWeights({ easy: 100, hard: 0, medium: 0 })
+                        }
+                        type="button"
+                      >
+                        Make 100% Easy
+                      </button>
+                    </div>
+
+                    {/* Medium Card */}
+                    <div
+                      className={`p-3.5 rounded bg-surface-container-low flex flex-col gap-2 transition-all ${
+                        difficultyWeights.medium > 0
+                          ? 'ring-1 ring-primary/30'
+                          : 'opacity-60 ring-1 ring-outline/10'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="font-body-sm text-body-sm font-semibold text-on-surface">
+                            Medium
+                          </span>
+                          <p className="font-label-sm text-[11px] text-on-surface-variant">
+                            Standard multi-step reasoning
+                          </p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded bg-surface-container-highest font-bold text-on-surface text-sm">
+                          {difficultyWeights.medium}%
+                        </span>
+                      </div>
+
+                      {/* Direct Item Count Input */}
+                      <div className="flex items-center justify-between gap-2 pt-1 font-label-sm text-xs">
+                        <label className="text-on-surface-variant font-medium">
+                          Allocated Questions:
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            className="w-14 px-2 py-1 text-center font-bold text-xs rounded bg-surface-container-highest border border-outline/20 text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+                            max={questionCount}
+                            min={0}
+                            onChange={(e) =>
+                              handleDifficultyItemCountChange(
+                                'medium',
+                                Number(e.target.value),
+                              )
+                            }
+                            type="number"
+                            value={Math.round(
+                              (questionCount * difficultyWeights.medium) / 100,
+                            )}
+                          />
+                          <span className="text-on-surface-variant text-[11px]">
+                            / {questionCount}
+                          </span>
+                        </div>
+                      </div>
+
+                      <input
+                        className="w-full accent-primary cursor-pointer h-1.5 bg-surface-container rounded"
+                        max="100"
+                        min="0"
+                        onChange={(e) =>
+                          handleDifficultySliderChange(
+                            'medium',
+                            Number(e.target.value),
+                          )
+                        }
+                        type="range"
+                        value={difficultyWeights.medium}
+                      />
+
+                      <button
+                        className="text-[11px] text-primary hover:underline font-semibold text-right transition-colors"
+                        onClick={() =>
+                          setDifficultyWeights({ easy: 0, hard: 0, medium: 100 })
+                        }
+                        type="button"
+                      >
+                        Make 100% Medium
+                      </button>
+                    </div>
+
+                    {/* Hard Card */}
+                    <div
+                      className={`p-3.5 rounded bg-surface-container-low flex flex-col gap-2 transition-all ${
+                        difficultyWeights.hard > 0
+                          ? 'ring-1 ring-primary/40 bg-primary/[0.02]'
+                          : 'opacity-60 ring-1 ring-outline/10'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="font-body-sm text-body-sm font-semibold text-primary">
+                            Hard (Advanced)
+                          </span>
+                          <p className="font-label-sm text-[11px] text-on-surface-variant">
+                            Synthesis, proofs &amp; edge cases
+                          </p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded bg-primary text-on-primary font-bold text-sm">
+                          {difficultyWeights.hard}%
+                        </span>
+                      </div>
+
+                      {/* Direct Item Count Input */}
+                      <div className="flex items-center justify-between gap-2 pt-1 font-label-sm text-xs">
+                        <label className="text-on-surface-variant font-medium">
+                          Allocated Questions:
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            className="w-14 px-2 py-1 text-center font-bold text-xs rounded bg-surface-container-highest border border-outline/20 text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+                            max={questionCount}
+                            min={0}
+                            onChange={(e) =>
+                              handleDifficultyItemCountChange(
+                                'hard',
+                                Number(e.target.value),
+                              )
+                            }
+                            type="number"
+                            value={Math.round(
+                              (questionCount * difficultyWeights.hard) / 100,
+                            )}
+                          />
+                          <span className="text-on-surface-variant text-[11px]">
+                            / {questionCount}
+                          </span>
+                        </div>
+                      </div>
+
+                      <input
+                        className="w-full accent-primary cursor-pointer h-1.5 bg-surface-container rounded"
+                        max="100"
+                        min="0"
+                        onChange={(e) =>
+                          handleDifficultySliderChange(
+                            'hard',
+                            Number(e.target.value),
+                          )
+                        }
+                        type="range"
+                        value={difficultyWeights.hard}
+                      />
+
+                      <button
+                        className="text-[11px] text-primary hover:underline font-semibold text-right transition-colors"
+                        onClick={() =>
+                          setDifficultyWeights({ easy: 0, hard: 100, medium: 0 })
+                        }
+                        type="button"
+                      >
+                        Make 100% Hard
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                {/* Question Types */}
-                <div className="flex flex-col gap-2 pt-1">
-                  <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
-                    Format Distribution:
-                  </span>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="p-3 rounded bg-surface-container-low flex flex-col gap-1">
+                {/* 3B: Question Format Distribution */}
+                <div className="flex flex-col gap-2.5 pt-2 border-t border-outline-variant/20">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                    <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold">
+                      Format Distribution:
+                    </span>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600">
+                      Total:{' '}
+                      {typeWeights.mcq +
+                        typeWeights.short_answer +
+                        typeWeights.long_answer}
+                      % · {questionCount} Items
+                    </span>
+                  </div>
+
+                  {/* Format Quick Presets */}
+                  <div className="flex items-center gap-1.5 flex-wrap font-label-sm text-label-sm">
+                    <span className="text-on-surface-variant text-xs font-semibold mr-1">
+                      Presets:
+                    </span>
+                    <button
+                      className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                        typeWeights.mcq === 100
+                          ? 'bg-primary text-on-primary font-bold shadow-sm'
+                          : 'bg-surface-container hover:bg-surface-container-high text-on-surface'
+                      }`}
+                      onClick={() =>
+                        setTypeWeights({
+                          long_answer: 0,
+                          mcq: 100,
+                          short_answer: 0,
+                        })
+                      }
+                      type="button"
+                    >
+                      100% MCQ
+                    </button>
+                    <button
+                      className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                        typeWeights.short_answer === 100
+                          ? 'bg-primary text-on-primary font-bold shadow-sm'
+                          : 'bg-surface-container hover:bg-surface-container-high text-on-surface'
+                      }`}
+                      onClick={() =>
+                        setTypeWeights({
+                          long_answer: 0,
+                          mcq: 0,
+                          short_answer: 100,
+                        })
+                      }
+                      type="button"
+                    >
+                      100% Short Answer
+                    </button>
+                    <button
+                      className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                        typeWeights.long_answer === 100
+                          ? 'bg-primary text-on-primary font-bold shadow-sm'
+                          : 'bg-surface-container hover:bg-surface-container-high text-on-surface'
+                      }`}
+                      onClick={() =>
+                        setTypeWeights({
+                          long_answer: 100,
+                          mcq: 0,
+                          short_answer: 0,
+                        })
+                      }
+                      type="button"
+                    >
+                      100% Long Scenario
+                    </button>
+                    <button
+                      className="px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium transition-all"
+                      onClick={() =>
+                        setTypeWeights({
+                          long_answer: 0,
+                          mcq: 50,
+                          short_answer: 50,
+                        })
+                      }
+                      type="button"
+                    >
+                      50/50 MCQ &amp; Short
+                    </button>
+                    <button
+                      className="px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium transition-all"
+                      onClick={() =>
+                        setTypeWeights({
+                          long_answer: 50,
+                          mcq: 50,
+                          short_answer: 0,
+                        })
+                      }
+                      type="button"
+                    >
+                      50/50 MCQ &amp; Long
+                    </button>
+                    <button
+                      className="px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium transition-all"
+                      onClick={() =>
+                        setTypeWeights({
+                          long_answer: 20,
+                          mcq: 50,
+                          short_answer: 30,
+                        })
+                      }
+                      type="button"
+                    >
+                      Default Mix (50/30/20)
+                    </button>
+                  </div>
+
+                  {/* Format Interactive Slider Cards with Direct Item Inputs */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                    {/* MCQ Card */}
+                    <div
+                      className={`p-3.5 rounded bg-surface-container-low flex flex-col gap-2 transition-all ${
+                        typeWeights.mcq > 0
+                          ? 'ring-1 ring-primary/30'
+                          : 'opacity-60 ring-1 ring-outline/10'
+                      }`}
+                    >
                       <div className="flex justify-between items-center">
-                        <span className="font-body-sm text-body-sm font-semibold text-on-surface">
-                          Multiple Choice (MCQ)
-                        </span>
-                        <span className="font-label-sm text-label-sm text-primary font-bold">
+                        <div>
+                          <span className="font-body-sm text-body-sm font-semibold text-on-surface">
+                            Multiple Choice (MCQ)
+                          </span>
+                          <p className="font-label-sm text-[11px] text-on-surface-variant">
+                            4-distractor rationale synthesis
+                          </p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded bg-primary text-on-primary font-bold text-sm">
                           {typeWeights.mcq}%
                         </span>
                       </div>
-                      <span className="font-label-sm text-label-sm text-on-surface-variant text-[12px]">
-                        4-distractor rationale synthesis
-                      </span>
+
+                      {/* Direct Item Count Input */}
+                      <div className="flex items-center justify-between gap-2 pt-1 font-label-sm text-xs">
+                        <label className="text-on-surface-variant font-medium">
+                          Allocated Questions:
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            className="w-14 px-2 py-1 text-center font-bold text-xs rounded bg-surface-container-highest border border-outline/20 text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+                            max={questionCount}
+                            min={0}
+                            onChange={(e) =>
+                              handleTypeItemCountChange(
+                                'mcq',
+                                Number(e.target.value),
+                              )
+                            }
+                            type="number"
+                            value={Math.round(
+                              (questionCount * typeWeights.mcq) / 100,
+                            )}
+                          />
+                          <span className="text-on-surface-variant text-[11px]">
+                            / {questionCount}
+                          </span>
+                        </div>
+                      </div>
+
+                      <input
+                        className="w-full accent-primary cursor-pointer h-1.5 bg-surface-container rounded"
+                        max="100"
+                        min="0"
+                        onChange={(e) =>
+                          handleTypeSliderChange('mcq', Number(e.target.value))
+                        }
+                        type="range"
+                        value={typeWeights.mcq}
+                      />
+
+                      <button
+                        className="text-[11px] text-primary hover:underline font-semibold text-right transition-colors"
+                        onClick={() =>
+                          setTypeWeights({
+                            long_answer: 0,
+                            mcq: 100,
+                            short_answer: 0,
+                          })
+                        }
+                        type="button"
+                      >
+                        Make 100% MCQ
+                      </button>
                     </div>
 
-                    <div className="p-3 rounded bg-surface-container-low flex flex-col gap-1">
+                    {/* Short Answer Card */}
+                    <div
+                      className={`p-3.5 rounded bg-surface-container-low flex flex-col gap-2 transition-all ${
+                        typeWeights.short_answer > 0
+                          ? 'ring-1 ring-primary/30'
+                          : 'opacity-60 ring-1 ring-outline/10'
+                      }`}
+                    >
                       <div className="flex justify-between items-center">
-                        <span className="font-body-sm text-body-sm font-semibold text-on-surface">
-                          Short Answer / Proofs
-                        </span>
-                        <span className="font-label-sm text-label-sm text-on-surface font-bold">
+                        <div>
+                          <span className="font-body-sm text-body-sm font-semibold text-on-surface">
+                            Short Answer / Proofs
+                          </span>
+                          <p className="font-label-sm text-[11px] text-on-surface-variant">
+                            Rubric-grounded criteria key
+                          </p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded bg-surface-container-highest font-bold text-on-surface text-sm">
                           {typeWeights.short_answer}%
                         </span>
                       </div>
-                      <span className="font-label-sm text-label-sm text-on-surface-variant text-[12px]">
-                        Rubric-grounded criteria key
-                      </span>
+
+                      {/* Direct Item Count Input */}
+                      <div className="flex items-center justify-between gap-2 pt-1 font-label-sm text-xs">
+                        <label className="text-on-surface-variant font-medium">
+                          Allocated Questions:
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            className="w-14 px-2 py-1 text-center font-bold text-xs rounded bg-surface-container-highest border border-outline/20 text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+                            max={questionCount}
+                            min={0}
+                            onChange={(e) =>
+                              handleTypeItemCountChange(
+                                'short_answer',
+                                Number(e.target.value),
+                              )
+                            }
+                            type="number"
+                            value={Math.round(
+                              (questionCount * typeWeights.short_answer) / 100,
+                            )}
+                          />
+                          <span className="text-on-surface-variant text-[11px]">
+                            / {questionCount}
+                          </span>
+                        </div>
+                      </div>
+
+                      <input
+                        className="w-full accent-primary cursor-pointer h-1.5 bg-surface-container rounded"
+                        max="100"
+                        min="0"
+                        onChange={(e) =>
+                          handleTypeSliderChange(
+                            'short_answer',
+                            Number(e.target.value),
+                          )
+                        }
+                        type="range"
+                        value={typeWeights.short_answer}
+                      />
+
+                      <button
+                        className="text-[11px] text-primary hover:underline font-semibold text-right transition-colors"
+                        onClick={() =>
+                          setTypeWeights({
+                            long_answer: 0,
+                            mcq: 0,
+                            short_answer: 100,
+                          })
+                        }
+                        type="button"
+                      >
+                        Make 100% Short Answer
+                      </button>
                     </div>
 
-                    <div className="p-3 rounded bg-surface-container-low flex flex-col gap-1">
+                    {/* Long Scenario Card */}
+                    <div
+                      className={`p-3.5 rounded bg-surface-container-low flex flex-col gap-2 transition-all ${
+                        typeWeights.long_answer > 0
+                          ? 'ring-1 ring-primary/30'
+                          : 'opacity-60 ring-1 ring-outline/10'
+                      }`}
+                    >
                       <div className="flex justify-between items-center">
-                        <span className="font-body-sm text-body-sm font-semibold text-on-surface">
-                          Long Scenario Analysis
-                        </span>
-                        <span className="font-label-sm text-label-sm text-on-surface font-bold">
+                        <div>
+                          <span className="font-body-sm text-body-sm font-semibold text-on-surface">
+                            Long Scenario Analysis
+                          </span>
+                          <p className="font-label-sm text-[11px] text-on-surface-variant">
+                            Architecture failure injection
+                          </p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded bg-surface-container-highest font-bold text-on-surface text-sm">
                           {typeWeights.long_answer}%
                         </span>
                       </div>
-                      <span className="font-label-sm text-label-sm text-on-surface-variant text-[12px]">
-                        Architecture failure injection
-                      </span>
+
+                      {/* Direct Item Count Input */}
+                      <div className="flex items-center justify-between gap-2 pt-1 font-label-sm text-xs">
+                        <label className="text-on-surface-variant font-medium">
+                          Allocated Questions:
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            className="w-14 px-2 py-1 text-center font-bold text-xs rounded bg-surface-container-highest border border-outline/20 text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+                            max={questionCount}
+                            min={0}
+                            onChange={(e) =>
+                              handleTypeItemCountChange(
+                                'long_answer',
+                                Number(e.target.value),
+                              )
+                            }
+                            type="number"
+                            value={Math.round(
+                              (questionCount * typeWeights.long_answer) / 100,
+                            )}
+                          />
+                          <span className="text-on-surface-variant text-[11px]">
+                            / {questionCount}
+                          </span>
+                        </div>
+                      </div>
+
+                      <input
+                        className="w-full accent-primary cursor-pointer h-1.5 bg-surface-container rounded"
+                        max="100"
+                        min="0"
+                        onChange={(e) =>
+                          handleTypeSliderChange(
+                            'long_answer',
+                            Number(e.target.value),
+                          )
+                        }
+                        type="range"
+                        value={typeWeights.long_answer}
+                      />
+
+                      <button
+                        className="text-[11px] text-primary hover:underline font-semibold text-right transition-colors"
+                        onClick={() =>
+                          setTypeWeights({
+                            long_answer: 100,
+                            mcq: 0,
+                            short_answer: 0,
+                          })
+                        }
+                        type="button"
+                      >
+                        Make 100% Long Scenario
+                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Style Constraints */}
-                <div className="flex items-center gap-2 flex-wrap pt-1 font-label-sm text-label-sm">
-                  <span className="text-on-surface-variant mr-1">
-                    Style Constraints:
-                  </span>
-                  <span className="px-2 py-1 rounded bg-primary/10 text-primary font-semibold flex items-center gap-1">
-                    <span>✓</span> Scenario-Based
-                  </span>
-                  <span className="px-2 py-1 rounded bg-primary/10 text-primary font-semibold flex items-center gap-1">
-                    <span>✓</span> Direct Analytical
-                  </span>
-                  <span className="px-2 py-1 rounded bg-surface-container text-on-surface-variant">
-                    + Comparative Case
-                  </span>
+                {/* 3C: Interactive Clickable Style Constraints */}
+                <div className="flex flex-col gap-2 pt-2 border-t border-outline-variant/20">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                    <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold">
+                      Style Constraints:
+                    </span>
+                    <span className="text-xs text-on-surface-variant">
+                      Click to toggle on/off. Active styles share equal weight.
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap font-label-sm text-label-sm">
+                    {AVAILABLE_STYLES.map((style) => {
+                      const isActive = (stylesWeights[style.id] || 0) > 0;
+                      const weight = stylesWeights[style.id] || 0;
+                      return (
+                        <button
+                          className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
+                            isActive
+                              ? 'bg-primary text-on-primary ring-1 ring-primary'
+                              : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high border border-outline-variant/30 hover:text-on-surface'
+                          }`}
+                          key={style.id}
+                          onClick={() => handleToggleStyle(style.id)}
+                          title={style.description}
+                          type="button"
+                        >
+                          <span className="font-bold">
+                            {isActive ? '✓' : '+'}
+                          </span>
+                          <span>{style.label}</span>
+                          {isActive && (
+                            <span className="px-1.5 py-0.2 rounded bg-on-primary/20 text-[11px]">
+                              {weight}%
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </section>
 

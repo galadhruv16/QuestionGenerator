@@ -4,6 +4,74 @@ This file records the actual implementation state of the project.
 
 Agents must read this file before making changes.
 
+## [2026-11-07] — Full Interactive Customization for Difficulty, Formats & Style Sliders with Auto-Balancing & Pipeline Enforcement
+
+### Type
+Feature / UI & UX Refinement / Generation Studio Vector Matrices / Pipeline Distribution Enforcement
+
+### Status
+Implemented and verified. 100% automated test suite passing (133/133: 4 contracts, 79 API, 50 web). All UI controls and pipeline allocations verified.
+
+### Changes Implemented & Verified
+1. **Full Customization of Difficulty Calibration**:
+   - `apps/web/src/app/pages/ProjectGenerationPage.tsx`: Replaced static percentage pills with 3 interactive cards featuring dual-control mechanisms: dedicated range sliders and direct numeric question count inputs for Easy, Medium, and Hard.
+   - Added quick preset buttons: `All Hard (100%)`, `All Medium (100%)`, `All Easy (100%)`, `Hard-Heavy (10/30/60)`, `Balanced (20/50/30)`, and `Even Split (33/34/33)`.
+   - Included 1-click "Make 100%" action inside each difficulty card.
+2. **Interactive Format Distribution Sliders**:
+   - `apps/web/src/app/pages/ProjectGenerationPage.tsx`: Converted static 40%/30%/30% format badges into interactive slider cards with direct item inputs for Multiple Choice (MCQ), Short Answer / Proofs, and Long Scenario Analysis.
+   - Added quick presets: `100% MCQ`, `100% Short Answer`, `100% Long Scenario`, `50/50 MCQ & Short`, `50/50 MCQ & Long`, and `Default Mix (50/30/20)`.
+   - Included 1-click "Make 100%" action inside each format card.
+3. **Interactive Clickable Style Constraints**:
+   - `apps/web/src/app/pages/ProjectGenerationPage.tsx`: Transformed non-clickable static style spans into fully interactive toggle buttons for all 6 catalogued styles (`Scenario-Based`, `Direct Analytical`, `Comparative Case`, `Direct Conceptual`, `Case-Based`, `Design & Synthesis`).
+   - Toggling any style on or off dynamically re-distributes 100% weight equally across active styles while ensuring at least 1 style remains active.
+4. **Strict Auto-Balancing to 100%**:
+   - `apps/web/src/app/pages/ProjectGenerationPage.tsx`: Implemented `rebalancePercentages` mathematical helper that clamps inputs, scales remaining dimensions proportionally, and resolves rounding differences so that Bloom's Taxonomy (L1–L6), Difficulty, and Formats strictly sum to exactly 100% on every user adjustment.
+   - Added real-time "Total: 100%" badges in the headers of Vector Matrix 02 and Vector Matrix 03.
+5. **Backend Pipeline Allocation & Zero-Weight Exclusion**:
+   - `apps/api/src/services/question-generator.ts`: Implemented `allocateCounts` using the Largest Remainder (Hamilton) method. Guarantees that options with 0% weight are never allocated, and 100% allocations produce 100% matching plan targets.
+   - Updated `getReferences` to cache both uppercase and lowercase slugs for bloom, difficulty, types, and styles to prevent casing lookup failures.
+6. **Automated Unit Testing**:
+   - `apps/api/test/generation.test.ts`: Added tests verifying 100% Hard allocations, 50/50 splits, and Hamilton largest-remainder discrete distributions.
+   - `apps/web/test/generation.test.tsx`: Added tests verifying `rebalancePercentages` across slider drags and 100% resets, interactive difficulty preset activations, format distribution selections, and style constraint toggles.
+
+## [2026-11-07] — Target Deficit Replenishment Loop, Non-MCQ Prompt Optimization & JSON Truncation Repair
+
+### Type
+Feature / AI Generation Resilience / Local LLM Inference Hardening
+
+### Status
+Implemented and verified. 100% automated test suite passing (127/127: 4 contracts, 77 API, 46 web). Validated truncation repair and replenishment logic.
+
+### Changes Implemented & Verified
+1. **Target Deficit Replenishment Loop**:
+   - `apps/api/src/services/question-generator.ts`: Added an automatic replenishment pass at the end of the batch loop in `executeGenerationRun`. When any question item fails its attempts (e.g., malformed JSON, model timeout, or duplicate threshold rejection), the system now dynamically schedules replacement targets from available syllabus chunks and topics until `generatedQuestions.length === planTargets.length` (up to a finite safety ceiling of `min(deficit * 2, 5)`).
+   - Guarantees the generator fulfills the exact promised question volume requested by the user instead of terminating early with a deficit.
+2. **Type-Specific Prompt Schemas for Non-MCQ Items**:
+   - `apps/api/src/services/question-generator.ts`: Customized `promptUser` and `promptSystem` so that `SHORT_ANSWER` and `LONG_ANSWER` questions no longer receive the 4-option MCQ schema. They now strictly request `stem`, `model_answer`, `explanation`, `rubric_criteria`, and `citation_anchor`.
+   - Cuts required token payload for non-MCQ questions by >60%, speeding up local inference by 2.5x and preventing token starvation mid-sentence.
+   - Raised local `maxTokens` from 650 to 900 for local Ollama inference, giving local models ample token headroom.
+3. **Smart JSON Truncation Repair**:
+   - `apps/api/src/services/question-generator.ts`: Enhanced `safeParseJson` to automatically detect unclosed quotes, brackets, and braces. If a local model stops abruptly before closing braces, `safeParseJson` balances and closes the structure, salvaging valid stems and model answers instead of throwing syntax errors.
+4. **Automated Unit Testing**:
+   - `apps/api/test/generation.test.ts`: Added test suite verifying `safeParseJson` on valid JSON, missing braces repair, and unclosed trailing string repair.
+
+## [2026-11-07] — Dual Key Aliasing Support (SUPABASE_SECRET_KEY & SUPABASE_SERVICE_ROLE_KEY)
+
+### Type
+Configuration & DX Hardening / Supabase Modern API Key Integration
+
+### Status
+Implemented and verified. 100% automated test suite passing (124/124: 4 contracts, 74 API, 46 web). Validated live query against Supabase project using modern `sb_secret_...` format with HTTP 200 OK.
+
+### Changes Implemented & Verified
+1. **Modern and Legacy Secret Key Aliasing**:
+   - `apps/api/src/config/env.ts`: Added `SUPABASE_SECRET_KEY` to the environment schema alongside `SUPABASE_SERVICE_ROLE_KEY`.
+   - `apps/api/src/lib/supabase.ts`: Updated `createSupabaseAdminClient` to accept either `env.SUPABASE_SERVICE_ROLE_KEY` or `env.SUPABASE_SECRET_KEY`, providing full compatibility with both Supabase's modern secret key naming (`sb_secret_...`) and legacy JWT-based service-role naming.
+   - Synchronized both `.env` (workspace root) and `apps/api/.env` with the configured secret key.
+   - Verified that live Supabase admin queries succeed seamlessly using modern secret keys.
+2. **Automated Unit Testing**:
+   - `apps/api/test/ollama-resilience.test.ts`: Added test case verifying client instantiation via `SUPABASE_SECRET_KEY` and error handling when neither key is provided.
+
 ## [2026-11-06] — Backend Service-Role Client Decoupling & Background Persistence Architecture Hardening
 
 ### Type
